@@ -1,0 +1,5 @@
+# Teletext Navigator: store and check out this tree BYTE FOR BYTE.
+# Every vendored crate lists the sha256 of each of its files in
+# .cargo-checksum.json, and the DLL is reproducible from these exact bytes,
+# so no line-ending conversion may touch them (core.autocrlf=true would).
+* -text

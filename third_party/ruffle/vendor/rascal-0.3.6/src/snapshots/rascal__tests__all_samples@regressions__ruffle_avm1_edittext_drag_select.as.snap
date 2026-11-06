@@ -1,0 +1,177 @@
+---
+source: crates/rascal/src/tests.rs
+expression: result
+input_file: samples/as2/regressions/ruffle_avm1_edittext_drag_select.as
+---
+initializer:
+  actions:
+    - ConstantPool:
+        - listener
+        - Object
+        - onMouseDown
+        - "Mouse down: "
+        - _xmouse
+        - ","
+        - _ymouse
+        - onMouseUp
+        - "Mouse up: "
+        - "<selection>"
+        - text
+        - replaceSel
+        - "Text: "
+        - "\\n"
+        - "\n"
+        - "\r"
+        - split
+        - join
+        - Key
+        - addListener
+        - Mouse
+    - Push:
+        - Constant: 0
+        - Integer: 0
+        - Constant: 1
+    - NewObject
+    - DefineLocal
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Constant: 2
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 3
+                - Register: 1
+                - Constant: 4
+            - GetMember
+            - Add2
+            - Push:
+                - Constant: 5
+            - Add2
+            - Push:
+                - Register: 1
+                - Constant: 6
+            - GetMember
+            - Add2
+            - Trace
+          label_positions: {}
+        register_count: 2
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: true
+        preload_parent: false
+        preload_global: false
+    - SetMember
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Constant: 7
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 8
+                - Register: 1
+                - Constant: 4
+            - GetMember
+            - Add2
+            - Push:
+                - Constant: 5
+            - Add2
+            - Push:
+                - Register: 1
+                - Constant: 6
+            - GetMember
+            - Add2
+            - Trace
+            - Push:
+                - Constant: 9
+                - Integer: 1
+                - Constant: 10
+            - GetVariable
+            - Push:
+                - Constant: 11
+            - CallMethod
+            - Pop
+            - Push:
+                - Constant: 12
+                - Constant: 13
+                - Integer: 1
+                - Constant: 14
+                - Integer: 1
+                - Constant: 13
+                - Integer: 1
+                - Constant: 15
+                - Integer: 1
+                - Constant: 10
+            - GetVariable
+            - Push:
+                - Constant: 10
+            - GetMember
+            - Push:
+                - Constant: 16
+            - CallMethod
+            - Push:
+                - Constant: 17
+            - CallMethod
+            - Push:
+                - Constant: 16
+            - CallMethod
+            - Push:
+                - Constant: 17
+            - CallMethod
+            - Add2
+            - Trace
+          label_positions: {}
+        register_count: 2
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: true
+        preload_parent: false
+        preload_global: false
+    - SetMember
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Integer: 1
+        - Constant: 18
+    - GetVariable
+    - Push:
+        - Constant: 19
+    - CallMethod
+    - Pop
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Integer: 1
+        - Constant: 20
+    - GetVariable
+    - Push:
+        - Constant: 19
+    - CallMethod
+    - Pop
+  label_positions: {}
+extra_modules: []
+compile_options:
+  swf_version: 15
+  optimizations:
+    fold_constants: true
+    promote_variables_to_registers: true
+custom_pcodes: []

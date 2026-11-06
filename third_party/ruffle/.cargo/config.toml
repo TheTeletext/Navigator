@@ -1,0 +1,41 @@
+# Teletext Navigator: build nav_ruffle.dll from the vendored sources only.
+# Written by cargo vendor (third_party/ruffle/README-NAVIGATOR.md); no network.
+
+[net]
+offline = true
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ruffle-rs/h263-rs?rev=27ee833ca97aadd2a14cf0b3b4ec8b53f31ff6bd"]
+git = "https://github.com/ruffle-rs/h263-rs"
+rev = "27ee833ca97aadd2a14cf0b3b4ec8b53f31ff6bd"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ruffle-rs/jpegxr?rev=86cc1749d493288f53d7290ac3eb7082c475b5d9"]
+git = "https://github.com/ruffle-rs/jpegxr"
+rev = "86cc1749d493288f53d7290ac3eb7082c475b5d9"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ruffle-rs/nellymoser?rev=073eb48d907201f46dea0c8feb4e8d9a1d92208c"]
+git = "https://github.com/ruffle-rs/nellymoser"
+rev = "073eb48d907201f46dea0c8feb4e8d9a1d92208c"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ruffle-rs/nihav-vp6?rev=12d0bdf10a85641dc2de3d6900c747894431ed77"]
+git = "https://github.com/ruffle-rs/nihav-vp6"
+rev = "12d0bdf10a85641dc2de3d6900c747894431ed77"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ruffle-rs/regras3?rev=6d48179d6bd448f2cc66b76352c9f048dde968d1"]
+git = "https://github.com/ruffle-rs/regras3"
+rev = "6d48179d6bd448f2cc66b76352c9f048dde968d1"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/ruffle-rs/rust-flash-lso?rev=61b717248aae853a4f5d8a103eba704268d286c8"]
+git = "https://github.com/ruffle-rs/rust-flash-lso"
+rev = "61b717248aae853a4f5d8a103eba704268d286c8"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"

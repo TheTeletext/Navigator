@@ -1,0 +1,129 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2/inline_pcode.as
+---
+Ok:
+  initial_script:
+    - Expr:
+        span:
+          start: 0
+          end: 207
+          file: 0
+        value:
+          Function:
+            signature:
+              name:
+                span:
+                  start: 9
+                  end: 26
+                  file: 0
+                value: traceThroughPcode
+              args:
+                - name: message
+                  type_name: ~
+                  register: ~
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 42
+                    end: 88
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 48
+                        end: 87
+                        file: 0
+                      value:
+                        Constant:
+                          String: "-- start of a very special message --"
+              - InlinePCode: "\n        Push \"message\"\n        GetVariable\n        Trace\n    "
+              - Expr:
+                  span:
+                    start: 170
+                    end: 204
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 176
+                        end: 203
+                        file: 0
+                      value:
+                        Constant:
+                          String: "-- end special message --"
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                message:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+    - Expr:
+        span:
+          start: 209
+          end: 243
+          file: 0
+        value:
+          Call:
+            name:
+              span:
+                start: 209
+                end: 226
+                file: 0
+              value:
+                Constant:
+                  Identifier: traceThroughPcode
+            args:
+              - span:
+                  start: 227
+                  end: 242
+                  file: 0
+                value:
+                  Constant:
+                    String: "Hello, world!"
+  interfaces: []
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

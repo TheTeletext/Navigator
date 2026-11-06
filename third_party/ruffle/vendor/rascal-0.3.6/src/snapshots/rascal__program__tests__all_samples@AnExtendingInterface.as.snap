@@ -1,0 +1,30 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2_classes/AnExtendingInterface.as
+---
+Ok:
+  initial_script: []
+  interfaces:
+    - name: AnExtendingInterface
+      extends: AnEmptyInterface
+      functions:
+        test:
+          name:
+            span:
+              start: 71
+              end: 75
+              file: 0
+            value: test
+          args: []
+          return_type: ~
+    - name: AnEmptyInterface
+      extends: ~
+      functions: {}
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

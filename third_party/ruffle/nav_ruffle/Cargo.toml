@@ -1,0 +1,20 @@
+[package]
+name = "nav_ruffle"
+description = "C ABI over Ruffle for Teletext Navigator's Retro Web Browser tab"
+version = "1.0.0"
+edition.workspace = true
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ruffle_core = { path = "../core", features = ["audio", "mp3", "nellymoser", "lzma", "default_font"] }
+ruffle_render_wgpu = { path = "../render/wgpu" }
+ruffle_video_software = { path = "../video/software" }
+cpal = { workspace = true }
+wgpu = { workspace = true }
+futures = { workspace = true }
+url = { workspace = true }
+async-channel = { workspace = true }

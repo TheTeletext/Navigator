@@ -1,0 +1,316 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2/switch_in_loop_break_continue.as
+---
+Ok:
+  initial_script:
+    - ForIn:
+        condition:
+          Classic:
+            initialize:
+              Declare:
+                name:
+                  span:
+                    start: 9
+                    end: 10
+                    file: 0
+                  value: i
+                value:
+                  span:
+                    start: 13
+                    end: 14
+                    file: 0
+                  value:
+                    Constant:
+                      Integer: 0
+                type_name: ~
+            condition:
+              - span:
+                  start: 16
+                  end: 21
+                  file: 0
+                value:
+                  BinaryOperator:
+                    - LessThan
+                    - span:
+                        start: 16
+                        end: 17
+                        file: 0
+                      value:
+                        Constant:
+                          Identifier: i
+                    - span:
+                        start: 20
+                        end: 21
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 6
+            update:
+              - span:
+                  start: 24
+                  end: 26
+                  file: 0
+                value:
+                  UnaryOperator:
+                    - Increment: Postfix
+                    - span:
+                        start: 23
+                        end: 24
+                        file: 0
+                      value:
+                        Constant:
+                          Identifier: i
+        body:
+          Block:
+            - Expr:
+                span:
+                  start: 34
+                  end: 54
+                  file: 0
+                value:
+                  Trace:
+                    span:
+                      start: 40
+                      end: 53
+                      file: 0
+                    value:
+                      BinaryOperator:
+                        - Add
+                        - span:
+                            start: 40
+                            end: 49
+                            file: 0
+                          value:
+                            Constant:
+                              String: loop i=
+                        - span:
+                            start: 52
+                            end: 53
+                            file: 0
+                          value:
+                            Constant:
+                              Identifier: i
+            - Switch:
+                target:
+                  span:
+                    start: 68
+                    end: 69
+                    file: 0
+                  value:
+                    Constant:
+                      Identifier: i
+                elements:
+                  - Case:
+                      span:
+                        start: 86
+                        end: 87
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 0
+                  - Statement:
+                      Expr:
+                        span:
+                          start: 101
+                          end: 136
+                          file: 0
+                        value:
+                          Trace:
+                            span:
+                              start: 107
+                              end: 135
+                              file: 0
+                            value:
+                              Constant:
+                                String: "  case 0 -> continue outer"
+                  - Statement: Continue
+                  - Case:
+                      span:
+                        start: 221
+                        end: 222
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 1
+                  - Case:
+                      span:
+                        start: 237
+                        end: 238
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 2
+                  - Statement:
+                      Block:
+                        - Expr:
+                            span:
+                              start: 254
+                              end: 310
+                              file: 0
+                            value:
+                              Trace:
+                                span:
+                                  start: 260
+                                  end: 309
+                                  file: 0
+                                value:
+                                  Constant:
+                                    String: "  case 1/2 -> fallthrough then break outer at 2"
+                        - If:
+                            condition:
+                              span:
+                                start: 328
+                                end: 334
+                                file: 0
+                              value:
+                                BinaryOperator:
+                                  - Equal
+                                  - span:
+                                      start: 328
+                                      end: 329
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        Identifier: i
+                                  - span:
+                                      start: 333
+                                      end: 334
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        Integer: 2
+                            "yes":
+                              Block:
+                                - Break
+                            "no": ~
+                        - Break
+                  - Case:
+                      span:
+                        start: 524
+                        end: 525
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 3
+                  - Statement:
+                      Expr:
+                        span:
+                          start: 539
+                          end: 577
+                          file: 0
+                        value:
+                          Trace:
+                            span:
+                              start: 545
+                              end: 576
+                              file: 0
+                            value:
+                              Constant:
+                                String: "  case 3 -> break switch only"
+                  - Statement: Break
+                  - Case:
+                      span:
+                        start: 681
+                        end: 682
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 4
+                  - Statement:
+                      Expr:
+                        span:
+                          start: 696
+                          end: 749
+                          file: 0
+                        value:
+                          Trace:
+                            span:
+                              start: 702
+                              end: 748
+                              file: 0
+                            value:
+                              Constant:
+                                String: "  case 4 -> continue outer from nested block"
+                  - Statement:
+                      Block:
+                        - If:
+                            condition:
+                              span:
+                                start: 833
+                                end: 837
+                                file: 0
+                              value:
+                                Constant:
+                                  Boolean: true
+                            "yes":
+                              Block:
+                                - Continue
+                            "no": ~
+                  - Default
+                  - Statement:
+                      Expr:
+                        span:
+                          start: 933
+                          end: 966
+                          file: 0
+                        value:
+                          Trace:
+                            span:
+                              start: 939
+                              end: 965
+                              file: 0
+                            value:
+                              Constant:
+                                String: "  default -> normal work"
+            - Expr:
+                span:
+                  start: 979
+                  end: 1009
+                  file: 0
+                value:
+                  Trace:
+                    span:
+                      start: 985
+                      end: 1008
+                      file: 0
+                    value:
+                      BinaryOperator:
+                        - Add
+                        - span:
+                            start: 985
+                            end: 1004
+                            file: 0
+                          value:
+                            Constant:
+                              String: "  after switch i="
+                        - span:
+                            start: 1007
+                            end: 1008
+                            file: 0
+                          value:
+                            Constant:
+                              Identifier: i
+    - Expr:
+        span:
+          start: 1014
+          end: 1027
+          file: 0
+        value:
+          Trace:
+            span:
+              start: 1020
+              end: 1026
+              file: 0
+            value:
+              Constant:
+                String: done
+  interfaces: []
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

@@ -1,0 +1,29 @@
+name: Build & Test
+
+on: [push, pull_request]
+
+jobs:
+  no_and_all_features:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, wasm32-unknown-unknown]
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup target add ${{ matrix.target }}
+      - run: cargo build --workspace --target ${{ matrix.target }}
+      - run: cargo build --workspace --target ${{ matrix.target }} --all-features
+      - run: cargo test --workspace --target ${{ matrix.target }} && cargo test --workspace --target ${{ matrix.target }} --all-features
+        if: contains(matrix.target, 'linux')
+  feature_tests:
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      matrix:
+        os: [ubuntu, macos, windows]
+        third-party-integration-feature: [handlebars, tera]
+        file-walker-feature: [walkdir, ignore]
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          cargo build --features ${{ matrix.third-party-integration-feature }},${{ matrix.file-walker-feature }}
+          cargo test --verbose --features ${{ matrix.third-party-integration-feature }},${{ matrix.file-walker-feature }}

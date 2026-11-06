@@ -1,0 +1,27 @@
+# Teletext Navigator: build outputs and local files that never belong in
+# the repository. Named explicitly rather than "*.exe": the GW-BASIC
+# interpreter firmware/gwbasic/GWBASICA.EXE is source the build embeds and
+# must stay tracked.
+*.o
+*.obj
+*.res
+*.wixpdb
+*.log
+*.bak*
+*~
+/TeletextNavigator.exe
+/TeletextNavigator.exe.*
+/tools/*.exe
+/installer/out/
+/installer/payload-navigator/
+/installer/art-navigator/
+/web/minitel/dist/
+tools/__pycache__/
+
+# Flash in the Retro Web Browser tab (docs/2026-11-05_RETROWEB_RUFFLE.md):
+# the DLL is a build output; third_party/ruffle/vendor/ must stay WHOLE
+# (every crate lists all its files in .cargo-checksum.json, and some are
+# a .o, a .log or a .dll that the patterns above would drop). Keep LAST.
+/nav_ruffle.dll
+/third_party/ruffle/target/
+!/third_party/ruffle/vendor/**

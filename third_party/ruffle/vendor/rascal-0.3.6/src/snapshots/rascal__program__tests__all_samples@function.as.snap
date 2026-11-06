@@ -1,0 +1,358 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2/function.as
+---
+Ok:
+  initial_script:
+    - Expr:
+        span:
+          start: 0
+          end: 63
+          file: 0
+        value:
+          Function:
+            signature:
+              name:
+                span:
+                  start: 9
+                  end: 13
+                  file: 0
+                value: test
+              args: []
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 22
+                    end: 43
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 28
+                        end: 42
+                        file: 0
+                      value:
+                        Constant:
+                          String: Test called!
+              - Return:
+                  - span:
+                      start: 56
+                      end: 60
+                      file: 0
+                    value:
+                      Constant:
+                        String: ":)"
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+    - Declare:
+        name:
+          span:
+            start: 69
+            end: 73
+            file: 0
+          value: anon
+        value:
+          span:
+            start: 76
+            end: 172
+            file: 0
+          value:
+            Function:
+              signature:
+                name: ~
+                args:
+                  - name: a
+                    type_name: ~
+                    register: 1
+                  - name: b
+                    type_name: ~
+                    register: 2
+                return_type: ~
+              body:
+                - Expr:
+                    span:
+                      start: 96
+                      end: 131
+                      file: 0
+                    value:
+                      Trace:
+                        span:
+                          start: 102
+                          end: 130
+                          file: 0
+                        value:
+                          Constant:
+                            String: Anonymous function called!
+                - Expr:
+                    span:
+                      start: 137
+                      end: 169
+                      file: 0
+                    value:
+                      Trace:
+                        span:
+                          start: 143
+                          end: 168
+                          file: 0
+                        value:
+                          BinaryOperator:
+                            - Add
+                            - span:
+                                start: 143
+                                end: 164
+                                file: 0
+                              value:
+                                BinaryOperator:
+                                  - Add
+                                  - span:
+                                      start: 143
+                                      end: 153
+                                      file: 0
+                                    value:
+                                      BinaryOperator:
+                                        - Add
+                                        - span:
+                                            start: 143
+                                            end: 149
+                                            file: 0
+                                          value:
+                                            Constant:
+                                              String: "a = "
+                                        - span:
+                                            start: 152
+                                            end: 153
+                                            file: 0
+                                          value:
+                                            Constant:
+                                              Register: 1
+                                  - span:
+                                      start: 156
+                                      end: 164
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        String: ", b = "
+                            - span:
+                                start: 167
+                                end: 168
+                                file: 0
+                              value:
+                                Constant:
+                                  Register: 2
+              scope:
+                defined_variables:
+                  this:
+                    used: false
+                    used_in_inner_scope: false
+                    type_name: ~
+                  arguments:
+                    used: false
+                    used_in_inner_scope: false
+                    type_name: ~
+                  super:
+                    used: false
+                    used_in_inner_scope: false
+                    type_name: ~
+                  _root:
+                    used: false
+                    used_in_inner_scope: false
+                    type_name: ~
+                  _parent:
+                    used: false
+                    used_in_inner_scope: false
+                    type_name: ~
+                  _global:
+                    used: false
+                    used_in_inner_scope: false
+                    type_name: ~
+                  a:
+                    used: true
+                    used_in_inner_scope: false
+                    type_name: ~
+                  b:
+                    used: true
+                    used_in_inner_scope: false
+                    type_name: ~
+                referenced_variables: []
+                could_reference_anything: false
+              register_count: 3
+              preload_this: false
+              suppress_this: true
+              preload_arguments: false
+              suppress_arguments: true
+              preload_super: false
+              suppress_super: true
+              preload_root: false
+              preload_parent: false
+              preload_global: false
+        type_name: ~
+    - Expr:
+        span:
+          start: 174
+          end: 190
+          file: 0
+        value:
+          Call:
+            name:
+              span:
+                start: 174
+                end: 178
+                file: 0
+              value:
+                Constant:
+                  Identifier: anon
+            args:
+              - span:
+                  start: 179
+                  end: 183
+                  file: 0
+                value:
+                  Constant:
+                    String: aa
+              - span:
+                  start: 185
+                  end: 189
+                  file: 0
+                value:
+                  Constant:
+                    String: bb
+    - Expr:
+        span:
+          start: 193
+          end: 215
+          file: 0
+        value:
+          Trace:
+            span:
+              start: 199
+              end: 214
+              file: 0
+            value:
+              BinaryOperator:
+                - Add
+                - span:
+                    start: 199
+                    end: 205
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 199
+                          end: 203
+                          file: 0
+                        value:
+                          Constant:
+                            Identifier: test
+                      args: []
+                - span:
+                    start: 208
+                    end: 214
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 208
+                          end: 212
+                          file: 0
+                        value:
+                          Constant:
+                            Identifier: test
+                      args: []
+    - Expr:
+        span:
+          start: 218
+          end: 231
+          file: 0
+        value:
+          Function:
+            signature:
+              name: ~
+              args: []
+              return_type: ~
+            body: []
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+  interfaces: []
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

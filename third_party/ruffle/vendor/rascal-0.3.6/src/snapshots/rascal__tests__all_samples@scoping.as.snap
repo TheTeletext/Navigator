@@ -1,0 +1,586 @@
+---
+source: crates/rascal/src/tests.rs
+expression: result
+input_file: samples/as2/scoping.as
+---
+initializer:
+  actions:
+    - ConstantPool:
+        - outer_a
+        - outer_b
+        - outer_c
+        - inner_a
+        - inner_b
+        - a
+        - err
+        - try_a
+        - try_b
+        - finally_a
+        - finally_b
+        - inner
+        - x
+        - _global
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+          label_positions: {}
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Constant: 5
+            - Not
+            - If: loc0000
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+          label_positions:
+            loc0000: 18
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - "True"
+            - Not
+            - If: loc0002
+            - Jump: loc0001
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+          label_positions:
+            loc0002: 13
+            loc0001: 19
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Integer: 0
+            - StoreRegister: 4
+            - Pop
+            - Push:
+                - Register: 4
+                - Integer: 1
+            - Less2
+            - Not
+            - If: loc0003
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Register: 4
+            - Increment
+            - StoreRegister: 4
+            - Pop
+            - Jump: loc0005
+          label_positions:
+            loc0005: 12
+            loc0004: 22
+            loc0003: 27
+        register_count: 5
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Integer: 0
+            - StoreRegister: 4
+            - Pop
+            - Push:
+                - Register: 4
+                - Register: 4
+            - Increment
+            - StoreRegister: 4
+            - Pop
+            - Push:
+                - Integer: 1
+            - Less2
+            - Not
+            - If: loc0007
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+            - Jump: loc0006
+          label_positions:
+            loc0006: 12
+            loc0007: 27
+        register_count: 5
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Integer: 1
+            - StoreRegister: 0
+            - Push:
+                - Integer: 1
+            - StrictEquals
+            - If: loc0009
+            - Jump: loc0008
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+            - Jump: loc0008
+          label_positions:
+            loc0009: 15
+            loc0008: 22
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Try:
+                try_body:
+                  actions:
+                    - Push:
+                        - Constant: 6
+                    - Throw
+                    - Jump: loc000a
+                  label_positions: {}
+                catch_body:
+                  - Variable: e
+                  - actions:
+                      - Push:
+                          - Constant: 3
+                      - StoreRegister: 1
+                      - Pop
+                      - Push:
+                          - Constant: 4
+                      - StoreRegister: 2
+                      - Pop
+                    label_positions: {}
+                finally_body: ~
+          label_positions:
+            loc000a: 10
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Try:
+                try_body:
+                  actions:
+                    - Push:
+                        - Constant: 7
+                    - StoreRegister: 1
+                    - Pop
+                    - Push:
+                        - Constant: 8
+                    - StoreRegister: 2
+                    - Pop
+                    - Jump: loc000b
+                  label_positions: {}
+                catch_body: ~
+                finally_body:
+                  actions:
+                    - Push:
+                        - Constant: 9
+                    - StoreRegister: 1
+                    - Pop
+                    - Push:
+                        - Constant: 10
+                    - StoreRegister: 2
+                    - Pop
+                  label_positions:
+                    loc000b: 0
+          label_positions: {}
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - DefineFunction2:
+                name: inner
+                params: []
+                actions:
+                  actions:
+                    - Push:
+                        - Constant: 5
+                        - Constant: 3
+                    - SetVariable
+                    - Push:
+                        - Constant: 4
+                    - StoreRegister: 1
+                    - Pop
+                  label_positions: {}
+                register_count: 2
+                preload_this: false
+                suppress_this: true
+                preload_arguments: false
+                suppress_arguments: true
+                preload_super: false
+                suppress_super: true
+                preload_root: false
+                preload_parent: false
+                preload_global: false
+            - Push:
+                - Constant: 5
+                - Constant: 0
+            - DefineLocal
+            - Push:
+                - Constant: 1
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Integer: 0
+                - Constant: 11
+            - CallFunction
+            - Pop
+          label_positions: {}
+        register_count: 3
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction2:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 1
+            - StoreRegister: 2
+            - Pop
+            - Push:
+                - Constant: 2
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Constant: 12
+                - Integer: 1
+                - Integer: 1
+            - InitObject
+            - StoreRegister: 4
+            - Pop
+            - Push:
+                - Register: 4
+            - Enumerate2
+            - StoreRegister: 0
+            - Push:
+                - "Null"
+            - Equals2
+            - If: loc000c
+            - Push:
+                - Register: 0
+            - StoreRegister: 5
+            - Pop
+            - Push:
+                - Constant: 3
+            - StoreRegister: 1
+            - Pop
+            - Push:
+                - Constant: 4
+            - StoreRegister: 2
+            - Pop
+            - Jump: loc000d
+          label_positions:
+            loc000d: 15
+            loc000c: 29
+        register_count: 6
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Pop
+    - DefineFunction:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - DefineFunction:
+                name: inner
+                params: []
+                actions:
+                  actions:
+                    - Push:
+                        - Constant: 5
+                    - GetVariable
+                    - GetVariable
+                    - Trace
+                  label_positions: {}
+            - Push:
+                - Constant: 5
+                - Constant: 0
+            - DefineLocal
+            - Push:
+                - Integer: 0
+                - Constant: 11
+            - CallFunction
+            - Pop
+          label_positions: {}
+    - Pop
+    - DefineFunction:
+        name: ""
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 5
+                - Constant: 5
+            - DefineLocal
+            - DefineFunction:
+                name: ""
+                params: []
+                actions:
+                  actions:
+                    - Push:
+                        - Constant: 13
+                    - GetVariable
+                    - With:
+                        actions: []
+                        label_positions: {}
+                  label_positions: {}
+            - Pop
+          label_positions: {}
+    - Pop
+  label_positions: {}
+extra_modules: []
+compile_options:
+  swf_version: 15
+  optimizations:
+    fold_constants: true
+    promote_variables_to_registers: true
+custom_pcodes: []

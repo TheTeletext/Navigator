@@ -1,0 +1,124 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2/if_frame_loaded.as
+---
+Ok:
+  initial_script:
+    - WaitForFrame:
+        frame:
+          span:
+            start: 14
+            end: 15
+            file: 0
+          value:
+            Constant:
+              Integer: 2
+        scene: ~
+        if_loaded:
+          Expr:
+            span:
+              start: 17
+              end: 37
+              file: 0
+            value:
+              Trace:
+                span:
+                  start: 23
+                  end: 36
+                  file: 0
+                value:
+                  Constant:
+                    String: single line
+    - WaitForFrame:
+        frame:
+          span:
+            start: 63
+            end: 68
+            file: 0
+          value:
+            Constant:
+              Identifier: frame
+        scene:
+          span:
+            start: 54
+            end: 61
+            file: 0
+          value:
+            Constant:
+              String: scene
+        if_loaded:
+          Block:
+            - Expr:
+                span:
+                  start: 73
+                  end: 87
+                  file: 0
+                value:
+                  Trace:
+                    span:
+                      start: 79
+                      end: 86
+                      file: 0
+                    value:
+                      Constant:
+                        String: block
+    - WaitForFrame:
+        frame:
+          span:
+            start: 106
+            end: 107
+            file: 0
+          value:
+            Constant:
+              Integer: 3
+        scene: ~
+        if_loaded:
+          If:
+            condition:
+              span:
+                start: 113
+                end: 117
+                file: 0
+              value:
+                Constant:
+                  Identifier: this
+            "yes":
+              Block:
+                - Expr:
+                    span:
+                      start: 122
+                      end: 149
+                      file: 0
+                    value:
+                      Trace:
+                        span:
+                          start: 128
+                          end: 148
+                          file: 0
+                        value:
+                          Constant:
+                            String: nested conditions!
+            "no": ~
+    - Expr:
+        span:
+          start: 154
+          end: 167
+          file: 0
+        value:
+          Trace:
+            span:
+              start: 160
+              end: 166
+              file: 0
+            value:
+              Constant:
+                String: end!
+  interfaces: []
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

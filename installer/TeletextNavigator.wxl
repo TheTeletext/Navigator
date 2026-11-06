@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TeletextNavigator.wxl - wizard text overrides for Teletext Navigator.
+
+  Part of Teletext Navigator.
+  Copyright (C) 2026 Dimitri Papadopoulos and The Teletext
+  Licensed under the GNU Affero General Public License v3.0 or later.
+
+  Each string is overridden for a reason: the narrow licence title, the
+  "the The" a publisher named The Teletext would otherwise produce, and
+  the dialogs this package can reach. The long and short names are the
+  same, "Teletext Navigator", so [LongName] and [ProductName] read
+  identically.
+-->
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl"
+                 Culture="en-US">
+
+  <!-- ============ window captions ============ -->
+  <String Id="WelcomeDlg_Title"            Overridable="yes" Value="[LongName] Setup" />
+  <String Id="LicenseAgreementDlg_Title"   Overridable="yes" Value="[LongName] Setup" />
+  <String Id="CustomizeDlg_Title"          Overridable="yes" Value="[LongName] Setup" />
+  <String Id="VerifyReadyDlg_Title"        Overridable="yes" Value="[LongName] Setup" />
+  <String Id="ProgressDlg_Title"           Overridable="yes" Value="[LongName] Setup" />
+  <String Id="ExitDialog_Title"            Overridable="yes" Value="[LongName] Setup" />
+  <String Id="MaintenanceWelcomeDlg_Title" Overridable="yes" Value="[LongName] Setup" />
+  <String Id="MaintenanceTypeDlg_Title"    Overridable="yes" Value="[LongName] Setup" />
+  <String Id="CancelDlg_Title"             Overridable="yes" Value="[LongName] Setup" />
+  <String Id="ErrorDlg_Title"              Overridable="yes" Value="[LongName] Setup" />
+  <String Id="FatalError_Title"            Overridable="yes" Value="[LongName] Setup" />
+  <String Id="UserExit_Title"              Overridable="yes" Value="[LongName] Setup" />
+  <String Id="FilesInUse_Title"            Overridable="yes" Value="[LongName] Setup" />
+  <String Id="MsiRMFilesInUse_Title"       Overridable="yes" Value="[LongName] Setup" />
+  <String Id="PrepareDlg_Title"            Overridable="yes" Value="[LongName] Setup" />
+  <String Id="ResumeDlg_Title"             Overridable="yes" Value="[LongName] Setup" />
+  <String Id="OutOfDiskDlg_Title"          Overridable="yes" Value="[LongName] Setup" />
+  <String Id="OutOfRbDiskDlg_Title"        Overridable="yes" Value="[LongName] Setup" />
+  <String Id="WaitForCostingDlg_Title"     Overridable="yes" Value="[LongName] Setup" />
+  <String Id="DiskCostDlg_Title"           Overridable="yes" Value="[LongName] Setup" />
+  <String Id="BrowseDlg_Title"             Overridable="yes" Value="[LongName] Setup" />
+  <String Id="InvalidDirDlg_Title"         Overridable="yes" Value="[LongName] Setup" />
+
+  <!-- ============ welcome ============ -->
+  <String Id="WelcomeDlgTitle" Overridable="yes"
+          Value="{\WixUI_Font_Bigger}Welcome to the Setup Wizard for [LongName]" />
+  <String Id="WelcomeDlgDescription" Overridable="yes"
+          Value="The Setup Wizard will install [LongName] on your computer. Click Next to continue or Cancel to exit the Setup Wizard." />
+
+  <!-- ============ licence ============ -->
+  <!-- 200x15, the narrowest control in the wizard. Short name, and no
+       "Please read the" preamble either: both together are what ran off
+       the end. -->
+  <String Id="LicenseAgreementDlgTitle" Overridable="yes"
+          Value="{\WixUI_Font_Title}[ProductName] License Agreement" />
+
+  <!-- ============ ready ============ -->
+  <String Id="VerifyReadyDlgRemoveText" Overridable="yes"
+          Value="Click Remove to remove [LongName] from your computer. Click Back to review or change any of your installation settings. Click Cancel to exit the wizard." />
+  <String Id="VerifyReadyDlgRepairText" Overridable="yes"
+          Value="Click Repair to repair the installation of [LongName]. Click Back to review or change any of your installation settings. Click Cancel to exit the wizard." />
+
+  <!-- ============ progress ============ -->
+  <String Id="ProgressDlgTextInstalling" Overridable="yes"
+          Value="Please wait while the Setup Wizard installs [LongName]." />
+  <String Id="ProgressDlgTextChanging" Overridable="yes"
+          Value="Please wait while the Setup Wizard changes [LongName]." />
+  <String Id="ProgressDlgTextRepairing" Overridable="yes"
+          Value="Please wait while the Setup Wizard repairs [LongName]." />
+  <String Id="ProgressDlgTextRemoving" Overridable="yes"
+          Value="Please wait while the Setup Wizard removes [LongName]." />
+
+  <!-- ============ finish, cancel, failure ============ -->
+  <String Id="ExitDialogTitle" Overridable="yes"
+          Value="{\WixUI_Font_Bigger}Completed the Setup Wizard for [LongName]" />
+  <String Id="CancelDlgText" Overridable="yes"
+          Value="Are you sure you want to cancel [LongName] installation?" />
+  <String Id="FatalErrorTitle" Overridable="yes"
+          Value="{\WixUI_Font_Bigger}Setup for [LongName] ended prematurely" />
+  <String Id="FatalErrorDescription1" Overridable="yes"
+          Value="[LongName] Setup Wizard ended prematurely because of an error. Your system has not been modified. To install this program at a later time, run Setup Wizard again." />
+  <String Id="UserExitTitle" Overridable="yes"
+          Value="{\WixUI_Font_Bigger}Setup for [LongName] was interrupted" />
+  <String Id="UserExitDescription1" Overridable="yes"
+          Value="[LongName] setup was interrupted. Your system has not been modified. To install this program at a later time, please run the installation again." />
+
+  <!-- ============ maintenance ============ -->
+  <String Id="MaintenanceWelcomeDlgTitle" Overridable="yes"
+          Value="{\WixUI_Font_Bigger}Welcome to the Setup Wizard for [LongName]" />
+  <String Id="MaintenanceWelcomeDlgDescription" Overridable="yes"
+          Value="The Setup Wizard allows you to change the way [LongName] features are installed on your computer or to remove it from your computer. Click Next to continue or Cancel to exit the Setup Wizard." />
+  <String Id="MaintenanceTypeDlgRemoveText" Overridable="yes"
+          Value="Removes [LongName] from your computer." />
+  <String Id="MaintenanceTypeDlgChangeDisabledText" Overridable="yes"
+          Value="[LongName] has no independently selectable features." />
+
+</WixLocalization>

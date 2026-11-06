@@ -1,0 +1,72 @@
+[workspace]
+members = [".", "macros"]
+
+[package]
+name = "fluent-templates"
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+resolver = "2"
+rust-version = "1.70.0"
+
+[workspace.package]
+edition = "2021"
+version = "0.15.1"
+license = "MIT/Apache-2.0"
+documentation = "https://docs.rs/fluent-templates/"
+repository = "https://github.com/XAMPPRocky/fluent-templates"
+authors = ["XAMPPRocky <xampprocky@icloud.com>"]
+description = "Templating for the Fluent localization framework"
+keywords = [
+    "handlebars",
+    "tera",
+    "fluent",
+    "internationalization",
+    "localization",
+]
+categories = ["internationalization", "localization", "template-engine"]
+
+[workspace.dependencies]
+unic-langid = { version = "0.9", features = ["macros"] }
+ignore = "0.4"
+flume = { version = "0.11", default-features = false }
+walkdir = "2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+all-features = true
+targets = ["x86_64-unknown-linux-gnu"]
+
+[features]
+default = ["macros", "ignore"]
+macros = ["fluent-template-macros"]
+ignore = ["dep:ignore", "fluent-template-macros/ignore", "dep:flume", "dep:log"]
+walkdir = ["dep:walkdir", "fluent-template-macros/walkdir", "dep:log"]
+handlebars = ["dep:handlebars", "dep:serde_json"]
+tera = ["dep:tera", "dep:heck", "dep:serde_json"]
+
+[dependencies]
+handlebars = { version = "6", optional = true }
+fluent-bundle = "0.16"
+fluent-syntax = "0.12"
+fluent-langneg = "0.13"
+serde_json = { version = "1", optional = true }
+unic-langid = { workspace = true, features = ["macros"] }
+thiserror = "2"
+tera = { version = "2.1", optional = true, default-features = false }
+heck = { version = "0.5", optional = true }
+ignore = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
+log = { version = "0.4", optional = true }
+fluent-template-macros = { path = "./macros", optional = true, version = "0.15.1" }
+intl-memoizer = "0.5"
+walkdir = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3.3"

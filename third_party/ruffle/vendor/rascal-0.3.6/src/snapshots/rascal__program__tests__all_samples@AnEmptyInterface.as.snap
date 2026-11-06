@@ -1,0 +1,18 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2_classes/AnEmptyInterface.as
+---
+Ok:
+  initial_script: []
+  interfaces:
+    - name: AnEmptyInterface
+      extends: ~
+      functions: {}
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

@@ -1,0 +1,2209 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2_classes/ClassMembersTest.as
+---
+Ok:
+  initial_script:
+    - Expr:
+        span:
+          start: 0
+          end: 0
+          file: ~
+        value:
+          Call:
+            name:
+              span:
+                start: 0
+                end: 0
+                file: ~
+              value:
+                Field:
+                  - span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value:
+                      Constant:
+                        Identifier: ClassMembersTest
+                  - span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value:
+                      Constant:
+                        String: main
+            args:
+              - span:
+                  start: 0
+                  end: 0
+                  file: ~
+                value:
+                  Constant:
+                    Identifier: this
+  interfaces:
+    - name: AnEmptyInterface
+      extends: ~
+      functions: {}
+    - name: path.to.ANestedInterface
+      extends: ~
+      functions:
+        success:
+          name:
+            span:
+              start: 47
+              end: 54
+              file: 3
+            value: success
+          args: []
+          return_type: ~
+  classes:
+    - name: ClassMembersTest
+      extends: ~
+      implements:
+        - AnEmptyInterface
+      functions:
+        test:
+          function:
+            signature:
+              name:
+                span:
+                  start: 283
+                  end: 287
+                  file: 0
+                value: test
+              args: []
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 300
+                    end: 314
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 306
+                        end: 313
+                        file: 0
+                      value:
+                        Constant:
+                          String: test!
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        greet:
+          function:
+            signature:
+              name:
+                span:
+                  start: 637
+                  end: 642
+                  file: 0
+                value: greet
+              args:
+                - name: name
+                  type_name:
+                    span:
+                      start: 649
+                      end: 655
+                      file: 0
+                    value: String
+                  register: 1
+              return_type:
+                span:
+                  start: 658
+                  end: 662
+                  file: 0
+                value: Void
+            body:
+              - Expr:
+                  span:
+                    start: 673
+                    end: 700
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 679
+                        end: 699
+                        file: 0
+                      value:
+                        BinaryOperator:
+                          - Add
+                          - span:
+                              start: 679
+                              end: 693
+                              file: 0
+                            value:
+                              BinaryOperator:
+                                - Add
+                                - span:
+                                    start: 679
+                                    end: 686
+                                    file: 0
+                                  value:
+                                    Constant:
+                                      String: "Hey, "
+                                - span:
+                                    start: 689
+                                    end: 693
+                                    file: 0
+                                  value:
+                                    Constant:
+                                      Register: 1
+                          - span:
+                              start: 696
+                              end: 699
+                              file: 0
+                            value:
+                              Constant:
+                                String: "!"
+              - Expr:
+                  span:
+                    start: 710
+                    end: 727
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 710
+                          end: 725
+                          file: 0
+                        value:
+                          Field:
+                            - span:
+                                start: 710
+                                end: 725
+                                file: 0
+                              value:
+                                Constant:
+                                  Identifier: ClassMembersTest
+                            - span:
+                                start: 710
+                                end: 725
+                                file: 0
+                              value:
+                                Constant:
+                                  String: shoutStatically
+                      args: []
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                name:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables:
+                - ClassMembersTest
+              could_reference_anything: false
+            register_count: 2
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        shoutStatically:
+          function:
+            signature:
+              name:
+                span:
+                  start: 756
+                  end: 771
+                  file: 0
+                value: shoutStatically
+              args: []
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 784
+                    end: 797
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 790
+                        end: 796
+                        file: 0
+                      value:
+                        Field:
+                          - span:
+                              start: 790
+                              end: 796
+                              file: 0
+                            value:
+                              Constant:
+                                Identifier: ClassMembersTest
+                          - span:
+                              start: 790
+                              end: 796
+                              file: 0
+                            value:
+                              Constant:
+                                String: scream
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables:
+                - ClassMembersTest
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: true
+        maybeABitmapData:
+          function:
+            signature:
+              name:
+                span:
+                  start: 819
+                  end: 835
+                  file: 0
+                value: maybeABitmapData
+              args: []
+              return_type:
+                span:
+                  start: 839
+                  end: 849
+                  file: 0
+                value: flash.display.BitmapData
+            body:
+              - Return:
+                  - span:
+                      start: 867
+                      end: 871
+                      file: 0
+                    value:
+                      Constant:
+                        Identifier: "null"
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables:
+                - "null"
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        secret:
+          function:
+            signature:
+              name:
+                span:
+                  start: 914
+                  end: 920
+                  file: 0
+                value: secret
+              args: []
+              return_type: ~
+            body: []
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        notASecret:
+          function:
+            signature:
+              name:
+                span:
+                  start: 947
+                  end: 957
+                  file: 0
+                value: notASecret
+              args: []
+              return_type: ~
+            body: []
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __get__virtualProperty:
+          function:
+            signature:
+              name:
+                span:
+                  start: 981
+                  end: 996
+                  file: 0
+                value: virtualProperty
+              args: []
+              return_type: ~
+            body:
+              - Return:
+                  - span:
+                      start: 1016
+                      end: 1026
+                      file: 0
+                    value:
+                      Constant:
+                        String: virtual!
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __get__onlyGetter:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1052
+                  end: 1062
+                  file: 0
+                value: onlyGetter
+              args: []
+              return_type: ~
+            body:
+              - Return:
+                  - span:
+                      start: 1082
+                      end: 1090
+                      file: 0
+                    value:
+                      Constant:
+                        String: getter
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __set__onlySetter:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1116
+                  end: 1126
+                  file: 0
+                value: onlySetter
+              args:
+                - name: value
+                  type_name: ~
+                  register: 2
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 1144
+                    end: 1172
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 1150
+                        end: 1171
+                        file: 0
+                      value:
+                        BinaryOperator:
+                          - Add
+                          - span:
+                              start: 1150
+                              end: 1163
+                              file: 0
+                            value:
+                              Constant:
+                                String: "New value: "
+                          - span:
+                              start: 1166
+                              end: 1171
+                              file: 0
+                            value:
+                              Constant:
+                                Register: 2
+              - Return:
+                  - span:
+                      start: 1116
+                      end: 1126
+                      file: 0
+                    value:
+                      Call:
+                        name:
+                          span:
+                            start: 1116
+                            end: 1126
+                            file: 0
+                          value:
+                            Field:
+                              - span:
+                                  start: 1116
+                                  end: 1126
+                                  file: 0
+                                value:
+                                  Constant:
+                                    Register: 1
+                              - span:
+                                  start: 1116
+                                  end: 1126
+                                  file: 0
+                                value:
+                                  Constant:
+                                    String: __get__onlySetter
+                        args: []
+            scope:
+              defined_variables:
+                this:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                value:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __set__virtualProperty:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1198
+                  end: 1213
+                  file: 0
+                value: virtualProperty
+              args:
+                - name: value
+                  type_name: ~
+                  register: 2
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 1231
+                    end: 1269
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 1237
+                        end: 1268
+                        file: 0
+                      value:
+                        BinaryOperator:
+                          - Add
+                          - span:
+                              start: 1237
+                              end: 1260
+                              file: 0
+                            value:
+                              Constant:
+                                String: "Virtually setting to "
+                          - span:
+                              start: 1263
+                              end: 1268
+                              file: 0
+                            value:
+                              Constant:
+                                Register: 2
+              - Return:
+                  - span:
+                      start: 1198
+                      end: 1213
+                      file: 0
+                    value:
+                      Call:
+                        name:
+                          span:
+                            start: 1198
+                            end: 1213
+                            file: 0
+                          value:
+                            Field:
+                              - span:
+                                  start: 1198
+                                  end: 1213
+                                  file: 0
+                                value:
+                                  Constant:
+                                    Register: 1
+                              - span:
+                                  start: 1198
+                                  end: 1213
+                                  file: 0
+                                value:
+                                  Constant:
+                                    String: __get__virtualProperty
+                        args: []
+            scope:
+              defined_variables:
+                this:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                value:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __get__virtualPropertyProbablyStatic:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1302
+                  end: 1331
+                  file: 0
+                value: virtualPropertyProbablyStatic
+              args: []
+              return_type: ~
+            body:
+              - Return:
+                  - span:
+                      start: 1351
+                      end: 1360
+                      file: 0
+                    value:
+                      Constant:
+                        String: Static!
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: true
+        __set__virtualPropertyProbablyStatic:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1386
+                  end: 1415
+                  file: 0
+                value: virtualPropertyProbablyStatic
+              args:
+                - name: value
+                  type_name: ~
+                  register: 2
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 1433
+                    end: 1461
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 1439
+                        end: 1460
+                        file: 0
+                      value:
+                        BinaryOperator:
+                          - Add
+                          - span:
+                              start: 1439
+                              end: 1452
+                              file: 0
+                            value:
+                              Constant:
+                                String: "New value: "
+                          - span:
+                              start: 1455
+                              end: 1460
+                              file: 0
+                            value:
+                              Constant:
+                                Register: 2
+              - Return:
+                  - span:
+                      start: 1386
+                      end: 1415
+                      file: 0
+                    value:
+                      Call:
+                        name:
+                          span:
+                            start: 1386
+                            end: 1415
+                            file: 0
+                          value:
+                            Field:
+                              - span:
+                                  start: 1386
+                                  end: 1415
+                                  file: 0
+                                value:
+                                  Constant:
+                                    Register: 1
+                              - span:
+                                  start: 1386
+                                  end: 1415
+                                  file: 0
+                                value:
+                                  Constant:
+                                    String: __get__virtualPropertyProbablyStatic
+                        args: []
+            scope:
+              defined_variables:
+                this:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                value:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __set__virtualPropertyProbablyNotStatic:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1487
+                  end: 1519
+                  file: 0
+                value: virtualPropertyProbablyNotStatic
+              args:
+                - name: value
+                  type_name: ~
+                  register: 2
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 1537
+                    end: 1565
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 1543
+                        end: 1564
+                        file: 0
+                      value:
+                        BinaryOperator:
+                          - Add
+                          - span:
+                              start: 1543
+                              end: 1556
+                              file: 0
+                            value:
+                              Constant:
+                                String: "New value: "
+                          - span:
+                              start: 1559
+                              end: 1564
+                              file: 0
+                            value:
+                              Constant:
+                                Register: 2
+              - Return:
+                  - span:
+                      start: 1487
+                      end: 1519
+                      file: 0
+                    value:
+                      Call:
+                        name:
+                          span:
+                            start: 1487
+                            end: 1519
+                            file: 0
+                          value:
+                            Field:
+                              - span:
+                                  start: 1487
+                                  end: 1519
+                                  file: 0
+                                value:
+                                  Constant:
+                                    Register: 1
+                              - span:
+                                  start: 1487
+                                  end: 1519
+                                  file: 0
+                                value:
+                                  Constant:
+                                    String: __get__virtualPropertyProbablyNotStatic
+                        args: []
+            scope:
+              defined_variables:
+                this:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                value:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+        __get__virtualPropertyProbablyNotStatic:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1598
+                  end: 1630
+                  file: 0
+                value: virtualPropertyProbablyNotStatic
+              args: []
+              return_type: ~
+            body:
+              - Return:
+                  - span:
+                      start: 1650
+                      end: 1659
+                      file: 0
+                    value:
+                      Constant:
+                        String: Static!
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables: []
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: true
+        main:
+          function:
+            signature:
+              name:
+                span:
+                  start: 1688
+                  end: 1692
+                  file: 0
+                value: main
+              args: []
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 0
+                    end: 0
+                    file: ~
+                  value:
+                    BinaryOperator:
+                      - Assign
+                      - span:
+                          start: 0
+                          end: 0
+                          file: ~
+                        value:
+                          Constant:
+                            Register: 1
+                      - span:
+                          start: 1713
+                          end: 1736
+                          file: 0
+                        value:
+                          New:
+                            name:
+                              span:
+                                start: 1717
+                                end: 1733
+                                file: 0
+                              value:
+                                Constant:
+                                  Identifier: ClassMembersTest
+                            args:
+                              - span:
+                                  start: 1734
+                                  end: 1736
+                                  file: 0
+                                value:
+                                  Constant:
+                                    String: ""
+              - Expr:
+                  span:
+                    start: 1748
+                    end: 1772
+                    file: 0
+                  value:
+                    BinaryOperator:
+                      - Assign
+                      - span:
+                          start: 1748
+                          end: 1764
+                          file: 0
+                        value:
+                          Field:
+                            - span:
+                                start: 1747
+                                end: 1748
+                                file: 0
+                              value:
+                                Constant:
+                                  Register: 1
+                            - span:
+                                start: 1749
+                                end: 1764
+                                file: 0
+                              value:
+                                Constant:
+                                  String: virtualProperty
+                      - span:
+                          start: 1767
+                          end: 1772
+                          file: 0
+                        value:
+                          Constant:
+                            String: foo
+              - Expr:
+                  span:
+                    start: 0
+                    end: 0
+                    file: ~
+                  value:
+                    BinaryOperator:
+                      - Assign
+                      - span:
+                          start: 0
+                          end: 0
+                          file: ~
+                        value:
+                          Constant:
+                            Register: 2
+                      - span:
+                          start: 1808
+                          end: 1809
+                          file: 0
+                        value:
+                          Constant:
+                            Register: 1
+              - Expr:
+                  span:
+                    start: 1820
+                    end: 1844
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 1820
+                          end: 1844
+                          file: 0
+                        value:
+                          Field:
+                            - span:
+                                start: 1819
+                                end: 1820
+                                file: 0
+                              value:
+                                Constant:
+                                  Register: 2
+                            - span:
+                                start: 1820
+                                end: 1844
+                                file: 0
+                              value:
+                                Constant:
+                                  String: __set__virtualProperty
+                      args:
+                        - span:
+                            start: 1839
+                            end: 1844
+                            file: 0
+                          value:
+                            Constant:
+                              String: foo
+              - Expr:
+                  span:
+                    start: 1854
+                    end: 1878
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 1861
+                        end: 1877
+                        file: 0
+                      value:
+                        Call:
+                          name:
+                            span:
+                              start: 1861
+                              end: 1877
+                              file: 0
+                            value:
+                              Field:
+                                - span:
+                                    start: 1860
+                                    end: 1861
+                                    file: 0
+                                  value:
+                                    Constant:
+                                      Register: 2
+                                - span:
+                                    start: 1861
+                                    end: 1877
+                                    file: 0
+                                  value:
+                                    Constant:
+                                      String: __get__virtualProperty
+                          args: []
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: ClassMembersTest
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                x:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name: ~
+                y:
+                  used: true
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 1789
+                      end: 1805
+                      file: 0
+                    value: ClassMembersTest
+              referenced_variables:
+                - ClassMembersTest
+              could_reference_anything: false
+            register_count: 3
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: true
+      virtual_properties:
+        virtualProperty:
+          name: virtualProperty
+          getter: __get__virtualProperty
+          setter: __set__virtualProperty
+          is_static: false
+        onlyGetter:
+          name: onlyGetter
+          getter: __get__onlyGetter
+          setter: ~
+          is_static: false
+        onlySetter:
+          name: onlySetter
+          getter: ~
+          setter: __set__onlySetter
+          is_static: false
+        virtualPropertyProbablyStatic:
+          name: virtualPropertyProbablyStatic
+          getter: __get__virtualPropertyProbablyStatic
+          setter: __set__virtualPropertyProbablyStatic
+          is_static: true
+        virtualPropertyProbablyNotStatic:
+          name: virtualPropertyProbablyNotStatic
+          getter: __get__virtualPropertyProbablyNotStatic
+          setter: __set__virtualPropertyProbablyNotStatic
+          is_static: false
+      fields:
+        regularPropertyWithoutValue:
+          value: ~
+          type_name: ~
+          is_static: false
+        regularPropertySetToFive:
+          value:
+            span:
+              start: 188
+              end: 189
+              file: 0
+            value:
+              Constant:
+                Integer: 5
+          type_name: ~
+          is_static: false
+        BitmapData:
+          value:
+            span:
+              start: 212
+              end: 234
+              file: 0
+            value:
+              Constant:
+                String: BitmapData on class!
+          type_name: ~
+          is_static: false
+        scream:
+          value:
+            span:
+              start: 260
+              end: 267
+              file: 0
+            value:
+              Constant:
+                String: Ahhh!
+          type_name: ~
+          is_static: true
+      constructor:
+        signature:
+          name:
+            span:
+              start: 336
+              end: 352
+              file: 0
+            value: ClassMembersTest
+          args:
+            - name: name
+              type_name:
+                span:
+                  start: 359
+                  end: 365
+                  file: 0
+                value: String
+              register: ~
+          return_type: ~
+        body:
+          - Expr:
+              span:
+                start: 377
+                end: 391
+                file: 0
+              value:
+                Call:
+                  name:
+                    span:
+                      start: 377
+                      end: 382
+                      file: 0
+                    value:
+                      Field:
+                        - span:
+                            start: 377
+                            end: 382
+                            file: 0
+                          value:
+                            Constant:
+                              Register: 1
+                        - span:
+                            start: 377
+                            end: 382
+                            file: 0
+                          value:
+                            Constant:
+                              String: greet
+                  args:
+                    - span:
+                        start: 383
+                        end: 390
+                        file: 0
+                      value:
+                        Constant:
+                          String: world
+          - Expr:
+              span:
+                start: 401
+                end: 418
+                file: 0
+              value:
+                Trace:
+                  span:
+                    start: 407
+                    end: 417
+                    file: 0
+                  value:
+                    Field:
+                      - span:
+                          start: 407
+                          end: 417
+                          file: 0
+                        value:
+                          Constant:
+                            Register: 1
+                      - span:
+                          start: 407
+                          end: 417
+                          file: 0
+                        value:
+                          Constant:
+                            String: BitmapData
+          - Expr:
+              span:
+                start: 428
+                end: 496
+                file: 0
+              value:
+                Trace:
+                  span:
+                    start: 434
+                    end: 495
+                    file: 0
+                  value:
+                    BinaryOperator:
+                      - Add
+                      - span:
+                          start: 434
+                          end: 465
+                          file: 0
+                        value:
+                          Constant:
+                            String: "regularPropertyWithoutValue: "
+                      - span:
+                          start: 468
+                          end: 495
+                          file: 0
+                        value:
+                          Field:
+                            - span:
+                                start: 468
+                                end: 495
+                                file: 0
+                              value:
+                                Constant:
+                                  Register: 1
+                            - span:
+                                start: 468
+                                end: 495
+                                file: 0
+                              value:
+                                Constant:
+                                  String: regularPropertyWithoutValue
+          - Expr:
+              span:
+                start: 507
+                end: 545
+                file: 0
+              value:
+                Trace:
+                  span:
+                    start: 534
+                    end: 544
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 534
+                          end: 542
+                          file: 0
+                        value:
+                          Field:
+                            - span:
+                                start: 525
+                                end: 534
+                                file: 0
+                              value:
+                                Call:
+                                  name:
+                                    span:
+                                      start: 525
+                                      end: 532
+                                      file: 0
+                                    value:
+                                      Field:
+                                        - span:
+                                            start: 513
+                                            end: 525
+                                            file: 0
+                                          value:
+                                            Field:
+                                              - span:
+                                                  start: 513
+                                                  end: 525
+                                                  file: 0
+                                                value:
+                                                  Field:
+                                                    - span:
+                                                        start: 513
+                                                        end: 525
+                                                        file: 0
+                                                      value:
+                                                        Constant:
+                                                          Identifier: path
+                                                    - span:
+                                                        start: 513
+                                                        end: 525
+                                                        file: 0
+                                                      value:
+                                                        Constant:
+                                                          String: to
+                                              - span:
+                                                  start: 513
+                                                  end: 525
+                                                  file: 0
+                                                value:
+                                                  Constant:
+                                                    String: ANestedClass
+                                        - span:
+                                            start: 526
+                                            end: 532
+                                            file: 0
+                                          value:
+                                            Constant:
+                                              String: create
+                                  args: []
+                            - span:
+                                start: 535
+                                end: 542
+                                file: 0
+                              value:
+                                Constant:
+                                  String: success
+                      args: []
+          - Expr:
+              span:
+                start: 556
+                end: 583
+                file: 0
+              value:
+                Call:
+                  name:
+                    span:
+                      start: 556
+                      end: 583
+                      file: 0
+                    value:
+                      Field:
+                        - span:
+                            start: 556
+                            end: 571
+                            file: 0
+                          value:
+                            Constant:
+                              Register: 1
+                        - span:
+                            start: 556
+                            end: 583
+                            file: 0
+                          value:
+                            Constant:
+                              String: __set__virtualProperty
+                  args:
+                    - span:
+                        start: 574
+                        end: 583
+                        file: 0
+                      value:
+                        Constant:
+                          String: a value
+          - Expr:
+              span:
+                start: 593
+                end: 615
+                file: 0
+              value:
+                Trace:
+                  span:
+                    start: 599
+                    end: 614
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 599
+                          end: 614
+                          file: 0
+                        value:
+                          Field:
+                            - span:
+                                start: 599
+                                end: 614
+                                file: 0
+                              value:
+                                Constant:
+                                  Register: 1
+                            - span:
+                                start: 599
+                                end: 614
+                                file: 0
+                              value:
+                                Constant:
+                                  String: __get__virtualProperty
+                      args: []
+        scope:
+          defined_variables:
+            this:
+              used: true
+              used_in_inner_scope: false
+              type_name:
+                span:
+                  start: 0
+                  end: 0
+                  file: ~
+                value: ClassMembersTest
+            arguments:
+              used: false
+              used_in_inner_scope: false
+              type_name: ~
+            super:
+              used: false
+              used_in_inner_scope: false
+              type_name: ~
+            _root:
+              used: false
+              used_in_inner_scope: false
+              type_name: ~
+            _parent:
+              used: false
+              used_in_inner_scope: false
+              type_name: ~
+            _global:
+              used: false
+              used_in_inner_scope: false
+              type_name: ~
+            name:
+              used: false
+              used_in_inner_scope: false
+              type_name: ~
+          referenced_variables:
+            - path
+          could_reference_anything: false
+        register_count: 2
+        preload_this: true
+        suppress_this: false
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - name: path.to.ANestedClass
+      extends: path.to.ANestedBaseClass
+      implements:
+        - path.to.ANestedInterface
+      functions:
+        create:
+          function:
+            signature:
+              name:
+                span:
+                  start: 163
+                  end: 169
+                  file: 2
+                value: create
+              args: []
+              return_type:
+                span:
+                  start: 173
+                  end: 185
+                  file: 2
+                value: path.to.ANestedClass
+            body:
+              - Return:
+                  - span:
+                      start: 203
+                      end: 206
+                      file: 2
+                    value:
+                      New:
+                        name:
+                          span:
+                            start: 207
+                            end: 219
+                            file: 2
+                          value:
+                            Field:
+                              - span:
+                                  start: 207
+                                  end: 219
+                                  file: 2
+                                value:
+                                  Field:
+                                    - span:
+                                        start: 207
+                                        end: 219
+                                        file: 2
+                                      value:
+                                        Constant:
+                                          Identifier: path
+                                    - span:
+                                        start: 207
+                                        end: 219
+                                        file: 2
+                                      value:
+                                        Constant:
+                                          String: to
+                              - span:
+                                  start: 207
+                                  end: 219
+                                  file: 2
+                                value:
+                                  Constant:
+                                    String: ANestedClass
+                        args: []
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: path.to.ANestedClass
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 35
+                      end: 59
+                      file: 2
+                    value: path.to.ANestedBaseClass
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables:
+                - path
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: true
+        success:
+          function:
+            signature:
+              name:
+                span:
+                  start: 250
+                  end: 257
+                  file: 2
+                value: success
+              args: []
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 270
+                    end: 297
+                    file: 2
+                  value:
+                    Trace:
+                      span:
+                        start: 288
+                        end: 296
+                        file: 2
+                      value:
+                        Field:
+                          - span:
+                              start: 276
+                              end: 288
+                              file: 2
+                            value:
+                              Field:
+                                - span:
+                                    start: 276
+                                    end: 288
+                                    file: 2
+                                  value:
+                                    Field:
+                                      - span:
+                                          start: 276
+                                          end: 288
+                                          file: 2
+                                        value:
+                                          Constant:
+                                            Identifier: path
+                                      - span:
+                                          start: 276
+                                          end: 288
+                                          file: 2
+                                        value:
+                                          Constant:
+                                            String: to
+                                - span:
+                                    start: 276
+                                    end: 288
+                                    file: 2
+                                  value:
+                                    Constant:
+                                      String: ANestedClass
+                          - span:
+                              start: 289
+                              end: 296
+                              file: 2
+                            value:
+                              Constant:
+                                String: message
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: path.to.ANestedClass
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 35
+                      end: 59
+                      file: 2
+                    value: path.to.ANestedBaseClass
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables:
+                - path
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: false
+      virtual_properties: {}
+      fields:
+        message:
+          value:
+            span:
+              start: 123
+              end: 133
+              file: 2
+            value:
+              Constant:
+                String: Success!
+          type_name: ~
+          is_static: true
+      constructor:
+        signature:
+          name:
+            span:
+              start: 6
+              end: 26
+              file: 2
+            value: path.to.ANestedClass
+          args: []
+          return_type: ~
+        body: []
+        scope:
+          defined_variables: {}
+          referenced_variables: []
+          could_reference_anything: false
+        register_count: 1
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - name: path.to.ANestedBaseClass
+      extends: ~
+      implements: []
+      functions: {}
+      virtual_properties: {}
+      fields: {}
+      constructor:
+        signature:
+          name:
+            span:
+              start: 6
+              end: 30
+              file: 4
+            value: path.to.ANestedBaseClass
+          args: []
+          return_type: ~
+        body: []
+        scope:
+          defined_variables: {}
+          referenced_variables: []
+          could_reference_anything: false
+        register_count: 1
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

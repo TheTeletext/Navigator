@@ -1,0 +1,445 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2/function_in_loop_break_continue.as
+---
+Ok:
+  initial_script:
+    - ForIn:
+        condition:
+          Classic:
+            initialize:
+              Declare:
+                name:
+                  span:
+                    start: 9
+                    end: 10
+                    file: 0
+                  value: i
+                value:
+                  span:
+                    start: 13
+                    end: 14
+                    file: 0
+                  value:
+                    Constant:
+                      Integer: 0
+                type_name: ~
+            condition:
+              - span:
+                  start: 16
+                  end: 21
+                  file: 0
+                value:
+                  BinaryOperator:
+                    - LessThan
+                    - span:
+                        start: 16
+                        end: 17
+                        file: 0
+                      value:
+                        Constant:
+                          Identifier: i
+                    - span:
+                        start: 20
+                        end: 21
+                        file: 0
+                      value:
+                        Constant:
+                          Integer: 5
+            update:
+              - span:
+                  start: 24
+                  end: 26
+                  file: 0
+                value:
+                  UnaryOperator:
+                    - Increment: Postfix
+                    - span:
+                        start: 23
+                        end: 24
+                        file: 0
+                      value:
+                        Constant:
+                          Identifier: i
+        body:
+          Block:
+            - Expr:
+                span:
+                  start: 34
+                  end: 54
+                  file: 0
+                value:
+                  Trace:
+                    span:
+                      start: 40
+                      end: 53
+                      file: 0
+                    value:
+                      BinaryOperator:
+                        - Add
+                        - span:
+                            start: 40
+                            end: 49
+                            file: 0
+                          value:
+                            Constant:
+                              String: loop i=
+                        - span:
+                            start: 52
+                            end: 53
+                            file: 0
+                          value:
+                            Constant:
+                              Identifier: i
+            - Declare:
+                name:
+                  span:
+                    start: 114
+                    end: 120
+                    file: 0
+                  value: decide
+                value:
+                  span:
+                    start: 123
+                    end: 288
+                    file: 0
+                  value:
+                    Function:
+                      signature:
+                        name: ~
+                        args:
+                          - name: v
+                            type_name: ~
+                            register: 1
+                        return_type: ~
+                      body:
+                        - If:
+                            condition:
+                              span:
+                                start: 149
+                                end: 155
+                                file: 0
+                              value:
+                                BinaryOperator:
+                                  - Equal
+                                  - span:
+                                      start: 149
+                                      end: 150
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        Register: 1
+                                  - span:
+                                      start: 154
+                                      end: 155
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        Integer: 1
+                            "yes":
+                              Block:
+                                - Return:
+                                    - span:
+                                        start: 178
+                                        end: 188
+                                        file: 0
+                                      value:
+                                        Constant:
+                                          String: continue
+                            "no": ~
+                        - If:
+                            condition:
+                              span:
+                                start: 212
+                                end: 218
+                                file: 0
+                              value:
+                                BinaryOperator:
+                                  - Equal
+                                  - span:
+                                      start: 212
+                                      end: 213
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        Register: 1
+                                  - span:
+                                      start: 217
+                                      end: 218
+                                      file: 0
+                                    value:
+                                      Constant:
+                                        Integer: 3
+                            "yes":
+                              Block:
+                                - Return:
+                                    - span:
+                                        start: 241
+                                        end: 248
+                                        file: 0
+                                      value:
+                                        Constant:
+                                          String: break
+                            "no": ~
+                        - Return:
+                            - span:
+                                start: 275
+                                end: 281
+                                file: 0
+                              value:
+                                Constant:
+                                  String: none
+                      scope:
+                        defined_variables:
+                          this:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          arguments:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          super:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          _root:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          _parent:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          _global:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          v:
+                            used: true
+                            used_in_inner_scope: false
+                            type_name: ~
+                        referenced_variables: []
+                        could_reference_anything: false
+                      register_count: 2
+                      preload_this: false
+                      suppress_this: true
+                      preload_arguments: false
+                      suppress_arguments: true
+                      preload_super: false
+                      suppress_super: true
+                      preload_root: false
+                      preload_parent: false
+                      preload_global: false
+                type_name: ~
+            - Declare:
+                name:
+                  span:
+                    start: 371
+                    end: 378
+                    file: 0
+                  value: naughty
+                value:
+                  span:
+                    start: 381
+                    end: 414
+                    file: 0
+                  value:
+                    Function:
+                      signature:
+                        name: ~
+                        args: []
+                        return_type: ~
+                      body:
+                        - Break
+                      scope:
+                        defined_variables:
+                          this:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          arguments:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          super:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          _root:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          _parent:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                          _global:
+                            used: false
+                            used_in_inner_scope: false
+                            type_name: ~
+                        referenced_variables: []
+                        could_reference_anything: false
+                      register_count: 1
+                      preload_this: false
+                      suppress_this: true
+                      preload_arguments: false
+                      suppress_arguments: true
+                      preload_super: false
+                      suppress_super: true
+                      preload_root: false
+                      preload_parent: false
+                      preload_global: false
+                type_name: ~
+            - Expr:
+                span:
+                  start: 420
+                  end: 429
+                  file: 0
+                value:
+                  Call:
+                    name:
+                      span:
+                        start: 420
+                        end: 427
+                        file: 0
+                      value:
+                        Constant:
+                          Identifier: naughty
+                    args: []
+            - Declare:
+                name:
+                  span:
+                    start: 440
+                    end: 446
+                    file: 0
+                  value: action
+                value:
+                  span:
+                    start: 449
+                    end: 458
+                    file: 0
+                  value:
+                    Call:
+                      name:
+                        span:
+                          start: 449
+                          end: 455
+                          file: 0
+                        value:
+                          Constant:
+                            Identifier: decide
+                      args:
+                        - span:
+                            start: 456
+                            end: 457
+                            file: 0
+                          value:
+                            Constant:
+                              Identifier: i
+                type_name: ~
+            - If:
+                condition:
+                  span:
+                    start: 468
+                    end: 488
+                    file: 0
+                  value:
+                    BinaryOperator:
+                      - Equal
+                      - span:
+                          start: 468
+                          end: 474
+                          file: 0
+                        value:
+                          Constant:
+                            Identifier: action
+                      - span:
+                          start: 478
+                          end: 488
+                          file: 0
+                        value:
+                          Constant:
+                            String: continue
+                "yes":
+                  Block:
+                    - Continue
+                "no": ~
+            - If:
+                condition:
+                  span:
+                    start: 524
+                    end: 541
+                    file: 0
+                  value:
+                    BinaryOperator:
+                      - Equal
+                      - span:
+                          start: 524
+                          end: 530
+                          file: 0
+                        value:
+                          Constant:
+                            Identifier: action
+                      - span:
+                          start: 534
+                          end: 541
+                          file: 0
+                        value:
+                          Constant:
+                            String: break
+                "yes":
+                  Block:
+                    - Break
+                "no": ~
+            - Expr:
+                span:
+                  start: 571
+                  end: 593
+                  file: 0
+                value:
+                  Trace:
+                    span:
+                      start: 577
+                      end: 592
+                      file: 0
+                    value:
+                      BinaryOperator:
+                        - Add
+                        - span:
+                            start: 577
+                            end: 588
+                            file: 0
+                          value:
+                            Constant:
+                              String: "  work i="
+                        - span:
+                            start: 591
+                            end: 592
+                            file: 0
+                          value:
+                            Constant:
+                              Identifier: i
+    - Expr:
+        span:
+          start: 598
+          end: 610
+          file: 0
+        value:
+          Trace:
+            span:
+              start: 604
+              end: 609
+              file: 0
+            value:
+              Constant:
+                String: end
+  interfaces: []
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

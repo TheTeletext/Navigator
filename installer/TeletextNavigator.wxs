@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TeletextNavigator.wxs - the MSI for Teletext Navigator.
+
+  Part of Teletext Navigator.
+  Copyright (C) 2026 Dimitri Papadopoulos and The Teletext
+  Licensed under the GNU Affero General Public License v3.0 or later.
+  See /COPYING for the full license text.
+
+  Built by installer\build_navigator_msi.bat, the only supported way to
+  build it. The version and the product name come from
+  src\suite_version.h through the C preprocessor; nothing about either is
+  typed here.
+
+  WiX Toolset 5.0.2 (dotnet global tool) with the UI and Util extensions,
+  all pinned at 5.0.2.
+
+  ======================================================================
+  IDENTITY. THIS PACKAGE NEVER SHARES AN IDENTITY WITH ANOTHER PRODUCT.
+  ======================================================================
+
+    * its OWN UpgradeCode (below), never reused by any other product and
+      never replaced by another product's.
+    * EVERY component GUID its own. Two products that share a component
+      GUID share its reference count and its resources, and uninstalling
+      one can remove the other's files. The NABU files are harvested;
+      their generated GUIDs derive from the install path.
+    * its own directory  C:\Program Files\Teletext Navigator\
+    * its own shortcuts  "Teletext Navigator"
+    * its own registry   HKLM\SOFTWARE\The Teletext\Teletext Navigator
+                         (the app writes the HKCU twin at run time)
+    * its own user data  %LOCALAPPDATA%\Teletext Navigator\ and
+                         Documents\Teletext BASIC\, written by the app
+
+  WHAT GETS INSTALLED
+
+    <ProgramFiles64>\Teletext Navigator\
+        TeletextNavigator.exe
+        README.TXT LICENSE.TXT NOTICES.TXT CREDITS.TXT
+        LICENSES\*.txt
+        NABU\           mgtipl.bin and opennabu.bin (the NABU tab's boot
+                        firmware)
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <?ifndef Version?>
+    <?error Version was not supplied. Build with installer\build_navigator_msi.bat.?>
+  <?endif?>
+  <?ifndef PayloadDir?>
+    <?error PayloadDir was not supplied. Build with installer\build_navigator_msi.bat.?>
+  <?endif?>
+
+  <!--
+    UpgradeCode: Teletext Navigator's product line. Generated 2026-10-29.
+    Never change it, and never use another product's (see the header).
+    ProductCode is "*", a new one per build.
+  -->
+  <Package
+      Name="$(ShortName)"
+      Manufacturer="The Teletext"
+      Version="$(Version)"
+      UpgradeCode="869001FE-49D6-4136-8112-E2079CC92BD4"
+      Scope="perMachine"
+      Compressed="yes"
+      InstallerVersion="500">
+
+    <SummaryInformation
+        Description="$(LongName)"
+        Manufacturer="The Teletext" />
+
+    <Property Id="LongName" Value="$(LongName)" />
+
+    <!--
+      Scheduled after InstallExecute, so a later Navigator upgrades this one
+      in place and the shortcuts keep their position. Component rules:
+      never add, remove, rename or move a resource inside an existing
+      component, and bump the version for every release.
+    -->
+    <MajorUpgrade
+        Schedule="afterInstallExecute"
+        AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of [ProductName] is already installed. Uninstall it first if you really want to go back." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Ask a running copy to close (WM_CLOSE), never force-kill it. -->
+    <util:CloseApplication
+        Id="CloseNavigator"
+        Target="TeletextNavigator.exe"
+        Description="Teletext Navigator is running and must be closed before it can be updated."
+        CloseMessage="yes"
+        RebootPrompt="no"
+        PromptToContinue="yes"
+        Timeout="15" />
+
+    <Launch
+        Condition="Installed OR (VersionNT &gt;= 603)"
+        Message="[ProductName] does not install on this version of Windows. It is tested on 64-bit Windows 10 22H2 and later, including Windows 11; earlier versions are untested." />
+
+    <Feature Id="Main"
+             Title="$(ShortName)"
+             Description="The application, its documentation and a Start Menu shortcut."
+             Level="1"
+             AllowAbsent="no"
+             ConfigurableDirectory="INSTALLFOLDER">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="NabuFiles" />
+      <ComponentGroupRef Id="DocFiles" />
+<?if $(NavFlash) = "1" ?>
+      <ComponentGroupRef Id="FlashFiles" />
+<?endif?>
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="RegistryEntries" />
+    </Feature>
+
+    <Feature Id="DesktopShortcut"
+             Title="Desktop shortcut"
+             Description="Put a shortcut to Teletext Navigator on the desktop."
+             Level="1">
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_FeatureTree" InstallDirectory="INSTALLFOLDER" />
+
+    <!-- Wizard artwork, generated from the Teletext monogram by
+         tools\gen_navigator_art.py into installer\art-navigator\. -->
+    <WixVariable Id="WixUIDialogBmp"  Value="$(ArtDir)\dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp"  Value="$(ArtDir)\banner.bmp" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(PayloadDir)\LICENSE.rtf" />
+
+    <!-- Apps and features: the monogram icon and the Teletext website,
+         which is always http://www.teletext.ca (never the bare apex). -->
+    <Icon Id="AppIcon.ico" SourceFile="$(IconDir)\teletext_navigator.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="http://www.teletext.ca" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPHELPLINK" Value="http://www.teletext.ca" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Teletext Navigator">
+        <Directory Id="LICENSESFOLDER" Name="LICENSES" />
+        <!-- src\nabu_native_module.c looks for NABU\mgtipl.bin and
+             NABU\opennabu.bin beside the exe: a contract, not a choice. -->
+        <Directory Id="NABUFOLDER" Name="NABU" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="22DE5CB1-6A9C-46F5-B4DF-AB9842DF3726">
+        <File Id="NavigatorExe"
+              Name="TeletextNavigator.exe"
+              Source="$(PayloadDir)\TeletextNavigator.exe"
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+<?if $(NavFlash) = "1" ?>
+    <!--
+      Flash in the Retro Web Browser tab (docs/2026-11-05_RETROWEB_RUFFLE.md):
+      the player DLL beside the exe, and its licence notices. Two NEW
+      components with their own GUIDs; no existing component was touched.
+      Built only with NAV_FLASH=1 (build_navigator_msi.bat); NAV_FLASH=0
+      leaves both out and the exe then shows pages as before Flash.
+    -->
+    <ComponentGroup Id="FlashFiles">
+      <Component Id="FlashPlayer" Directory="INSTALLFOLDER"
+                 Guid="70FECBBC-148D-429A-9035-56676C6F70BE">
+        <File Id="NavRuffleDll" Name="nav_ruffle.dll"
+              Source="$(PayloadDir)\nav_ruffle.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="FlashLicenseTexts" Directory="LICENSESFOLDER"
+                 Guid="1FBD5266-E413-44A8-B2C1-F6B1A192AA38">
+        <File Id="LicRuffle"       Name="LICENSE.ruffle.txt"        Source="$(PayloadDir)\LICENSES\LICENSE.ruffle.txt" KeyPath="yes" />
+        <File Id="LicRuffleCrates" Name="LICENSE.ruffle-crates.txt" Source="$(PayloadDir)\LICENSES\LICENSE.ruffle-crates.txt" />
+      </Component>
+    </ComponentGroup>
+<?endif?>
+
+    <ComponentGroup Id="NabuFiles" Directory="NABUFOLDER">
+      <Files Include="$(PayloadDir)\NABU\**" />
+    </ComponentGroup>
+
+    <ComponentGroup Id="DocFiles">
+      <Component Id="Docs" Directory="INSTALLFOLDER"
+                 Guid="0FCA6B3A-371C-4119-86AA-6AE855BFB8C3">
+        <File Id="ReadmeTxt"  Name="README.TXT"  Source="$(PayloadDir)\README.TXT" KeyPath="yes" />
+        <File Id="LicenseTxt" Name="LICENSE.TXT" Source="$(PayloadDir)\LICENSE.TXT" />
+        <File Id="NoticesTxt" Name="NOTICES.TXT" Source="$(PayloadDir)\NOTICES.TXT" />
+        <File Id="CreditsTxt" Name="CREDITS.TXT" Source="$(PayloadDir)\CREDITS.TXT" />
+      </Component>
+      <!-- The licence texts of the third-party components (freeWAIS-sf,
+           libwww, mbzm, Marduk, OpenNabu, GW-BASIC, libx86emu, Modern
+           DOS), plus the GPL-2.0 and LGPL-2.1 texts. The component's
+           file list is kept unchanged across upgrades. -->
+      <Component Id="LicenseTexts" Directory="LICENSESFOLDER"
+                 Guid="6104BD9F-2D3F-4785-A39A-EBC7FCAD35E9">
+        <File Id="LicCnidr"     Name="CNIDR-1993.txt"                  Source="$(PayloadDir)\LICENSES\CNIDR-1993.txt" KeyPath="yes" />
+        <File Id="LicLgpl"      Name="LGPL-2.1.txt"                    Source="$(PayloadDir)\LICENSES\LGPL-2.1.txt" />
+        <File Id="LicGpl2"      Name="GPL-2.0.txt"                     Source="$(PayloadDir)\LICENSES\GPL-2.0.txt" />
+        <File Id="LicW3C"       Name="W3C-Software-Notice.txt"         Source="$(PayloadDir)\LICENSES\W3C-Software-Notice.txt" />
+        <File Id="LicMbzm"      Name="LICENSE.mbzm.txt"                Source="$(PayloadDir)\LICENSES\LICENSE.mbzm.txt" />
+        <File Id="LicMbzmGp"    Name="LICENSE.mbzm-smblib-REMOVED.txt" Source="$(PayloadDir)\LICENSES\LICENSE.mbzm-smblib-REMOVED.txt" />
+        <File Id="LicMarduk"    Name="LICENSE.marduk.txt"              Source="$(PayloadDir)\LICENSES\LICENSE.marduk.txt" />
+        <File Id="LicOpenNabu"  Name="LICENSE.opennabu.txt"            Source="$(PayloadDir)\LICENSES\LICENSE.opennabu.txt" />
+        <File Id="LicGwBasic"   Name="LICENSE.gwbasic.txt"             Source="$(PayloadDir)\LICENSES\LICENSE.gwbasic.txt" />
+        <File Id="LicLibx86emu" Name="LICENSE.libx86emu.txt"           Source="$(PayloadDir)\LICENSES\LICENSE.libx86emu.txt" />
+        <File Id="LicModernDos" Name="LICENSE.moderndos.txt"           Source="$(PayloadDir)\LICENSES\LICENSE.moderndos.txt" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder"
+               Guid="EB2A8BBB-091B-43D8-86BF-A225B1988258">
+      <Shortcut Id="StartMenuLink"
+                Name="Teletext Navigator"
+                Description="The retro internet of The Teletext: Gopher, WAIS, Archie, RIPscrip, NABU, Videotex and more"
+                Target="[INSTALLFOLDER]TeletextNavigator.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\The Teletext\Teletext Navigator"
+                     Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcutComponent" Directory="DesktopFolder"
+               Guid="4010AE25-D7EF-4A68-AE0E-A9E60069FED1">
+      <Shortcut Id="DesktopLink"
+                Name="Teletext Navigator"
+                Description="The retro internet of The Teletext: Gopher, WAIS, Archie, RIPscrip, NABU, Videotex and more"
+                Target="[INSTALLFOLDER]TeletextNavigator.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\The Teletext\Teletext Navigator"
+                     Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- The installed-version key, read-only to the app (HKLM). -->
+    <Component Id="RegistryEntries" Directory="INSTALLFOLDER"
+               Guid="2E82F0B5-C40D-4B6C-98E1-83227249D3C5">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\The Teletext\Teletext Navigator">
+        <RegistryValue Name="Version"    Type="string" Value="$(FullVersion)" KeyPath="yes" />
+        <RegistryValue Name="MsiVersion" Type="string" Value="$(Version)" />
+        <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" />
+      </RegistryKey>
+    </Component>
+  </Fragment>
+</Wix>

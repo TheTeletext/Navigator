@@ -1,0 +1,238 @@
+--- src/arpamail_module.c.bak-20260518T022220Z-pre-loneperiod	2026-05-17 20:27:17.970599500 -0400
++++ src/arpamail_module.c	2026-05-17 22:56:41.720353800 -0400
+@@ -144,6 +144,12 @@
+  * connected flag. */
+ static BOOL g_a_connected = FALSE;
+ 
++/* Post-submit lock per blueprint 4.3. Set TRUE on a 2xx final reply
++ * for either submit path; cleared on Reset (Clear while locked) and
++ * on Disconnect. When TRUE the Send-enable expression in the counter
++ * helper goes FALSE and the Message edit is EM_SETREADONLY TRUE. */
++static BOOL g_a_locked = FALSE;
++
+ /* ------------------------------------------------------------------ */
+ /* Status helper.                                                      */
+ /* ------------------------------------------------------------------ */
+@@ -226,7 +232,7 @@
+               len > ARPA_MAX_BODY ? "  (over cap)" : "");
+     SetWindowTextA(g_a_count_lbl, buf);
+ 
+-    EnableWindow(g_a_send_btn, g_a_connected ? TRUE : FALSE);
++    EnableWindow(g_a_send_btn, (g_a_connected && !g_a_locked) ? TRUE : FALSE);
+ }
+ 
+ /* ------------------------------------------------------------------ */
+@@ -436,6 +442,8 @@
+     BOOL               crlf_ended;
+     const char        *term;
+     int                term_len;
++    size_t             period_off = 0;
++    BOOL               has_period = FALSE;
+     BOOL               ok = FALSE;
+ 
+     port_int = atoi(g_a_active_port);
+@@ -496,29 +504,83 @@
+     code = arpa_read_reply_loop(ctrl, content, line, sizeof(line));
+     if (code != 354) goto cleanup;
+ 
+-    /* Sanitize and send the body, then the strict lone-period
+-     * terminator. Strict no-dot-stuffing per blueprint 3.6: the body
+-     * is written verbatim. If the sanitized body already ends with
+-     * CRLF the terminator is ".\r\n"; otherwise it is "\r\n.\r\n"
+-     * to guarantee the lone period sits on its own line. */
++    /* Sanitize and frame the wire bytes after 354 per the 2026-05-18
++     * authority: a lone-period line is the terminator wherever it
++     * first appears in the sanitized body, and the no-period path
++     * still appends the client terminator with the existing
++     * crlf_ended choice. Strict no-dot-stuffing applies in both
++     * cases; body lines before the terminator are written verbatim. */
+     clean = (char *)malloc(raw_len * 2 + 8);
+     if (!clean) { arpa_status(content, "Out of memory."); goto cleanup; }
+     clean_len = arpa_sanitize_body(raw_body, raw_len, clean, raw_len * 2 + 8);
+-    if (clean_len > 0) {
+-        if (arpa_send_all(ctrl, clean, (int)clean_len) < 0) goto cleanup;
++
++    /* Scan clean for the first lone-period line. A line is a maximal
++     * byte run delimited by CRLF or the buffer start or end; the
++     * lone-period line content is exactly one 0x2E with nothing else.
++     * Per blueprint 3.4, this scan applies to both submit triggers. */
++    {
++        size_t scan_i = 0;
++        period_off = clean_len;
++        has_period = FALSE;
++        while (scan_i < clean_len) {
++            size_t scan_e = scan_i;
++            while (scan_e < clean_len) {
++                if (scan_e + 1 < clean_len &&
++                    clean[scan_e] == '\r' && clean[scan_e + 1] == '\n') break;
++                scan_e++;
++            }
++            if (scan_e - scan_i == 1 && clean[scan_i] == '.') {
++                period_off = scan_i;
++                has_period = TRUE;
++                break;
++            }
++            if (scan_e >= clean_len) break;
++            scan_i = scan_e + 2;
++        }
+     }
+ 
+-    crlf_ended = (clean_len >= 2 &&
+-                  clean[clean_len - 2] == '\r' &&
+-                  clean[clean_len - 1] == '\n');
+-    term     = crlf_ended ? ".\r\n" : "\r\n.\r\n";
+-    term_len = crlf_ended ? 3       : 5;
+-    if (arpa_send_all(ctrl, term, term_len) < 0) goto cleanup;
++    if (has_period) {
++        /* Trigger B path, or Send-button path with a lone-period in
++         * the body. Send the prefix up to the period line as the
++         * mail text (CRLF-framed by construction, since each line
++         * start in the scan is at offset 0 or just past a CRLF),
++         * then exactly ".\r\n" as the terminator. Empty-body case
++         * (period at offset 0) sends only ".\r\n". Nothing after
++         * the period line is transmitted. */
++        if (period_off > 0) {
++            if (arpa_send_all(ctrl, clean, (int)period_off) < 0) goto cleanup;
++        }
++        if (arpa_send_all(ctrl, ".\r\n", 3) < 0) goto cleanup;
++    } else {
++        /* No-period path: preserve the existing behavior byte for
++         * byte. Send the sanitized body if non-empty, then the
++         * crlf_ended choice of ".\r\n" or "\r\n.\r\n". */
++        if (clean_len > 0) {
++            if (arpa_send_all(ctrl, clean, (int)clean_len) < 0) goto cleanup;
++        }
++        crlf_ended = (clean_len >= 2 &&
++                      clean[clean_len - 2] == '\r' &&
++                      clean[clean_len - 1] == '\n');
++        term     = crlf_ended ? ".\r\n" : "\r\n.\r\n";
++        term_len = crlf_ended ? 3       : 5;
++        if (arpa_send_all(ctrl, term, term_len) < 0) goto cleanup;
++    }
+ 
+-    /* Final reply: 250 or another 2xx for success. */
++    /* Final reply: 250 or another 2xx for success. On a 2xx the
++     * post-submit lock per blueprint 4.3 engages: Send is disabled
++     * via the counter helper (whose gate is connected && !locked),
++     * the Message edit becomes read-only, and the byte counter
++     * naturally freezes because the read-only edit emits no further
++     * EN_CHANGE. On a non-2xx no lock is applied; the literal reply
++     * stays in the status surface and the box remains editable. */
+     code = arpa_read_reply_loop(ctrl, content, line, sizeof(line));
+     if (code < 0) goto cleanup;
+-    if (arpa_class(code) == 2) ok = TRUE;
++    if (arpa_class(code) == 2) {
++        ok = TRUE;
++        g_a_locked = TRUE;
++        SendMessageA(g_a_body_edit, EM_SETREADONLY, (WPARAM)TRUE, 0);
++        arpa_update_byte_counter();
++    }
+ 
+ cleanup:
+     if (ctrl != INVALID_SOCKET) {
+@@ -543,6 +605,15 @@
+     char   *body;
+     int     body_len;
+ 
++    /* Unified submit guard per blueprint 2.2: every submit path
++     * (Send button, Trigger B, and the Ctrl+Enter accelerator)
++     * passes through this function, so a single early return here
++     * is sufficient to honor the post-submit lock and the
++     * connected precondition. Defense in depth: the Send button
++     * is also greyed via the counter helper, and Trigger B
++     * already checks the same flags before calling. */
++    if (!g_a_connected || g_a_locked) return;
++
+     GetWindowTextA(g_a_to_edit, recipient, sizeof(recipient));
+     body_len = GetWindowTextLengthA(g_a_body_edit);
+ 
+@@ -733,6 +804,12 @@
+ reset:
+     if (ctrl != INVALID_SOCKET) closesocket(ctrl);
+ 
++    /* Clear the post-submit lock as part of the disconnected
++     * baseline. Disconnect was never gated on the lock, so this is
++     * reached from both the locked and the composable states. */
++    g_a_locked = FALSE;
++    SendMessageA(g_a_body_edit, EM_SETREADONLY, (WPARAM)FALSE, 0);
++
+     /* Restore To: to the default, clear Message, return UI to pre-connect. */
+     SetWindowTextA(g_a_to_edit, ARPA_DEFAULT_TO);
+     SetWindowTextA(g_a_body_edit, "");
+@@ -740,21 +817,36 @@
+ }
+ 
+ /* ------------------------------------------------------------------ */
+-/* Clear button: empty fields, reset counter, status to Ready.         */
++/* Clear button. State-aware per the 2026-05-18 authority blueprint:  */
++/* locked-state acts as Reset (clears the lock, removes read-only,    */
++/* clears Message, refreshes counter to re-enable Send, status to     */
++/* Ready); composable-state clears Message and refreshes the counter. */
++/* Both paths leave To unchanged and focus the Message edit.          */
+ /* ------------------------------------------------------------------ */
+ 
+ static void arpa_on_clear(HWND content)
+ {
+-    SetWindowTextA(g_a_to_edit, "");
++    if (g_a_locked) {
++        /* Reset transition per blueprint 4.4: drop the lock and put
++         * the Message edit back into the editable state, then fall
++         * through to the composable cleanup below. */
++        g_a_locked = FALSE;
++        SendMessageA(g_a_body_edit, EM_SETREADONLY, (WPARAM)FALSE, 0);
++    }
++    /* Composable cleanup: clear Message, refresh the counter (which
++     * re-enables Send because locked is now FALSE), status to Ready,
++     * focus the Message edit. To is left unchanged per blueprint. */
+     SetWindowTextA(g_a_body_edit, "");
+     arpa_update_byte_counter();
+     arpa_status(content, "Ready");
+-    SetFocus(g_a_to_edit);
++    SetFocus(g_a_body_edit);
+ }
+ 
+ /* ------------------------------------------------------------------ */
+-/* Subclass: To edit (Enter forwards focus to body) and Body edit      */
+-/* (Ctrl+Enter triggers Send).                                         */
++/* Subclass: To edit (Enter forwards focus to body) and Body edit.    */
++/* Body edit handles: plain Enter on a lone-period line, which fires  */
++/* Trigger B per blueprint 4.1 and submits via the Send path; and    */
++/* the pre-existing Ctrl+Enter Send accelerator.                     */
+ /* ------------------------------------------------------------------ */
+ 
+ static LRESULT CALLBACK ToEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
+@@ -777,6 +869,34 @@
+ 
+ static LRESULT CALLBACK BodyEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
+ {
++    /* Trigger B per blueprint 4.1: a plain Enter (no Ctrl) that
++     * completes a logical line whose entire content is exactly one
++     * period byte (0x2E) and nothing else, including no spaces or
++     * tabs, fires the same submit path the Send button uses.
++     * Precondition per blueprint 4.1 and 4.3: connected and not
++     * locked. Disjoint from the existing Ctrl+Enter branch below. */
++    if (m == WM_KEYDOWN && w == VK_RETURN &&
++        !(GetKeyState(VK_CONTROL) & 0x8000) &&
++        g_a_connected && !g_a_locked) {
++        DWORD sel_start = 0;
++        int   line_idx, char_idx, line_len;
++        SendMessageA(h, EM_GETSEL, (WPARAM)&sel_start, 0);
++        line_idx = (int)SendMessageA(h, EM_LINEFROMCHAR, (WPARAM)sel_start, 0);
++        char_idx = (int)SendMessageA(h, EM_LINEINDEX,    (WPARAM)line_idx,  0);
++        line_len = (int)SendMessageA(h, EM_LINELENGTH,   (WPARAM)char_idx,  0);
++        if (line_len == 1) {
++            char lbuf[8];
++            int  copied;
++            *(WORD *)lbuf = sizeof(lbuf);
++            copied = (int)SendMessageA(h, EM_GETLINE,
++                                       (WPARAM)line_idx, (LPARAM)lbuf);
++            if (copied == 1 && lbuf[0] == '.') {
++                arpa_on_send(GetParent(h));
++                return 0;
++            }
++        }
++        /* Not a lone-period line: fall through to default newline. */
++    }
+     /* Multi-line: Enter inserts newline (default). Ctrl+Enter sends. */
+     if (m == WM_KEYDOWN && w == VK_RETURN && (GetKeyState(VK_CONTROL) & 0x8000)) {
+         arpa_on_send(GetParent(h));

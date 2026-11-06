@@ -1,0 +1,46 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2_classes/EmptyClass.as
+---
+Ok:
+  initial_script: []
+  interfaces: []
+  classes:
+    - name: EmptyClass
+      extends: ~
+      implements: []
+      functions: {}
+      virtual_properties: {}
+      fields: {}
+      constructor:
+        signature:
+          name:
+            span:
+              start: 6
+              end: 16
+              file: 0
+            value: EmptyClass
+          args: []
+          return_type: ~
+        body: []
+        scope:
+          defined_variables: {}
+          referenced_variables: []
+          could_reference_anything: false
+        register_count: 1
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

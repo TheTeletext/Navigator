@@ -1,0 +1,4 @@
+# The two Gazette listings are seeded into the reader's Documents\MGT BASIC
+# byte for byte (RCDATA 401/402), ASCII with CRLF, exactly as printed.
+# Store them as-is so no clone's line-ending settings can change them.
+assets/basic/*.BAS -text

@@ -1,0 +1,331 @@
+---
+source: crates/rascal/src/tests.rs
+expression: result
+input_file: samples/as2/try_catch.as
+---
+initializer:
+  actions:
+    - ConstantPool:
+        - " -- try catch finally -- "
+        - try!
+        - message
+        - Hello World!
+        - catch!
+        - e
+        - finally!
+        - " -- try catch -- "
+        - test
+        - "caught something! "
+        - " -- empty try -- "
+        - " -- try with no throw -- "
+        - " -- try with conditional throw -- "
+        - " -- try catch(MovieClip) finally -- "
+        - this
+        - " -- try catch(MovieClip) catch(Number) --"
+        - catch something of MovieClip!
+        - catch something of Number!
+        - catch anything else!
+        - " -- try finally -- "
+        - "If you see this, it didn't throw! :("
+    - Push:
+        - Constant: 0
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 2
+                - Constant: 3
+            - DefineLocal
+            - Push:
+                - Constant: 2
+            - GetVariable
+            - Throw
+            - Jump: loc0000
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 4
+              - Trace
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Trace
+            label_positions: {}
+        finally_body:
+          actions:
+            - Push:
+                - Constant: 6
+            - Trace
+          label_positions:
+            loc0000: 0
+    - Push:
+        - Constant: 7
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 8
+            - Throw
+            - Jump: loc0001
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 10
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Jump: loc0002
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 11
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 2
+                - Constant: 2
+            - DefineLocal
+            - Jump: loc0003
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 12
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 2
+                - Constant: 2
+            - DefineLocal
+            - Push:
+                - Constant: 2
+            - GetVariable
+            - Push:
+                - Constant: 2
+            - Equals2
+            - Not
+            - Not
+            - If: loc0005
+            - Push:
+                - Constant: 2
+            - GetVariable
+            - Throw
+            - Jump: loc0004
+          label_positions:
+            loc0005: 12
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 13
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 14
+            - GetVariable
+            - Throw
+            - Jump: loc0006
+          label_positions: {}
+        catch_body:
+          - Register: 0
+          - actions:
+              - Push:
+                  - String: MovieClip
+              - GetVariable
+              - Push:
+                  - Register: 0
+              - CastOp
+              - PushDuplicate
+              - Push:
+                  - "Null"
+              - Equals2
+              - If: loc0007
+              - Push:
+                  - String: e
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 9
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+              - Jump: loc0006
+              - Pop
+              - Push:
+                  - Register: 0
+              - Throw
+            label_positions:
+              loc0007: 16
+        finally_body:
+          actions:
+            - Push:
+                - Constant: 6
+            - Trace
+          label_positions:
+            loc0006: 0
+    - Push:
+        - Constant: 15
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 14
+            - GetVariable
+            - Throw
+            - Jump: loc0008
+          label_positions: {}
+        catch_body:
+          - Register: 0
+          - actions:
+              - Push:
+                  - String: MovieClip
+              - GetVariable
+              - Push:
+                  - Register: 0
+              - CastOp
+              - PushDuplicate
+              - Push:
+                  - "Null"
+              - Equals2
+              - If: loc0009
+              - Push:
+                  - String: e
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 16
+              - Trace
+              - Jump: loc0008
+              - Pop
+              - Push:
+                  - String: Number
+              - GetVariable
+              - Push:
+                  - Register: 0
+              - CastOp
+              - PushDuplicate
+              - Push:
+                  - "Null"
+              - Equals2
+              - If: loc000a
+              - Push:
+                  - String: e
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 17
+              - Trace
+              - Jump: loc0008
+              - Pop
+              - Push:
+                  - Register: 0
+                  - String: e
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 18
+              - Trace
+            label_positions:
+              loc0009: 14
+              loc000a: 29
+        finally_body: ~
+    - Push:
+        - Constant: 19
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - "Null"
+            - Throw
+            - Jump: loc000b
+          label_positions: {}
+        catch_body: ~
+        finally_body:
+          actions:
+            - Push:
+                - Constant: 6
+            - Trace
+          label_positions:
+            loc000b: 0
+    - Push:
+        - Constant: 20
+    - Trace
+  label_positions:
+    loc0001: 7
+    loc0002: 10
+    loc0003: 13
+    loc0004: 16
+    loc0008: 22
+extra_modules: []
+compile_options:
+  swf_version: 15
+  optimizations:
+    fold_constants: true
+    promote_variables_to_registers: true
+custom_pcodes: []

@@ -1,0 +1,262 @@
+---
+source: crates/rascal/src/tests.rs
+expression: result
+input_file: samples/as2/typed_variables.as
+---
+initializer:
+  actions:
+    - ConstantPool:
+        - Test message
+        - name
+        - age
+        - valid
+        - length
+        - num
+        - str
+        - Hello
+        - flag
+        - obj
+        - arr
+        - numbers
+        - Array
+        - strings
+        - three
+        - two
+        - one
+        - someValue
+        - "123"
+        - numValue
+        - strValue
+        - userData
+        - id
+        - Number
+        - String
+        - User
+        - scores
+    - DefineFunction2:
+        name: add
+        params:
+          - name: a
+            register: 1
+          - name: b
+            register: 2
+        actions:
+          actions:
+            - Push:
+                - Register: 1
+                - Register: 2
+            - Add2
+            - Return
+          label_positions: {}
+        register_count: 3
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - DefineFunction:
+        name: getMessage
+        params: []
+        actions:
+          actions:
+            - Push:
+                - Constant: 0
+            - Return
+          label_positions: {}
+    - DefineFunction2:
+        name: processData
+        params:
+          - name: data
+            register: 1
+        actions:
+          actions:
+            - Push:
+                - Register: 1
+            - Trace
+          label_positions: {}
+        register_count: 2
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - DefineFunction2:
+        name: complexFunc
+        params:
+          - name: name
+            register: 1
+          - name: age
+            register: 2
+          - name: isValid
+            register: 3
+        actions:
+          actions:
+            - Push:
+                - Constant: 1
+                - Register: 1
+                - Constant: 2
+                - Register: 2
+                - Constant: 3
+                - Register: 3
+                - Integer: 3
+            - InitObject
+            - Return
+          label_positions: {}
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - DefineFunction2:
+        name: forEach
+        params:
+          - name: arr
+            register: 1
+          - name: callback
+            register: 2
+        actions:
+          actions:
+            - Push:
+                - Integer: 0
+            - StoreRegister: 3
+            - Pop
+            - Push:
+                - Register: 3
+                - Register: 1
+                - Constant: 4
+            - GetMember
+            - Less2
+            - Not
+            - If: loc0000
+            - Push:
+                - Register: 1
+                - Register: 3
+            - GetMember
+            - Push:
+                - Integer: 1
+                - Register: 2
+                - Undefined
+            - CallMethod
+            - Pop
+            - Push:
+                - Register: 3
+            - Increment
+            - StoreRegister: 3
+            - Pop
+            - Jump: loc0002
+          label_positions:
+            loc0002: 3
+            loc0001: 13
+            loc0000: 18
+        register_count: 4
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - Push:
+        - Constant: 5
+        - Integer: 42
+    - DefineLocal
+    - Push:
+        - Constant: 6
+        - Constant: 7
+    - DefineLocal
+    - Push:
+        - Constant: 8
+        - "True"
+    - DefineLocal
+    - Push:
+        - Constant: 9
+        - Integer: 0
+    - InitObject
+    - DefineLocal
+    - Push:
+        - Constant: 10
+        - Integer: 0
+    - InitArray
+    - DefineLocal
+    - Push:
+        - Constant: 11
+        - Integer: 0
+        - Constant: 12
+    - NewObject
+    - DefineLocal
+    - Push:
+        - Constant: 13
+        - Constant: 14
+        - Constant: 15
+        - Constant: 16
+        - Integer: 3
+    - InitArray
+    - DefineLocal
+    - Push:
+        - Constant: 17
+        - Constant: 18
+    - DefineLocal
+    - Push:
+        - Constant: 19
+        - Constant: 17
+    - GetVariable
+    - ToNumber
+    - DefineLocal
+    - Push:
+        - Constant: 20
+        - Integer: 42
+    - ToString
+    - DefineLocal
+    - Push:
+        - Constant: 21
+        - Constant: 22
+        - Constant: 23
+        - Integer: 1
+    - StoreRegister: 0
+    - SetVariable
+    - Push:
+        - Register: 0
+        - Constant: 1
+        - Constant: 24
+        - Constant: 25
+    - StoreRegister: 0
+    - SetVariable
+    - Push:
+        - Register: 0
+        - Constant: 26
+        - Constant: 12
+        - Integer: 3
+        - Integer: 2
+        - Integer: 1
+        - Integer: 3
+    - InitArray
+    - StoreRegister: 0
+    - SetVariable
+    - Push:
+        - Register: 0
+        - Integer: 3
+    - InitObject
+    - DefineLocal
+  label_positions: {}
+extra_modules: []
+compile_options:
+  swf_version: 15
+  optimizations:
+    fold_constants: true
+    promote_variables_to_registers: true
+custom_pcodes: []

@@ -1,0 +1,1038 @@
+---
+source: crates/rascal/src/tests.rs
+expression: result
+input_file: samples/as2_classes/ClassMembersTest.as
+---
+initializer:
+  actions:
+    - ConstantPool:
+        - this
+        - ClassMembersTest
+        - main
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Integer: 1
+        - Constant: 1
+    - GetVariable
+    - Push:
+        - Constant: 2
+    - CallMethod
+    - Pop
+  label_positions: {}
+extra_modules:
+  - - path.to.ANestedInterface
+    - actions:
+        - ConstantPool: []
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Not
+        - Not
+        - If: loc0000
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+            - Integer: 0
+            - String: Object
+        - NewObject
+        - SetMember
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Not
+        - Not
+        - If: loc0001
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+            - Integer: 0
+            - String: Object
+        - NewObject
+        - SetMember
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedInterface
+        - GetMember
+        - Not
+        - Not
+        - If: loc0002
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedInterface
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - SetMember
+        - Pop
+      label_positions:
+        loc0000: 13
+        loc0001: 30
+        loc0002: 51
+  - - AnEmptyInterface
+    - actions:
+        - ConstantPool: []
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: AnEmptyInterface
+        - GetMember
+        - Not
+        - Not
+        - If: loc0000
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: AnEmptyInterface
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - SetMember
+        - Pop
+      label_positions:
+        loc0000: 13
+  - - path.to.ANestedBaseClass
+    - actions:
+        - ConstantPool: []
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Not
+        - Not
+        - If: loc0000
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+            - Integer: 0
+            - String: Object
+        - NewObject
+        - SetMember
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Not
+        - Not
+        - If: loc0001
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+            - Integer: 0
+            - String: Object
+        - NewObject
+        - SetMember
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedBaseClass
+        - GetMember
+        - Not
+        - Not
+        - If: loc0002
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedBaseClass
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - StoreRegister: 1
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: prototype
+        - GetMember
+        - StoreRegister: 2
+        - Pop
+        - Push:
+            - Integer: 1
+            - "Null"
+            - String: path
+        - GetVariable
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedBaseClass
+        - GetMember
+        - Push:
+            - String: prototype
+        - GetMember
+        - Push:
+            - Integer: 3
+            - String: ASSetPropFlags
+        - CallFunction
+        - Pop
+      label_positions:
+        loc0000: 13
+        loc0001: 30
+        loc0002: 66
+  - - path.to.ANestedClass
+    - actions:
+        - ConstantPool:
+            - path
+            - to
+            - ANestedClass
+            - message
+            - Success!
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Not
+        - Not
+        - If: loc0000
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+            - Integer: 0
+            - String: Object
+        - NewObject
+        - SetMember
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Not
+        - Not
+        - If: loc0001
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+            - Integer: 0
+            - String: Object
+        - NewObject
+        - SetMember
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedClass
+        - GetMember
+        - Not
+        - Not
+        - If: loc0002
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedClass
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - StoreRegister: 1
+        - SetMember
+        - Push:
+            - String: path
+        - GetVariable
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedClass
+        - GetMember
+        - Push:
+            - String: path
+        - GetVariable
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedBaseClass
+        - GetMember
+        - Extends
+        - Push:
+            - Register: 1
+            - String: prototype
+        - GetMember
+        - StoreRegister: 2
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedInterface
+        - GetMember
+        - Push:
+            - Integer: 1
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: path
+        - GetMember
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedClass
+        - GetMember
+        - ImplementsOp
+        - Push:
+            - Register: 1
+            - String: create
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Integer: 0
+                    - Constant: 0
+                - GetVariable
+                - Push:
+                    - Constant: 1
+                - GetMember
+                - Push:
+                    - Constant: 2
+                - NewMethod
+                - Return
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: success
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 0
+                - GetVariable
+                - Push:
+                    - Constant: 1
+                - GetMember
+                - Push:
+                    - Constant: 2
+                - GetMember
+                - Push:
+                    - Constant: 3
+                - GetMember
+                - Trace
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: message
+            - Constant: 4
+        - SetMember
+        - Push:
+            - Integer: 1
+            - "Null"
+            - String: path
+        - GetVariable
+        - Push:
+            - String: to
+        - GetMember
+        - Push:
+            - String: ANestedClass
+        - GetMember
+        - Push:
+            - String: prototype
+        - GetMember
+        - Push:
+            - Integer: 3
+            - String: ASSetPropFlags
+        - CallFunction
+        - Pop
+      label_positions:
+        loc0000: 13
+        loc0001: 30
+        loc0002: 104
+  - - ClassMembersTest
+    - actions:
+        - ConstantPool:
+            - world
+            - greet
+            - BitmapData
+            - "regularPropertyWithoutValue: "
+            - regularPropertyWithoutValue
+            - path
+            - to
+            - ANestedClass
+            - create
+            - success
+            - a value
+            - __set__virtualProperty
+            - __get__virtualProperty
+            - test!
+            - "Hey, "
+            - "!"
+            - ClassMembersTest
+            - shoutStatically
+            - scream
+            - virtual!
+            - getter
+            - "New value: "
+            - __get__onlySetter
+            - "Virtually setting to "
+            - Static!
+            - __get__virtualPropertyProbablyStatic
+            - __get__virtualPropertyProbablyNotStatic
+            - ""
+            - virtualProperty
+            - foo
+            - BitmapData on class!
+            - Ahhh!
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: ClassMembersTest
+        - GetMember
+        - Not
+        - Not
+        - If: loc0000
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: ClassMembersTest
+        - DefineFunction2:
+            name: ""
+            params:
+              - name: name
+                register: 0
+            actions:
+              actions:
+                - Push:
+                    - Constant: 0
+                    - Integer: 1
+                    - Register: 1
+                    - Constant: 1
+                - CallMethod
+                - Pop
+                - Push:
+                    - Register: 1
+                    - Constant: 2
+                - GetMember
+                - Trace
+                - Push:
+                    - Constant: 3
+                    - Register: 1
+                    - Constant: 4
+                - GetMember
+                - Add2
+                - Trace
+                - Push:
+                    - Integer: 0
+                    - Integer: 0
+                    - Constant: 5
+                - GetVariable
+                - Push:
+                    - Constant: 6
+                - GetMember
+                - Push:
+                    - Constant: 7
+                - GetMember
+                - Push:
+                    - Constant: 8
+                - CallMethod
+                - Push:
+                    - Constant: 9
+                - CallMethod
+                - Trace
+                - Push:
+                    - Constant: 10
+                    - Integer: 1
+                    - Register: 1
+                    - Constant: 11
+                - CallMethod
+                - Pop
+                - Push:
+                    - Integer: 0
+                    - Register: 1
+                    - Constant: 12
+                - CallMethod
+                - Trace
+              label_positions: {}
+            register_count: 2
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - StoreRegister: 1
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: prototype
+        - GetMember
+        - StoreRegister: 2
+        - Pop
+        - Push:
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: AnEmptyInterface
+        - GetMember
+        - Push:
+            - Integer: 1
+            - String: _global
+        - GetVariable
+        - Push:
+            - String: ClassMembersTest
+        - GetMember
+        - ImplementsOp
+        - Push:
+            - Register: 2
+            - String: test
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 13
+                - Trace
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: greet
+        - DefineFunction2:
+            name: ""
+            params:
+              - name: name
+                register: 1
+            actions:
+              actions:
+                - Push:
+                    - Constant: 14
+                    - Register: 1
+                - Add2
+                - Push:
+                    - Constant: 15
+                - Add2
+                - Trace
+                - Push:
+                    - Integer: 0
+                    - Constant: 16
+                - GetVariable
+                - Push:
+                    - Constant: 17
+                - CallMethod
+                - Pop
+              label_positions: {}
+            register_count: 2
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: shoutStatically
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 16
+                - GetVariable
+                - Push:
+                    - Constant: 18
+                - GetMember
+                - Trace
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: maybeABitmapData
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - "Null"
+                - Return
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: secret
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: notASecret
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __get__virtualProperty
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 19
+                - Return
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __get__onlyGetter
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 20
+                - Return
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __set__onlySetter
+        - DefineFunction2:
+            name: ""
+            params:
+              - name: value
+                register: 2
+            actions:
+              actions:
+                - Push:
+                    - Constant: 21
+                    - Register: 2
+                - Add2
+                - Trace
+                - Push:
+                    - Integer: 0
+                    - Register: 1
+                    - Constant: 22
+                - CallMethod
+                - Return
+              label_positions: {}
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __set__virtualProperty
+        - DefineFunction2:
+            name: ""
+            params:
+              - name: value
+                register: 2
+            actions:
+              actions:
+                - Push:
+                    - Constant: 23
+                    - Register: 2
+                - Add2
+                - Trace
+                - Push:
+                    - Integer: 0
+                    - Register: 1
+                    - Constant: 12
+                - CallMethod
+                - Return
+              label_positions: {}
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: __get__virtualPropertyProbablyStatic
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 24
+                - Return
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __set__virtualPropertyProbablyStatic
+        - DefineFunction2:
+            name: ""
+            params:
+              - name: value
+                register: 2
+            actions:
+              actions:
+                - Push:
+                    - Constant: 21
+                    - Register: 2
+                - Add2
+                - Trace
+                - Push:
+                    - Integer: 0
+                    - Register: 1
+                    - Constant: 25
+                - CallMethod
+                - Return
+              label_positions: {}
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __set__virtualPropertyProbablyNotStatic
+        - DefineFunction2:
+            name: ""
+            params:
+              - name: value
+                register: 2
+            actions:
+              actions:
+                - Push:
+                    - Constant: 21
+                    - Register: 2
+                - Add2
+                - Trace
+                - Push:
+                    - Integer: 0
+                    - Register: 1
+                    - Constant: 26
+                - CallMethod
+                - Return
+              label_positions: {}
+            register_count: 3
+            preload_this: true
+            suppress_this: false
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: __get__virtualPropertyProbablyNotStatic
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 24
+                - Return
+              label_positions: {}
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: main
+        - DefineFunction2:
+            name: ""
+            params: []
+            actions:
+              actions:
+                - Push:
+                    - Constant: 27
+                    - Integer: 1
+                    - Constant: 16
+                - NewObject
+                - StoreRegister: 1
+                - Pop
+                - Push:
+                    - Register: 1
+                    - Constant: 28
+                    - Constant: 29
+                - SetMember
+                - Push:
+                    - Register: 1
+                - StoreRegister: 2
+                - Pop
+                - Push:
+                    - Constant: 29
+                    - Integer: 1
+                    - Register: 2
+                    - Constant: 11
+                - CallMethod
+                - Pop
+                - Push:
+                    - Integer: 0
+                    - Register: 2
+                    - Constant: 12
+                - CallMethod
+                - Trace
+              label_positions: {}
+            register_count: 3
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: regularPropertySetToFive
+            - Integer: 5
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: BitmapData
+            - Constant: 30
+        - SetMember
+        - Push:
+            - Register: 1
+            - String: scream
+            - Constant: 31
+        - SetMember
+        - Push:
+            - Register: 2
+            - String: __set__virtualProperty
+        - GetMember
+        - Push:
+            - Register: 2
+            - String: __get__virtualProperty
+        - GetMember
+        - Push:
+            - String: virtualProperty
+            - Integer: 3
+            - Register: 2
+            - String: addProperty
+        - CallMethod
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - Push:
+            - Register: 2
+            - String: __get__onlyGetter
+        - GetMember
+        - Push:
+            - String: onlyGetter
+            - Integer: 3
+            - Register: 2
+            - String: addProperty
+        - CallMethod
+        - Push:
+            - Register: 2
+            - String: __set__onlySetter
+        - GetMember
+        - DefineFunction:
+            name: ""
+            params: []
+            actions:
+              actions: []
+              label_positions: {}
+        - Push:
+            - String: onlySetter
+            - Integer: 3
+            - Register: 2
+            - String: addProperty
+        - CallMethod
+        - Push:
+            - Register: 1
+            - String: __set__virtualPropertyProbablyStatic
+        - GetMember
+        - Push:
+            - Register: 1
+            - String: __get__virtualPropertyProbablyStatic
+        - GetMember
+        - Push:
+            - String: virtualPropertyProbablyStatic
+            - Integer: 3
+            - Register: 1
+            - String: addProperty
+        - CallMethod
+        - Push:
+            - Register: 2
+            - String: __set__virtualPropertyProbablyNotStatic
+        - GetMember
+        - Push:
+            - Register: 2
+            - String: __get__virtualPropertyProbablyNotStatic
+        - GetMember
+        - Push:
+            - String: virtualPropertyProbablyNotStatic
+            - Integer: 3
+            - Register: 2
+            - String: addProperty
+        - CallMethod
+        - Push:
+            - Integer: 1
+            - "Null"
+            - String: ClassMembersTest
+        - GetVariable
+        - Push:
+            - String: prototype
+        - GetMember
+        - Push:
+            - Integer: 3
+            - String: ASSetPropFlags
+        - CallFunction
+        - Pop
+      label_positions:
+        loc0000: 112
+compile_options:
+  swf_version: 15
+  optimizations:
+    fold_constants: true
+    promote_variables_to_registers: true
+custom_pcodes: []

@@ -1,0 +1,33 @@
+[package]
+name = "id3"
+version = "1.17.2"
+edition = "2024"
+rust-version = "1.85"
+authors = [
+    "polyfloyd <floyd@polyfloyd.net>",
+]
+license = "MIT"
+readme = "README.md"
+repository = "https://codeberg.org/polyfloyd/rust-id3"
+description = "A library for reading and writing ID3 metadata"
+keywords = ["id3", "mp3", "wav", "aiff", "metadata"]
+categories = ["encoding", "multimedia", "multimedia::audio", "parser-implementations",]
+include = ["src/*", "Cargo.toml", "LICENSE", "README.md"]
+
+[dependencies]
+bitflags = "2.0"
+byteorder = "1.4"
+flate2 = "1"
+tokio = { version = "1.21", default-features = false, features = ["rt", "macros", "io-util", "fs"], optional = true}
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = ["decode_picture"]
+
+## Support parsing ID3 tags with Tokio
+tokio = ["dep:tokio"]
+
+## Picture decoding takes ~20% of time. Allow disabling it if it's unneeded.
+decode_picture = []

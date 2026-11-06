@@ -1,0 +1,45 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2/assign_variable_and_trace.as
+---
+Ok:
+  initial_script:
+    - Declare:
+        name:
+          span:
+            start: 4
+            end: 11
+            file: 0
+          value: message
+        value:
+          span:
+            start: 14
+            end: 27
+            file: 0
+          value:
+            Constant:
+              String: Hello World
+        type_name: ~
+    - Expr:
+        span:
+          start: 29
+          end: 43
+          file: 0
+        value:
+          Trace:
+            span:
+              start: 35
+              end: 42
+              file: 0
+            value:
+              Constant:
+                Identifier: message
+  interfaces: []
+  classes: []
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

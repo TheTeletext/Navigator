@@ -1,0 +1,328 @@
+---
+source: crates/rascal/src/internal/as2_pcode/parser/tests.rs
+expression: parsed
+input_file: samples/as2_pcode/try_catch.pcode
+---
+Ok:
+  actions:
+    - ConstantPool:
+        - " -- try catch finally -- "
+        - try!
+        - message
+        - Hello World!
+        - catch!
+        - e
+        - finally!
+        - " -- try catch -- "
+        - test
+        - "caught something! "
+        - " -- empty try -- "
+        - " -- try with no throw -- "
+        - " -- try with conditional throw -- "
+        - " -- try catch(MovieClip) finally -- "
+        - this
+        - MovieClip
+        - " -- try catch(MovieClip) catch(Number) --"
+        - catch something of MovieClip!
+        - Number
+        - catch something of Number!
+        - catch anything else!
+        - " -- try finally -- "
+        - "If you see this, it didn\\'t throw! :("
+    - Push:
+        - Constant: 0
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 2
+            - Push:
+                - Constant: 3
+            - DefineLocal
+            - Push:
+                - Constant: 2
+            - GetVariable
+            - Throw
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 4
+              - Trace
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Trace
+            label_positions: {}
+        finally_body:
+          actions:
+            - Push:
+                - Constant: 6
+            - Trace
+          label_positions: {}
+    - Push:
+        - Constant: 7
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 8
+            - Throw
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 10
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Jump: loc023c
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 11
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 2
+            - Push:
+                - Constant: 2
+            - DefineLocal
+            - Jump: loc026b
+          label_positions: {}
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 12
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 2
+            - Push:
+                - Constant: 2
+            - DefineLocal
+            - Push:
+                - Constant: 2
+            - GetVariable
+            - Push:
+                - Constant: 2
+            - Equals2
+            - Not
+            - Not
+            - If: loc02a2
+            - Push:
+                - Constant: 2
+            - GetVariable
+            - Throw
+            - Jump: loc02b4
+          label_positions:
+            loc02a2: 13
+        catch_body:
+          - Variable: e
+          - actions:
+              - Push:
+                  - Constant: 9
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+            label_positions: {}
+        finally_body: ~
+    - Push:
+        - Constant: 13
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 14
+            - GetVariable
+            - Throw
+          label_positions: {}
+        catch_body:
+          - Register: 0
+          - actions:
+              - Push:
+                  - Constant: 15
+              - GetVariable
+              - Push:
+                  - Register: 0
+              - CastOp
+              - PushDuplicate
+              - Push:
+                  - "Null"
+              - Equals2
+              - If: loc0302
+              - Push:
+                  - Constant: 5
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 9
+              - Push:
+                  - Constant: 5
+              - GetVariable
+              - Add2
+              - Trace
+              - Jump: loc0309
+              - Pop
+              - Push:
+                  - Register: 0
+              - Throw
+            label_positions:
+              loc0302: 17
+        finally_body:
+          actions:
+            - Push:
+                - Constant: 6
+            - Trace
+          label_positions:
+            loc0309: 0
+    - Push:
+        - Constant: 16
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - Constant: 14
+            - GetVariable
+            - Throw
+          label_positions: {}
+        catch_body:
+          - Register: 0
+          - actions:
+              - Push:
+                  - Constant: 15
+              - GetVariable
+              - Push:
+                  - Register: 0
+              - CastOp
+              - PushDuplicate
+              - Push:
+                  - "Null"
+              - Equals2
+              - If: loc0356
+              - Push:
+                  - Constant: 5
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 17
+              - Trace
+              - Jump: loc0398
+              - Pop
+              - Push:
+                  - Constant: 18
+              - GetVariable
+              - Push:
+                  - Register: 0
+              - CastOp
+              - PushDuplicate
+              - Push:
+                  - "Null"
+              - Equals2
+              - If: loc0380
+              - Push:
+                  - Constant: 5
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 19
+              - Trace
+              - Jump: loc0398
+              - Pop
+              - Push:
+                  - Register: 0
+              - Push:
+                  - Constant: 5
+              - StackSwap
+              - DefineLocal
+              - Push:
+                  - Constant: 20
+              - Trace
+              - Jump: loc0398
+            label_positions:
+              loc0356: 14
+              loc0380: 29
+        finally_body: ~
+    - Push:
+        - Constant: 21
+    - Trace
+    - Try:
+        try_body:
+          actions:
+            - Push:
+                - Constant: 1
+            - Trace
+            - Push:
+                - "Null"
+            - Throw
+          label_positions: {}
+        catch_body: ~
+        finally_body:
+          actions:
+            - Push:
+                - Constant: 6
+            - Trace
+          label_positions: {}
+    - Push:
+        - Constant: 22
+    - Trace
+  label_positions:
+    loc023c: 10
+    loc026b: 13
+    loc02b4: 16
+    loc0398: 22

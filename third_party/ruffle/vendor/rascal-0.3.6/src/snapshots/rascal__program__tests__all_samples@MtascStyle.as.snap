@@ -1,0 +1,284 @@
+---
+source: crates/rascal/src/program.rs
+expression: parsed
+input_file: samples/as2_classes/MtascStyle.as
+---
+Ok:
+  initial_script:
+    - Expr:
+        span:
+          start: 0
+          end: 0
+          file: ~
+        value:
+          Call:
+            name:
+              span:
+                start: 0
+                end: 0
+                file: ~
+              value:
+                Field:
+                  - span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value:
+                      Constant:
+                        Identifier: MtascStyle
+                  - span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value:
+                      Constant:
+                        String: main
+            args:
+              - span:
+                  start: 0
+                  end: 0
+                  file: ~
+                value:
+                  Constant:
+                    Identifier: this
+  interfaces:
+    - name: path.to.ANestedInterface
+      extends: ~
+      functions:
+        success:
+          name:
+            span:
+              start: 47
+              end: 54
+              file: 1
+            value: success
+          args: []
+          return_type: ~
+    - name: AnEmptyInterface
+      extends: ~
+      functions: {}
+  classes:
+    - name: MtascStyle
+      extends: ~
+      implements: []
+      functions:
+        main:
+          function:
+            signature:
+              name:
+                span:
+                  start: 46
+                  end: 50
+                  file: 0
+                value: main
+              args: []
+              return_type: ~
+            body:
+              - Expr:
+                  span:
+                    start: 63
+                    end: 84
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 69
+                        end: 83
+                        file: 0
+                      value:
+                        Constant:
+                          String: Main method!
+              - Expr:
+                  span:
+                    start: 94
+                    end: 122
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 100
+                        end: 121
+                        file: 0
+                      value:
+                        CastToObject:
+                          class:
+                            span:
+                              start: 100
+                              end: 116
+                              file: 0
+                            value:
+                              Constant:
+                                Identifier: AnEmptyInterface
+                          object:
+                            span:
+                              start: 117
+                              end: 120
+                              file: 0
+                            value:
+                              Constant:
+                                Identifier: foo
+              - Expr:
+                  span:
+                    start: 132
+                    end: 158
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 138
+                        end: 157
+                        file: 0
+                      value:
+                        Call:
+                          name:
+                            span:
+                              start: 138
+                              end: 152
+                              file: 0
+                            value:
+                              Constant:
+                                Identifier: NotAnInterface
+                          args:
+                            - span:
+                                start: 153
+                                end: 156
+                                file: 0
+                              value:
+                                Constant:
+                                  Identifier: foo
+              - Expr:
+                  span:
+                    start: 168
+                    end: 204
+                    file: 0
+                  value:
+                    Trace:
+                      span:
+                        start: 181
+                        end: 203
+                        file: 0
+                      value:
+                        CastToObject:
+                          class:
+                            span:
+                              start: 181
+                              end: 198
+                              file: 0
+                            value:
+                              Field:
+                                - span:
+                                    start: 178
+                                    end: 181
+                                    file: 0
+                                  value:
+                                    Field:
+                                      - span:
+                                          start: 174
+                                          end: 178
+                                          file: 0
+                                        value:
+                                          Constant:
+                                            Identifier: path
+                                      - span:
+                                          start: 179
+                                          end: 181
+                                          file: 0
+                                        value:
+                                          Constant:
+                                            String: to
+                                - span:
+                                    start: 182
+                                    end: 198
+                                    file: 0
+                                  value:
+                                    Constant:
+                                      String: ANestedInterface
+                          object:
+                            span:
+                              start: 199
+                              end: 202
+                              file: 0
+                            value:
+                              Constant:
+                                Identifier: foo
+            scope:
+              defined_variables:
+                this:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name:
+                    span:
+                      start: 0
+                      end: 0
+                      file: ~
+                    value: MtascStyle
+                arguments:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                super:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _root:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _parent:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+                _global:
+                  used: false
+                  used_in_inner_scope: false
+                  type_name: ~
+              referenced_variables:
+                - AnEmptyInterface
+                - foo
+                - NotAnInterface
+                - path
+              could_reference_anything: false
+            register_count: 1
+            preload_this: false
+            suppress_this: true
+            preload_arguments: false
+            suppress_arguments: true
+            preload_super: false
+            suppress_super: true
+            preload_root: false
+            preload_parent: false
+            preload_global: false
+          is_static: true
+      virtual_properties: {}
+      fields: {}
+      constructor:
+        signature:
+          name:
+            span:
+              start: 6
+              end: 16
+              file: 0
+            value: MtascStyle
+          args: []
+          return_type: ~
+        body: []
+        scope:
+          defined_variables: {}
+          referenced_variables: []
+          could_reference_anything: false
+        register_count: 1
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+  custom_pcodes: []
+  compile_options:
+    swf_version: 15
+    optimizations:
+      fold_constants: true
+      promote_variables_to_registers: true

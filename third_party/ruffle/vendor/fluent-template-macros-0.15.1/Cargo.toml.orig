@@ -1,0 +1,31 @@
+[package]
+name = "fluent-template-macros"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description.workspace = true
+license.workspace = true
+documentation.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+resolver = "2"
+
+[lib]
+proc-macro = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = []
+ignore = ["dep:ignore", "dep:flume"]
+walkdir = ["dep:walkdir"]
+
+[dependencies]
+quote = "1.0.15"
+syn = { version = "2.0", features = ["full"] }
+proc-macro2 = "1.0.36"
+ignore = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
+unic-langid = { workspace = true }
+walkdir = { workspace = true, optional = true }

@@ -1,0 +1,100 @@
+---
+source: crates/rascal/src/tests.rs
+expression: result
+input_file: samples/as2/op_precedence/inc_dec.as
+---
+initializer:
+  actions:
+    - ConstantPool:
+        - a
+        - trc
+    - Push:
+        - Constant: 0
+        - Integer: 10
+    - DefineLocal
+    - Push:
+        - Constant: 1
+    - DefineFunction2:
+        name: ""
+        params:
+          - name: msg
+            register: 1
+        actions:
+          actions:
+            - Push:
+                - Register: 1
+            - Trace
+          label_positions: {}
+        register_count: 2
+        preload_this: false
+        suppress_this: true
+        preload_arguments: false
+        suppress_arguments: true
+        preload_super: false
+        suppress_super: true
+        preload_root: false
+        preload_parent: false
+        preload_global: false
+    - DefineLocal
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Constant: 0
+        - Constant: 0
+    - GetVariable
+    - Increment
+    - SetVariable
+    - Push:
+        - Integer: 1
+        - Constant: 1
+    - CallFunction
+    - Pop
+    - Push:
+        - Constant: 0
+    - GetVariable
+    - Push:
+        - Constant: 0
+        - Constant: 0
+    - GetVariable
+    - Decrement
+    - SetVariable
+    - Push:
+        - Integer: 1
+        - Constant: 1
+    - CallFunction
+    - Pop
+    - Push:
+        - Constant: 0
+        - Constant: 0
+    - GetVariable
+    - Increment
+    - StoreRegister: 0
+    - SetVariable
+    - Push:
+        - Register: 0
+        - Integer: 1
+        - Constant: 1
+    - CallFunction
+    - Pop
+    - Push:
+        - Constant: 0
+        - Constant: 0
+    - GetVariable
+    - Decrement
+    - StoreRegister: 0
+    - SetVariable
+    - Push:
+        - Register: 0
+        - Integer: 1
+        - Constant: 1
+    - CallFunction
+    - Pop
+  label_positions: {}
+extra_modules: []
+compile_options:
+  swf_version: 15
+  optimizations:
+    fold_constants: true
+    promote_variables_to_registers: true
+custom_pcodes: []
