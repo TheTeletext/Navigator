@@ -38,6 +38,35 @@
 401 RCDATA "../assets/basic/RETRO649.BAS"
 402 RCDATA "../assets/basic/DIALUP.BAS"
 
+/* Navigator 1.1: the Windows 3.1 ribbon and launcher icons, 32x32 in
+ * the 16-colour VGA palette, drawn by tools/make_w31_icons.py. */
+500 BITMAP "../assets/w31icons/home.bmp"
+501 BITMAP "../assets/w31icons/ripscrip.bmp"
+502 BITMAP "../assets/w31icons/nabu.bmp"
+503 BITMAP "../assets/w31icons/videotex.bmp"
+504 BITMAP "../assets/w31icons/web.bmp"
+505 BITMAP "../assets/w31icons/gopher.bmp"
+506 BITMAP "../assets/w31icons/arpanet.bmp"
+507 BITMAP "../assets/w31icons/wais.bmp"
+508 BITMAP "../assets/w31icons/archie.bmp"
+509 BITMAP "../assets/w31icons/irc.bmp"
+510 BITMAP "../assets/w31icons/cuseeme.bmp"
+511 BITMAP "../assets/w31icons/terminal.bmp"
+512 BITMAP "../assets/w31icons/gwbasic.bmp"
+513 BITMAP "../assets/w31icons/ftp.bmp"
+514 BITMAP "../assets/w31icons/newsgroups.bmp"
+520 BITMAP "../assets/cusmicons/testpattern.bmp"   /* IDB_CUSM_TESTPATTERN */
+530 BITMAP "../assets/w31icons/gt_menu.bmp"
+531 BITMAP "../assets/w31icons/gt_text.bmp"
+532 BITMAP "../assets/w31icons/gt_search.bmp"
+533 BITMAP "../assets/w31icons/gt_telnet.bmp"
+534 BITMAP "../assets/w31icons/gt_image.bmp"
+535 BITMAP "../assets/w31icons/gt_video.bmp"
+536 BITMAP "../assets/w31icons/gt_binary.bmp"
+537 BITMAP "../assets/w31icons/gt_sound.bmp"
+538 BITMAP "../assets/w31icons/gt_unknown.bmp"
+539 BITMAP "../assets/w31icons/gt_link.bmp"
+
 1 VERSIONINFO
 FILEVERSION    SUITE_VERSION_MAJOR, SUITE_VERSION_MINOR, SUITE_VERSION_PATCH, SUITE_VERSION_BUILD
 PRODUCTVERSION SUITE_VERSION_MAJOR, SUITE_VERSION_MINOR, SUITE_VERSION_PATCH, SUITE_VERSION_BUILD

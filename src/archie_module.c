@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "suite_w31.h"
 
 /* Module-local control IDs (3000+). */
 #define IDC_A_SEARCH_EDIT   3001
@@ -111,6 +112,7 @@ static HFONT g_a_bold_font = NULL;
 /* Index into g_a_result.hits of the currently selected file, or -1 for
  * none. Drives the Download button's enabled state. */
 static int g_a_selected_hit = -1;
+static BOOL archie_dl_running(void);   /* 2026-11-12, defined with the download */
 
 static BOOL g_a_controls_created = FALSE;
 
@@ -276,7 +278,8 @@ static void archie_clear_detail(void)
     SetWindowTextA(g_a_host_val,  "");
     /* No file selected: disable Download. */
     g_a_selected_hit = -1;
-    if (g_a_download_btn) EnableWindow(g_a_download_btn, FALSE);
+    /* not while a download runs: then the button is its Cancel */
+    if (g_a_download_btn && !archie_dl_running()) EnableWindow(g_a_download_btn, FALSE);
 }
 
 static void archie_clear_panes(void)
@@ -386,6 +389,10 @@ typedef struct ArchieQueryCtx {
 
     volatile LONG        done;
     archie_result_t      result;
+    /* the reply's ARDP packets so far and its packet count (2026-11-11):
+     * a true percentage for a multi-packet reply */
+    volatile LONG        prog_got, prog_total;
+    LONG                 shown_got;
 } ArchieQueryCtx;
 
 static ArchieQueryCtx *g_a_query      = NULL;
@@ -394,8 +401,9 @@ static UINT_PTR        g_a_query_timer = 0;
 static DWORD WINAPI archie_query_worker(LPVOID arg)
 {
     ArchieQueryCtx *ctx = (ArchieQueryCtx *)arg;
-    archie_query(ctx->server, ctx->port, ctx->term, ctx->type,
-                 ctx->exact_first, ctx->maxhits, &ctx->result);
+    archie_query_progress(ctx->server, ctx->port, ctx->term, ctx->type,
+                          ctx->exact_first, ctx->maxhits, &ctx->result,
+                          &ctx->prog_got, &ctx->prog_total);
     InterlockedExchange(&ctx->done, 1);
     return 0;
 }
@@ -406,9 +414,27 @@ static void CALLBACK archie_query_timer_proc(HWND hwnd, UINT msg,
     ArchieQueryCtx *ctx;
     (void)msg; (void)time;
 
-    if (!g_a_query || !g_a_query->done) return;
+    if (!g_a_query) return;
+    if (!g_a_query->done) {
+        /* A multi-packet reply: a true percentage of its packets (the
+         * ARDP header carries the count). A single-packet reply has
+         * nothing to measure and keeps "Searching Archie...". */
+        ArchieQueryCtx *q = g_a_query;
+        LONG got = InterlockedCompareExchange(&q->prog_got, 0, 0);
+        LONG tot = InterlockedCompareExchange(&q->prog_total, 0, 0);
+        if (tot > 1 && got > 0 && got != q->shown_got) {
+            char m[96];
+            q->shown_got = got;
+            _snprintf(m, sizeof m, "Searching Archie: packet %ld of %ld", (long)got, (long)tot);
+            m[sizeof m - 1] = '\0';
+            archie_status(m);
+            suite_set_progress(SUITE_ID_BTN_ARCHIE, (int)((long long)got * 100 / tot));
+        }
+        return;
+    }
 
     KillTimer(hwnd, id);
+    suite_set_progress(SUITE_ID_BTN_ARCHIE, -1);
     g_a_query_timer = 0;
     ctx = g_a_query;
     g_a_query = NULL;
@@ -427,21 +453,18 @@ static void CALLBACK archie_query_timer_proc(HWND hwnd, UINT msg,
          * floor. Announcing VERSION 5 means it should no longer arrive; if
          * it does, something has fallen back to v1 and the user should see
          * it rather than silently receive a short answer. */
+        /* Completion text (2026-11-11, docs/2026-11-11_STATUS_PROGRESS.md):
+         * "Search: Done (N hits)". The bar, shown while a multi-packet
+         * reply arrives, goes away here. */
         char line[512];
-        if (ctx->result.warning[0]) {
-            if (ctx->result.hit_count > 0)
-                _snprintf(line, sizeof line, "%s  [server warning: %s]",
-                          ctx->result.message, ctx->result.warning);
-            else
-                _snprintf(line, sizeof line, "No matches.  [server warning: %s]",
-                          ctx->result.warning);
-            line[sizeof line - 1] = '\0';
-            archie_status(line);
-        } else if (ctx->result.hit_count > 0) {
-            archie_status(ctx->result.message);
-        } else {
-            archie_status("No matches.");
-        }
+        int  n = (int)ctx->result.hit_count;
+        if (ctx->result.warning[0])
+            _snprintf(line, sizeof line, "Search: Done (%d hit%s)  [server warning: %s]",
+                      n, n == 1 ? "" : "s", ctx->result.warning);
+        else
+            _snprintf(line, sizeof line, "Search: Done (%d hit%s)", n, n == 1 ? "" : "s");
+        line[sizeof line - 1] = '\0';
+        archie_status(line);
     } else {
         archie_status(ctx->result.message[0] ? ctx->result.message
                                              : "Archie query failed.");
@@ -549,6 +572,7 @@ typedef struct ArchieDlCtx {
     char          local[MAX_PATH];
     volatile LONG done;
     volatile LONG bytes;     /* progress, updated by the worker */
+    volatile LONG cancel;    /* 2026-11-12: set by the Cancel button */
     int           ok;
     long          total;
     char          msg[256];
@@ -556,6 +580,8 @@ typedef struct ArchieDlCtx {
 
 static ArchieDlCtx *g_a_dl       = NULL;
 static UINT_PTR     g_a_dl_timer = 0;
+
+static BOOL archie_dl_running(void) { return g_a_dl != NULL; }
 
 /* Worker-thread progress callback: no UI here, just publish the count. */
 static void archie_dl_progress(void *user, long bytes)
@@ -570,8 +596,8 @@ static DWORD WINAPI archie_dl_worker(LPVOID arg)
     char err[256];
     long total = 0;
     err[0] = '\0';
-    c->ok = ftp_fetch_file(c->host, FTP_FETCH_DEFAULT_PORT, c->remote, c->local,
-                           archie_dl_progress, c, &total, err, sizeof err);
+    c->ok = ftp_fetch_file_ex(c->host, FTP_FETCH_DEFAULT_PORT, c->remote, c->local,
+                              archie_dl_progress, c, &c->cancel, &total, err, sizeof err);
     c->total = total;
     if (c->ok)
         _snprintf(c->msg, sizeof c->msg, "Saved %ld bytes to %s", total, c->local);
@@ -604,8 +630,12 @@ static void CALLBACK archie_dl_timer_proc(HWND hwnd, UINT msg,
     g_a_dl = NULL;
 
     archie_status(c->msg);
-    /* Re-enable Download only if a valid file is still selected. */
-    if (g_a_download_btn) EnableWindow(g_a_download_btn, g_a_selected_hit >= 0);
+    /* The button reads Download again; enabled only if a valid file is
+     * still selected. */
+    if (g_a_download_btn) {
+        SetWindowTextA(g_a_download_btn, "Download");
+        EnableWindow(g_a_download_btn, g_a_selected_hit >= 0);
+    }
     free(c);
 }
 
@@ -618,7 +648,15 @@ static void archie_on_download(void)
     HANDLE thr;
     HWND owner;
 
-    if (g_a_dl) return;              /* one transfer at a time */
+    if (g_a_dl) {
+        /* 2026-11-12: while a download runs this button reads Cancel
+         * (ftp_fetch_file_ex stops within ~200 ms, removes the partial
+         * file, and the timer restores the button). */
+        InterlockedExchange(&g_a_dl->cancel, 1);
+        if (g_a_download_btn) EnableWindow(g_a_download_btn, FALSE);
+        archie_status("Cancelling the download...");
+        return;
+    }
     if (!g_a_have_result || g_a_selected_hit < 0 ||
         g_a_selected_hit >= g_a_result.hit_count) {
         archie_status("Select a file to download.");
@@ -644,7 +682,7 @@ static void archie_on_download(void)
     ofn.nMaxFile    = sizeof path;
     ofn.lpstrTitle  = "Download file";
     ofn.Flags       = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
-    if (!GetSaveFileNameA(&ofn))
+    if (!W31_UNHOOKED(GetSaveFileNameA(&ofn)))
         return;                      /* Cancel: clean no-op */
 
     ctx = (ArchieDlCtx *)calloc(1, sizeof(*ctx));
@@ -654,13 +692,13 @@ static void archie_on_download(void)
     strncpy(ctx->local,  path,        sizeof ctx->local  - 1);
 
     g_a_dl = ctx;
-    if (g_a_download_btn) EnableWindow(g_a_download_btn, FALSE);
+    if (g_a_download_btn) SetWindowTextA(g_a_download_btn, "Cancel");
     archie_status("Downloading...");
 
     thr = CreateThread(NULL, 0, archie_dl_worker, ctx, 0, NULL);
     if (!thr) {
         archie_status("Cannot start download thread.");
-        if (g_a_download_btn) EnableWindow(g_a_download_btn, TRUE);
+        if (g_a_download_btn) { SetWindowTextA(g_a_download_btn, "Download"); EnableWindow(g_a_download_btn, TRUE); }
         free(ctx);
         g_a_dl = NULL;
         return;

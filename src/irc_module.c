@@ -31,6 +31,7 @@
  */
 
 #include "irc_module.h"
+#include "suite_w31.h"   /* the Connect/Disconnect toggle */
 #include "vt_term.h"
 #include "irc_client.h"
 #include "suite_clipboard.h"
@@ -54,10 +55,22 @@
 #define IRC_DEFAULT_CHANNEL_NAME "retro"    /* bare name for the field (# in label) */
 #define IRC_DEFAULT_NICK_PATTERN "mgtview-XXXX"
 
-/* ---------- palette (matches F6 amber; kept as a local literal, same as
- * F3 Gopher keeps its own -- there is no shared colors header) ---------- */
-#define IRC_COL_BG   RGB(0x0a, 0x0a, 0x0a)   /* near-black */
-#define IRC_COL_FG   RGB(0xff, 0xb0, 0x00)   /* amber phosphor */
+/* ---------- palette. Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md):
+ * a Windows 3.1 document window, black on white, selection in the
+ * Windows highlight (navy, white text). Through 1.0 this was amber on
+ * near-black; IRC is plain text on the wire, so the amber was app
+ * styling, not protocol output. ---------- */
+#define IRC_COL_BG   RGB(0xff, 0xff, 0xff)   /* white */
+#define IRC_COL_FG   RGB(0x00, 0x00, 0x00)   /* black */
+#define IRC_COL_SEL  RGB(0x00, 0x00, 0x80)   /* navy selection */
+/* Zebra stripes (2026-11-11, operator; docs/2026-11-11_W31_SCROLLBARS.md
+ * section 8): every other MESSAGE on this light green, sampled from
+ * refshots/ref14_zebra_striping_green.png (its stripe pixels are 217..219,
+ * 231..232, 215..217: #DAE8D8 the mean); the others stay white. A wrapped
+ * message keeps one background on all its rows (vt_term's VT_FLAG_STRIPE).
+ * PER-ROW instead: test the visible row's logical index (row & 1) in
+ * render_paint in place of the flag. */
+#define IRC_COL_ZEBRA RGB(0xDA, 0xE8, 0xD8)
 
 /* ---------- IDs ---------- */
 #define IDC_IRC_RENDER         6201
@@ -96,12 +109,14 @@ static HWND   g_hRender         = NULL;
 static HWND   g_hServerLbl,  g_hServerEdit;
 static HWND   g_hPortLbl,    g_hPortEdit;
 static HWND   g_hChanLbl,    g_hHashLbl,   g_hChanEdit;
-static HWND   g_hConnectBtn, g_hDisconnectBtn;
+static HWND   g_hConnectBtn, g_hDisconnectBtn;   /* 2026-11-11: Disconnect retired
+                                                    (one toggle); stays NULL */
 static BOOL   g_controls_created = FALSE;
 static BOOL   g_render_class_reg  = FALSE;
 static HFONT  g_hFontIrc         = NULL;
 static HBRUSH g_hBrushBg         = NULL;
 static HBRUSH g_hBrushFg         = NULL;
+static HBRUSH g_hBrushZebra     = NULL;
 static int    g_cell_w           = 9;
 static int    g_cell_h           = 18;
 
@@ -185,11 +200,16 @@ static void compute_grid_for_client(HWND hwnd, int *out_cols, int *out_rows)
     rh = g_cell_h > 0 ? g_cell_h : 18;
     cols = (rc.right  - rc.left) / cw;
     rows = (rc.bottom - rc.top ) / rh;
-    /* Floor at 80x24 so our formatted "[HH:MM:SS] " + long weather/alert
-     * lines have a stable minimum width; above the floor cols grow with
-     * the window so a wide pane wraps less. */
+    /* Floor at 80 columns so our formatted "[HH:MM:SS] " + long
+     * weather/alert lines have a stable minimum width; above the floor cols
+     * grow with the window so a wide pane wraps less. NO row floor
+     * (2026-11-11, docs/2026-11-11_W31_TITLE_OUTLINES_IRC_ROWS.md): the
+     * grid used to keep at least 24 rows, more than an 800x600 pane shows
+     * (about 18), so the newest rows, at the grid's bottom, were drawn
+     * below the visible area. The grid now has exactly the rows the pane
+     * shows, so the newest line is always the last visible row. */
     if (cols < IRC_COLS_MIN) cols = IRC_COLS_MIN;
-    if (rows < IRC_ROWS_MIN) rows = IRC_ROWS_MIN;
+    if (rows < 1) rows = 1;
     *out_cols = cols;
     *out_rows = rows;
 }
@@ -222,13 +242,24 @@ static void update_vscrollbar(HWND hwnd)
  * first: if the user was scrolled up (offset>0) we re-apply offset+delta
  * (delta = rows newly pushed into scrollback) to keep their view fixed
  * on the same content; if they were at the bottom we stay pinned. */
+static BOOL g_fed_any = FALSE;   /* a line has been fed since the last clear */
+
 static void feed_line(const char *s)
 {
     int old_offset, before, after, delta;
+    size_t n;
     if (!g_term_inited || !s) return;
     old_offset = vt_term_scroll_offset(&g_term);
     before     = vt_term_scrollback_count(&g_term);
-    vt_term_feed_bytes(&g_term, (const unsigned char *)s, strlen(s));
+    /* The line break goes BEFORE each line, not after (2026-11-11,
+     * docs/2026-11-11_W31_TITLE_OUTLINES_IRC_ROWS.md): with it after, the
+     * cursor waited on an empty last row, one row below the newest line.
+     * Now the newest line is the bottom row of the transcript. */
+    n = strlen(s);
+    while (n > 0 && (s[n - 1] == '\n' || s[n - 1] == '\r')) n--;
+    if (g_fed_any) vt_term_feed_bytes(&g_term, (const unsigned char *)"\r\n", 2);
+    vt_term_feed_bytes(&g_term, (const unsigned char *)s, n);
+    g_fed_any = TRUE;
     if (old_offset > 0) {
         after = vt_term_scrollback_count(&g_term);
         delta = after - before;
@@ -317,6 +348,18 @@ static void on_irc_failed(IrcMessage *m)
  * arriving just after a user Disconnect cannot resurrect a stale status.
  * LPARAM is unused for this event -- nothing to free. */
 static void on_irc_registered(void)
+{
+    char st[400];
+    if (!g_connected) return;
+    /* the stage text (2026-11-11): registered, now joining */
+    _snprintf(st, sizeof(st), "Connected to %s; joining %s...",
+              g_active_host, g_active_channel);
+    st[sizeof(st) - 1] = '\0';
+    suite_set_status(st);
+}
+
+/* The JOIN completed (numeric 366): the connected state, as before. */
+static void on_irc_joined(void)
 {
     char st[400];
     if (!g_connected) return;
@@ -421,7 +464,16 @@ static void paint_view(HWND hwnd)
             const VTCell *cells = vt_term_get_visible(&g_term, row);
             char buf[512];
             int  logical_row, run_start;
+            COLORREF row_bg;
             if (!cells) continue;
+            /* The row's stripe: its message's parity, set by vt_term. */
+            row_bg = (cells[0].flags & VT_FLAG_STRIPE) ? IRC_COL_ZEBRA : IRC_COL_BG;
+            if (row_bg != IRC_COL_BG && g_hBrushZebra) {
+                RECT rr;
+                rr.left = 0; rr.right = client_w;
+                rr.top = row * g_cell_h; rr.bottom = rr.top + g_cell_h;
+                FillRect(mem_dc, &rr, g_hBrushZebra);
+            }
             if (g_term.cols >= (int)sizeof(buf)) continue;
             for (col = 0; col < g_term.cols; col++) {
                 unsigned char ch = (unsigned char)cells[col].ch;
@@ -452,7 +504,7 @@ static void paint_view(HWND hwnd)
                     SetBkMode   (mem_dc, TRANSPARENT);
                 } else {
                     SetTextColor(mem_dc, IRC_COL_FG);
-                    SetBkColor  (mem_dc, IRC_COL_BG);
+                    SetBkColor  (mem_dc, row_bg);
                     SetBkMode   (mem_dc, OPAQUE);
                 }
                 TextOutA(mem_dc, x_px, py, buf + run_start, run_len);
@@ -700,6 +752,7 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         else if (wParam == IRC_EVT_SYSTEM)     on_irc_system((IrcMessage *)lParam);
         else if (wParam == IRC_EVT_FAILED)     on_irc_failed((IrcMessage *)lParam);
         else if (wParam == IRC_EVT_REGISTERED) on_irc_registered();
+        else if (wParam == IRC_EVT_JOINED)     on_irc_joined();
         return 0;
 
     case WM_USER_FOCUS_RENDER:
@@ -715,9 +768,11 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 
 /* ---------- connect-bar session gate (mirrors WAIS) ---------- */
 
-/* Pre-connect: Server/Port/Channel + Connect enabled, Disconnect grayed.
- * Connected/active: those grayed, Disconnect enabled. Same field/button
- * lifecycle and timing as wais_set_connected_state. */
+/* Pre-connect: Server/Port/Channel enabled, the toggle reads Connect.
+ * Connecting or connected: the fields grayed, the toggle reads Disconnect
+ * (2026-11-11: one Connect/Disconnect button, docs/2026-11-11_W31_BUTTONS.md).
+ * g_connected goes TRUE as the attempt starts, so a click while connecting
+ * cancels it: irc_client_close halts the transport and its reconnect loop. */
 static void irc_set_connected_state(BOOL connected)
 {
     g_connected = connected;
@@ -725,9 +780,7 @@ static void irc_set_connected_state(BOOL connected)
     EnableWindow(g_hServerEdit,     !connected);
     EnableWindow(g_hPortEdit,       !connected);
     EnableWindow(g_hChanEdit,       !connected);
-    EnableWindow(g_hConnectBtn,     !connected);
-
-    EnableWindow(g_hDisconnectBtn,   connected);
+    w31_toggle_set(g_hConnectBtn, connected);
 }
 
 /* Connect: read host/port/channel from the fields, normalize the channel
@@ -770,6 +823,7 @@ static void irc_on_connect(HWND content)
 
     /* Fresh manual session: wipe the pane and the dedup set. */
     if (g_term_inited) vt_term_clear_all(&g_term);
+    g_fed_any = FALSE;
     g_seen_head  = 0;
     g_seen_count = 0;
     if (g_hRender) InvalidateRect(g_hRender, NULL, FALSE);
@@ -838,6 +892,7 @@ void irc_module_shutdown(void)
     if (g_hFontIrc)    { DeleteObject(g_hFontIrc);  g_hFontIrc  = NULL; }
     if (g_hBrushBg)    { DeleteObject(g_hBrushBg);  g_hBrushBg  = NULL; }
     if (g_hBrushFg)    { DeleteObject(g_hBrushFg);  g_hBrushFg  = NULL; }
+    if (g_hBrushZebra) { DeleteObject(g_hBrushZebra); g_hBrushZebra = NULL; }
 }
 
 void irc_module_resize(HWND content, int w, int h)
@@ -862,15 +917,11 @@ void irc_module_resize(HWND content, int w, int h)
     MoveWindow(g_hChanLbl,    margin + 439, 18, 58,  22,    TRUE);
     MoveWindow(g_hHashLbl,    margin + 505, 14, 12,  row_h, TRUE);
     MoveWindow(g_hChanEdit,   margin + 517, 14, 130, row_h, TRUE);
-    {
-        const int conn_w   = 85;
-        const int disc_w   = 95;
-        const int conn_gap = 8;
-        int disc_x = w - margin - disc_w;
-        int conn_x = disc_x - conn_gap - conn_w;
-        MoveWindow(g_hConnectBtn,    conn_x, 12, conn_w, btn_h, TRUE);
-        MoveWindow(g_hDisconnectBtn, disc_x, 12, disc_w, btn_h, TRUE);
-    }
+    /* The Connect/Disconnect toggle: right end of the strip, centred on
+     * the field row (y 14, 26 high). */
+    MoveWindow(g_hConnectBtn, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2,
+               W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
+    (void)btn_h;
 
     /* Terminal fills the rest, below the bar (same reserve-top-strip
      * pattern as the WAIS output pane), shortened by the bar height so
@@ -928,7 +979,8 @@ void irc_module_activate(HWND content)
                 DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH | FF_MODERN, NULL);
     }
     if (!g_hBrushBg) g_hBrushBg = CreateSolidBrush(IRC_COL_BG);
-    if (!g_hBrushFg) g_hBrushFg = CreateSolidBrush(IRC_COL_FG);
+    if (!g_hBrushFg) g_hBrushFg = CreateSolidBrush(IRC_COL_SEL);  /* selection fill */
+    if (!g_hBrushZebra) g_hBrushZebra = CreateSolidBrush(IRC_COL_ZEBRA);
 
     register_render_class(hInst);
 
@@ -960,10 +1012,8 @@ void irc_module_activate(HWND content)
         0, 0, 130, 26, content, (HMENU)(INT_PTR)IDC_IRC_CHAN_EDIT, hInst, NULL);
     g_hConnectBtn = CreateWindowA("BUTTON", "Connect",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 85, 30, content, (HMENU)(INT_PTR)IDC_IRC_CONNECT_BTN, hInst, NULL);
-    g_hDisconnectBtn = CreateWindowA("BUTTON", "Disconnect",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 95, 30, content, (HMENU)(INT_PTR)IDC_IRC_DISCONNECT_BTN, hInst, NULL);
+        0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_IRC_CONNECT_BTN, hInst, NULL);
+    g_hDisconnectBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
 
     if (g_hFontUI) {
         SendMessageA(g_hServerLbl,     WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
@@ -1021,8 +1071,12 @@ BOOL irc_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     (void)lParam;
 
     switch (id) {
-    case IDC_IRC_CONNECT_BTN:
-        if (notif == BN_CLICKED) { irc_on_connect(content);    return TRUE; }
+    case IDC_IRC_CONNECT_BTN:      /* the toggle: its label says which */
+        if (notif == BN_CLICKED) {
+            if (g_connected) irc_on_disconnect(content);
+            else             irc_on_connect(content);
+            return TRUE;
+        }
         break;
     case IDC_IRC_DISCONNECT_BTN:
         if (notif == BN_CLICKED) { irc_on_disconnect(content); return TRUE; }

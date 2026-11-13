@@ -414,6 +414,17 @@ archie_status_t archie_query(const char *server, int port,
                              int exact_first, int maxhits,
                              archie_result_t *out)
 {
+    return archie_query_progress(server, port, term, type, exact_first,
+                                 maxhits, out, NULL, NULL);
+}
+
+archie_status_t archie_query_progress(const char *server, int port,
+                                      const char *term, archie_search_type_t type,
+                                      int exact_first, int maxhits,
+                                      archie_result_t *out,
+                                      volatile LONG *prog_got,
+                                      volatile LONG *prog_total)
+{
     struct sockaddr_in sa;
     unsigned long      inaddr;
     SOCKET             s;
@@ -532,6 +543,8 @@ archie_status_t archie_query(const char *server, int port,
                 pkt_data[seq - 1][plen] = '\0';
                 pkt_len[seq - 1] = plen;
                 got++;
+                if (prog_total) InterlockedExchange(prog_total, (LONG)total);
+                if (prog_got)   InterlockedExchange(prog_got, (LONG)got);
             }
             if (total > 0 && got >= total) { complete = 1; break; }
         }

@@ -84,3 +84,35 @@ int suite_clipboard_has_text(void)
 {
     return IsClipboardFormatAvailable(CF_TEXT) ? 1 : 0;
 }
+
+/* 2026-11-13 (docs/2026-11-13_NETNEWS_TAB.md): CF_UNICODETEXT for the
+ * Newsgroups article pane, whose text is UTF-16. Windows synthesises
+ * CF_TEXT from it for ANSI readers, so one format is put. The CF_TEXT
+ * functions above are unchanged and every other tab keeps them. */
+int suite_clipboard_put_wtext(HWND owner, const wchar_t *text)
+{
+    size_t  len;
+    HGLOBAL hMem;
+    void   *p;
+
+    if (!text) return 0;
+    len = wcslen(text);
+
+    if (!open_clipboard_with_retry(owner)) return 0;
+    if (!EmptyClipboard()) { CloseClipboard(); return 0; }
+
+    hMem = GlobalAlloc(GMEM_MOVEABLE, (len + 1) * sizeof(wchar_t));
+    if (!hMem) { CloseClipboard(); return 0; }
+    p = GlobalLock(hMem);
+    if (!p) { GlobalFree(hMem); CloseClipboard(); return 0; }
+    memcpy(p, text, (len + 1) * sizeof(wchar_t));
+    GlobalUnlock(hMem);
+
+    if (!SetClipboardData(CF_UNICODETEXT, hMem)) {
+        GlobalFree(hMem);
+        CloseClipboard();
+        return 0;
+    }
+    CloseClipboard();
+    return 1;
+}

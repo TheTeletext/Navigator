@@ -29,6 +29,11 @@ void gopher_module_init(void);
  * (history strings, in-flight worker handles, image-viewer windows). */
 void gopher_module_shutdown(void);
 
+/* Open a gopher:// URL handed over from another tab (2026-11-11: the Web
+ * tab's gopher links), exactly as if it were typed in the Selector field
+ * and Go pressed. The caller switches to the Gopher tab first. */
+void gopher_module_open_url(const char *url);
+
 #ifdef __cplusplus
 }
 #endif

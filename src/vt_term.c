@@ -278,13 +278,22 @@ static void newline_with_scroll(VTTerm *t)
 static void put_printable(VTTerm *t, unsigned char b)
 {
     VTCell *row;
+    int wrapped = 0;
     if (t->cursor_x >= t->cols) {
         t->cursor_x = 0;
         newline_with_scroll(t);
+        wrapped = 1;
     }
     row = row_ptr(t, visible_top_index(t) + t->cursor_y);
     row[t->cursor_x].ch    = (char)b;
     row[t->cursor_x].flags = VT_FLAG_NONE;
+    if (t->cursor_x == 0) {
+        /* A row's first cell carries its marks: a new message flips the
+         * stripe, a wrapped row keeps its message's. */
+        if (!wrapped) t->stripe = !t->stripe;
+        row[0].flags = (uint8_t)((wrapped ? VT_FLAG_WRAPCONT : 0) |
+                                 (t->stripe ? VT_FLAG_STRIPE : 0));
+    }
     t->cursor_x += 1;
 }
 

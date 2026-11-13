@@ -25,6 +25,7 @@
  */
 
 #include "gopher_module.h"
+#include "suite_res.h"   /* IDB_W31_GT_* */
 #include "gopher_protocol.h"
 #include "gophermap.h"
 #include "gopher_search_dialog.h"
@@ -44,6 +45,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "suite_w31.h"
 
 /* ---------- gdi+ flat C API (matches web_module's vendored declarations) ---------- */
 
@@ -72,16 +74,18 @@ extern int  WINAPI GdipGetImageHeight(void *image, UINT *height);
 #define GOPHER_DEFAULT_PORT_  70
 #define GOPHER_HOME_URL       "gopher://gopher.teletext.ca/"
 
-/* Bright white on dark for maximum legibility. Kept local; no shared
- * color header in this project. Numbers are locked here so a future
- * theme switch is a one-place change. */
-#define GOPHER_COL_BG       RGB(0x1b, 0x1b, 0x1b)  /* view background        */
-#define GOPHER_COL_FG       RGB(0xff, 0xff, 0xff)  /* main text (pure white) */
-#define GOPHER_COL_LINK     RGB(0xff, 0xff, 0xff)  /* clickable item (white) */
-#define GOPHER_COL_INFO     RGB(0xc0, 0xc0, 0xc0)  /* 'i' lines (dim silver) */
+/* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): a Windows 3.1
+ * document window, black on white, menu items in VGA navy so a
+ * selector reads as something to press, info lines black, selection in
+ * the Windows highlight (navy, white text). Through 1.0 this was white
+ * on #1B1B1B. Numbers are locked here so a theme switch is one place. */
+#define GOPHER_COL_BG       RGB(0xff, 0xff, 0xff)  /* view background        */
+#define GOPHER_COL_FG       RGB(0x00, 0x00, 0x00)  /* main text              */
+#define GOPHER_COL_LINK     RGB(0x00, 0x00, 0x80)  /* clickable item (navy)  */
+#define GOPHER_COL_INFO     RGB(0x00, 0x00, 0x00)  /* 'i' lines              */
 #define GOPHER_COL_HINT     RGB(0x80, 0x80, 0x80)  /* empty-state hint       */
-#define GOPHER_COL_GUTTER   RGB(0x45, 0x45, 0x45)  /* future line-number gutter */
-#define GOPHER_COL_SEL      RGB(0xcf, 0x9a, 0x0c)  /* reserved selection hi  */
+#define GOPHER_COL_GUTTER   RGB(0xc0, 0xc0, 0xc0)  /* future line-number gutter */
+#define GOPHER_COL_SEL      RGB(0x00, 0x00, 0x80)  /* selection highlight    */
 
 #define IDC_GOPH_URL_LBL      4001
 #define IDC_GOPH_URL_EDIT     4002
@@ -107,6 +111,7 @@ extern int  WINAPI GdipGetImageHeight(void *image, UINT *height);
 #define ID_CTX_PASTE             2002
 #define ID_CTX_SELECT_ALL        2003
 #define ID_TIMER_F3_SEL_SCROLL   91
+#define ID_TIMER_F3_PROGRESS     92   /* the byte count while a fetch runs */
 #define F3_DRAG_THRESHOLD_PX     3
 
 typedef struct GopherFetchResult {
@@ -603,20 +608,27 @@ static void gopher_render_set_text(char *body, size_t n)
     }
 }
 
-/* ---------- icon glyphs ---------- */
+/* ---------- item-type icons ---------- */
 
-static const wchar_t *gopher_icon_for(char type)
+/* The 16-colour item icon for a Gopher item type, by the type character
+ * the server sends (RFC 1436 and the common extensions), never by a file
+ * extension (2026-11-11, docs/2026-11-11_W31_MENUS_GOPHER_ICONS.md).
+ * 'i' has none. Through 1.1 these were Segoe UI Emoji glyphs for eight
+ * types only. */
+static int gopher_icon_for(char type)
 {
     switch (type) {
-    case '1': return L"\xD83D\xDCC1";  /* U+1F4C1 folder */
-    case '0': return L"\xD83D\xDCC4";  /* U+1F4C4 document */
-    case '7': return L"\xD83D\xDD0D";  /* U+1F50D magnifying glass (search) */
-    case 'g': return L"\xD83D\xDDBC";  /* U+1F5BC frame */
-    case '9': return L"\xD83D\xDCBE";  /* U+1F4BE floppy */
-    case 's': return L"\xD83D\xDD0A";  /* U+1F50A speaker */
-    case 'I': return L"\xD83D\xDDBC";  /* same as 'g' */
-    case 'h': return L"\xD83D\xDD17";  /* U+1F517 link */
-    default:  return L"";              /* informational / unknown */
+    case '1':           return IDB_W31_GT_MENU;     /* menu: a folder        */
+    case '0':           return IDB_W31_GT_TEXT;     /* text: a page          */
+    case '7':           return IDB_W31_GT_SEARCH;   /* search: a glass       */
+    case '8': case 'T': return IDB_W31_GT_TELNET;   /* telnet, tn3270        */
+    case 'I': case 'g': return IDB_W31_GT_IMAGE;    /* image, GIF            */
+    case ';':           return IDB_W31_GT_VIDEO;    /* video: film           */
+    case '5': case '9': return IDB_W31_GT_BINARY;   /* archive, binary       */
+    case 's':           return IDB_W31_GT_SOUND;    /* sound                 */
+    case 'h':           return IDB_W31_GT_LINK;     /* HTML / URL link       */
+    case 'i':           return 0;                   /* info line: no icon    */
+    default:            return IDB_W31_GT_UNKNOWN;  /* anything else         */
     }
 }
 
@@ -809,15 +821,14 @@ static void gopher_paint_menu(HDC hdc, RECT *rc)
             }
             SetTextColor(hdc, text_col);
 
+            /* Every type but 'i' shows its icon (clickable or not), 16x16,
+             * centred on the text line. */
+            if (it->type != 'i') {
+                int id = gopher_icon_for(it->type);
+                HBITMAP bmp = id ? w31_icon(id) : NULL;
+                if (bmp) w31_draw_icon(hdc, bmp, 8, line_y + (tm.tmHeight - 16) / 2);
+            }
             if (it->type != 'i' && gopher_type_is_clickable(it->type)) {
-                const wchar_t *icon = gopher_icon_for(it->type);
-                int icon_len = (int)wcslen(icon);
-                HFONT prev = NULL;
-                if (icon_len > 0 && g_hFontIcon) {
-                    prev = (HFONT)SelectObject(hdc, g_hFontIcon);
-                    TextOutW(hdc, 8, line_y, icon, icon_len);
-                    SelectObject(hdc, prev);
-                }
                 /* Display label via the selection-aware emitter so any
                  * active drag-select renders inverted runs in place.
                  * The icon glyph is NOT part of the selectable text. */
@@ -1006,6 +1017,22 @@ static DWORD WINAPI gopher_fetch_thread(LPVOID arg)
     return 0;
 }
 
+
+/* While a fetch runs: the bytes received so far. A Gopher reply has no
+ * length (RFC 1436), so there is no bar, only the count. */
+static void CALLBACK gopher_progress_timer(HWND hwnd, UINT msg, UINT_PTR id, DWORD t)
+{
+    static LONG shown = -1;
+    LONG n = InterlockedCompareExchange(&g_gopher_bytes_read, 0, 0);
+    char m[64];
+    (void)hwnd; (void)msg; (void)id; (void)t;
+    if (n <= 0 || n == shown) return;
+    shown = n;
+    _snprintf(m, sizeof m, "Reading: %ld bytes", (long)n);
+    m[sizeof m - 1] = 0;
+    gopher_set_status(m);
+}
+
 static void gopher_kick_fetch(GopherFetchResult *r)
 {
     if (InterlockedExchange(&g_fetch_in_flight, 1) != 0) {
@@ -1018,6 +1045,8 @@ static void gopher_kick_fetch(GopherFetchResult *r)
     }
     gopher_update_nav_buttons();
     gopher_set_status("Connecting...");
+    InterlockedExchange(&g_gopher_bytes_read, 0);
+    if (g_hRender) SetTimer(g_hRender, ID_TIMER_F3_PROGRESS, 100, gopher_progress_timer);
     g_fetch_thread = CreateThread(NULL, 0, gopher_fetch_thread, r, 0, NULL);
     if (!g_fetch_thread) {
         InterlockedExchange(&g_fetch_in_flight, 0);
@@ -1093,6 +1122,7 @@ static void gopher_on_fetch_done(int ok, GopherFetchResult *r)
 {
     g_fetch_thread = NULL;
     InterlockedExchange(&g_fetch_in_flight, 0);
+    if (g_hRender) KillTimer(g_hRender, ID_TIMER_F3_PROGRESS);
 
     if (!ok || r->err_code != 0) {
         char status[320];
@@ -1118,7 +1148,7 @@ static void gopher_on_fetch_done(int ok, GopherFetchResult *r)
         g_current_url = gopher_dup(r->url);
         gopher_render_set_menu(items, n);
         gopher_update_url_bar(g_current_url);
-        gopher_set_status("Done");
+        gopher_set_status("Menu: Done");
         break;
     }
     case GOPHER_KIND_TEXT: {
@@ -1132,7 +1162,7 @@ static void gopher_on_fetch_done(int ok, GopherFetchResult *r)
         gopher_render_set_text(r->bytes, r->size);
         r->bytes = NULL;   /* owned by the view now */
         gopher_update_url_bar(g_current_url);
-        gopher_set_status("Done");
+        gopher_set_status("Document: Done");
         break;
     }
     case GOPHER_KIND_BINARY: {
@@ -1468,7 +1498,7 @@ static int gopher_save_binary_dialog(HWND owner, const char *suggested,
     ofn.lpstrFile   = path;
     ofn.nMaxFile    = sizeof(path);
     ofn.Flags       = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST;
-    if (!GetSaveFileNameA(&ofn)) return 1;
+    if (!W31_UNHOOKED(GetSaveFileNameA(&ofn))) return 1;
 
     h = CreateFileA(path, GENERIC_WRITE, 0, NULL,
                     CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -1822,7 +1852,7 @@ static void gopher_register_render_class_once(HINSTANCE hInst)
     if (!g_hBrushGopherBg)
         g_hBrushGopherBg = CreateSolidBrush(GOPHER_COL_BG);
     if (!g_f3_sel_brush)
-        g_f3_sel_brush = CreateSolidBrush(GOPHER_COL_FG);  /* light = selection bg */
+        g_f3_sel_brush = CreateSolidBrush(GOPHER_COL_SEL);  /* navy selection bg, text in GOPHER_COL_BG */
     memset(&wc, 0, sizeof(wc));
     wc.style         = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc   = GopherRenderProc;
@@ -2062,6 +2092,13 @@ void gopher_module_deactivate(HWND content)
     ShowWindow(g_hUrlEdit,    SW_HIDE);
     ShowWindow(g_hGoBtn,      SW_HIDE);
     ShowWindow(g_hRender,     SW_HIDE);
+}
+
+void gopher_module_open_url(const char *url)
+{
+    if (!url || !url[0]) return;
+    gopher_update_url_bar(url);
+    gopher_navigate(url, /*push_history=*/1, NULL);
 }
 
 BOOL gopher_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)

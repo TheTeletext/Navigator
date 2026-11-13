@@ -233,6 +233,8 @@ static size_t gopher_undot_inplace(char *buf, size_t len)
 
 /* ---------- public fetch ---------- */
 
+volatile LONG g_gopher_bytes_read = 0;
+
 int gopher_fetch_sync(const char *host, int port,
                       const char *selector,
                       GopherFetchKind kind,
@@ -292,6 +294,7 @@ int gopher_fetch_sync(const char *host, int port,
         }
         memcpy(buf + len, recv_buf, (size_t)n);
         len += (size_t)n;
+        InterlockedExchange(&g_gopher_bytes_read, (LONG)len);
     }
     closesocket(s);
 

@@ -58,6 +58,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "suite_w31.h"
 
 /* Module-local control IDs (6400+, clear of IRC's 6200 block). */
 #define IDC_RIP_HOST_EDIT    6401
@@ -90,7 +91,8 @@ static HWND g_hPanel     = NULL;
 static HWND g_hCanvas    = NULL;
 static HWND g_hHostLbl   = NULL, g_hHostEdit = NULL;
 static HWND g_hPortLbl   = NULL, g_hPortEdit = NULL;
-static HWND g_hConnBtn   = NULL, g_hDiscBtn  = NULL;
+static HWND g_hConnBtn   = NULL, g_hDiscBtn  = NULL;   /* 2026-11-11: Disconnect
+                                                         retired (one toggle); NULL */
 
 static BOOL g_controls_created  = FALSE;
 static BOOL g_panel_class_reg   = FALSE;
@@ -719,6 +721,33 @@ static void rip_hotkey_activate(HWND hwnd, int idx)
 
 /* Feed payload bytes to the parser, after pulling out the ANSI
  * auto-sensing sequences. Returns non-zero if the surface changed. */
+/* Page progress in the status bar (2026-11-11,
+ * docs/2026-11-11_STATUS_PROGRESS.md). A RIPscrip page is a Telnet stream
+ * with no length, so there is no bar: the bytes of the page so far, then
+ * "Page: Done" when the scene ends with RIP_NO_MORE. Below 64 bytes since
+ * the last page ended (an echoed key, a Telnet reply) nothing is said. */
+static unsigned long g_page_bytes = 0;
+static unsigned long g_page_seen_nomore = 0;
+
+static void rip_page_progress(int len)
+{
+    char warn[128] = "";
+    if (!g_rip_enabled) return;
+    /* a mouse-region overflow is still said, after the page text */
+    if (g_parser.scene_dropped > 0)
+        _snprintf(warn, sizeof warn, "  WARNING: %d mouse regions over the limit of %d refused",
+                  g_parser.scene_dropped, RIP_MAX_BUTTONS);
+    warn[sizeof warn - 1] = '\0';
+    g_page_bytes += (unsigned long)len;
+    if (g_parser.stats.no_more != g_page_seen_nomore) {
+        g_page_seen_nomore = g_parser.stats.no_more;
+        g_page_bytes = 0;
+        rip_status("Page: Done%s", warn);
+    } else if (g_page_bytes >= 64) {
+        rip_status("Reading page: %lu bytes%s", g_page_bytes, warn);
+    }
+}
+
 static int rip_consume(const unsigned char *data, int len)
 {
     unsigned char out[8192];
@@ -933,20 +962,26 @@ static void rip_do_connect(void)
         rip_set_session_ui(FALSE);
         return;
     }
-    /* The buttons flip on TELNET_EVT_CONNECTED, not here: until the TCP
-     * handshake lands there is no session to disconnect from. */
+    /* Until the TCP handshake lands the toggle reads Disconnect, grayed:
+     * the EXCEPTION to cancel-while-connecting (2026-11-11). telnet_proto
+     * connects with a blocking getaddrinfo/connect on its thread and
+     * telnet_proto_close frees the context after a 3 s wait, so closing
+     * mid-handshake to an unreachable host could let that thread write
+     * into freed memory (docs/2026-11-11_W31_BUTTONS.md, finding). It
+     * goes live on TELNET_EVT_CONNECTED and back to Connect on
+     * ERROR/CLOSED (rip_on_closed -> rip_close_session). */
+    w31_toggle_busy(g_hConnBtn);
 }
 
 /* Enable/disable the strip for the session state. Pre-connect the host
- * and port are editable and Connect is live; once connected they lock
- * and only Disconnect is live. */
+ * and port are editable and the toggle reads Connect; once connected they
+ * lock and it reads Disconnect (2026-11-11, one toggle). */
 static void rip_set_session_ui(BOOL connected)
 {
     if (!g_controls_created) return;
     EnableWindow(g_hHostEdit, !connected);
     EnableWindow(g_hPortEdit, !connected);
-    EnableWindow(g_hConnBtn,  !connected);
-    EnableWindow(g_hDiscBtn,   connected);
+    w31_toggle_set(g_hConnBtn, connected);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1049,22 +1084,12 @@ static void rip_on_data(TelnetDataChunk *chunk)
             rip_dib_refresh();
             InvalidateRect(g_hCanvas, NULL, FALSE);
         }
-        if (drew) {
-            g_ever_drew = TRUE;
-            if (g_parser.scene_dropped > 0)
-                rip_status("%s:%d  %lu commands, %lu drawn, %lu deferred  "
-                           "WARNING: %d mouse regions over the limit of %d "
-                           "refused",
-                           g_active_host, g_active_port,
-                           g_parser.stats.commands, g_parser.stats.drawn,
-                           rip_stats_deferred(&g_parser.stats),
-                           g_parser.scene_dropped, RIP_MAX_BUTTONS);
-            else
-                rip_status("%s:%d  %lu commands, %lu drawn, %lu deferred",
-                           g_active_host, g_active_port,
-                           g_parser.stats.commands, g_parser.stats.drawn,
-                           rip_stats_deferred(&g_parser.stats));
-        }
+        if (drew) g_ever_drew = TRUE;
+        /* Status (2026-11-11, docs/2026-11-11_STATUS_PROGRESS.md): the
+         * page's bytes so far, then "Page: Done" at RIP_NO_MORE. This
+         * replaces the per-chunk diagnostic line "host:port  N commands,
+         * N drawn, N deferred"; the overflow warning is kept. */
+        rip_page_progress(chunk->len);
     }
     telnet_proto_free_chunk(chunk);
 }
@@ -1095,6 +1120,11 @@ static void rip_on_zmr_progress(ZmrProgress *p)
         line[sizeof line - 1] = '\0';
         rip_notice_set(line, TRUE);
         rip_status("%s  Esc cancels.", line);
+        /* a true percentage: the sender's ZFILE header gave the size */
+        if (p->total > 0) {
+            int pct = (int)((p->received * 100ULL) / p->total);
+            suite_set_progress(SUITE_ID_BTN_RIPSCRIP, pct > 100 ? 100 : pct);
+        }
     }
     zmodem_recv_free_progress(p);
 }
@@ -1113,6 +1143,7 @@ static void rip_on_zmr_done(void)
     g_zmr           = NULL;
     g_zmodem_active = FALSE;
     g_zsig_len      = 0;
+    suite_set_progress(SUITE_ID_BTN_RIPSCRIP, -1);
 
     if (!r) {
         rip_notice_clear();
@@ -1126,8 +1157,8 @@ static void rip_on_zmr_done(void)
                   r->name, r->received);
         line[sizeof line - 1] = '\0';
         rip_notice_set(line, FALSE);
-        rip_status("Download complete: %s  (%llu bytes, %lu this session)",
-                   r->path[0] ? r->path : r->name, r->received, g_zmr_done);
+        /* the completion text; where it was saved stays in the notice */
+        rip_status("Transfer: Done");
     } else {
         /* Not a hang and not a crash: say what happened, count it the
          * way the old guard counted a blocked download, and go back to
@@ -1384,16 +1415,16 @@ static LRESULT CALLBACK RipPanelProc(HWND hwnd, UINT msg,
         HDC  hdc = (HDC)wParam;
         RECT rc;
         GetClientRect(hwnd, &rc);
-        FillRect(hdc, &rc, g_hBrushBlack);
+        FillRect(hdc, &rc, g_w31_br_face);
         return 1;
     }
-    /* The tab keeps Navigator's white-on-black retro chrome. */
+    /* Navigator 1.1: the strip is Windows 3.1 chrome, gray with black
+     * labels and white fields. The RIPscrip canvas itself stays the
+     * black of the protocol, in its sunken (WS_EX_CLIENTEDGE) frame. */
     case WM_CTLCOLORSTATIC:
     case WM_CTLCOLORBTN:
     case WM_CTLCOLOREDIT:
-        SetTextColor((HDC)wParam, RGB(255, 255, 255));
-        SetBkColor((HDC)wParam, RGB(0, 0, 0));
-        return (LRESULT)g_hBrushBlack;
+        return (LRESULT)w31_ctlcolor(msg, (HDC)wParam, (HWND)lParam);
 
     case WM_COMMAND:
         if (ripscrip_module_on_command(hwnd, wParam, lParam)) return 0;
@@ -1421,7 +1452,7 @@ static void rip_register_classes(HINSTANCE hInst)
         wc.lpfnWndProc   = RipPanelProc;
         wc.hInstance     = hInst;
         wc.hCursor       = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
-        wc.hbrBackground = g_hBrushBlack;
+        wc.hbrBackground = g_w31_br_face;
         wc.lpszClassName = RIP_PANEL_CLASS;
         RegisterClassExA(&wc);
         g_panel_class_reg = TRUE;
@@ -1469,13 +1500,10 @@ void ripscrip_module_resize(HWND content, int w, int h)
     MoveWindow(g_hPortLbl,  margin + 300, 18, 35,  22,    TRUE);
     MoveWindow(g_hPortEdit, margin + 338, 14, 55,  row_h, TRUE);
     {
-        const int conn_w   = 85;
-        const int disc_w   = 95;
-        const int conn_gap = 8;
-        int disc_x = w - margin - disc_w;
-        int conn_x = disc_x - conn_gap - conn_w;
-        MoveWindow(g_hConnBtn, conn_x, 12, conn_w, btn_h, TRUE);
-        MoveWindow(g_hDiscBtn, disc_x, 12, disc_w, btn_h, TRUE);
+        /* The Connect/Disconnect toggle: right end, centred on the row. */
+        MoveWindow(g_hConnBtn, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2,
+                   W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
+        (void)btn_h;
         /* Erase the whole strip and repaint every control in it, so no
          * fragment of a button's previous position survives (audit C1). */
         RedrawWindow(g_hPanel, NULL, NULL,
@@ -1541,12 +1569,9 @@ void ripscrip_module_activate(HWND content)
         (HMENU)(INT_PTR)IDC_RIP_PORT_EDIT, hInst, NULL);
     g_hConnBtn = CreateWindowA("BUTTON", "Connect",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 85, 30, g_hPanel,
+        0, 0, W31_TOGGLE_W, W31_TOGGLE_H, g_hPanel,
         (HMENU)(INT_PTR)IDC_RIP_CONNECT_BTN, hInst, NULL);
-    g_hDiscBtn = CreateWindowA("BUTTON", "Disconnect",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED,
-        0, 0, 95, 30, g_hPanel,
-        (HMENU)(INT_PTR)IDC_RIP_DISCONN_BTN, hInst, NULL);
+    g_hDiscBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
 
     g_hCanvas = CreateWindowExA(WS_EX_CLIENTEDGE, RIP_CANVAS_CLASS, "",
         WS_CHILD | WS_VISIBLE,
@@ -1555,7 +1580,7 @@ void ripscrip_module_activate(HWND content)
 
     if (g_hFontUI) {
         HWND all[] = { g_hHostLbl, g_hHostEdit, g_hPortLbl, g_hPortEdit,
-                       g_hConnBtn, g_hDiscBtn };
+                       g_hConnBtn };
         int k;
         for (k = 0; k < (int)(sizeof all / sizeof all[0]); k++)
             SendMessageA(all[k], WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
@@ -1587,9 +1612,12 @@ BOOL ripscrip_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     (void)lParam;
 
     switch (id) {
-    case IDC_RIP_CONNECT_BTN:
-        rip_do_connect();
-        return TRUE;
+    case IDC_RIP_CONNECT_BTN:       /* the toggle: its label says which */
+        if (!g_connected) {
+            if (!g_telnet) rip_do_connect();   /* mid-handshake it is grayed */
+            return TRUE;
+        }
+        /* fall through: connected, so the toggle reads Disconnect */
     case IDC_RIP_DISCONN_BTN:
         if (g_telnet || g_connected) {
             rip_close_session();

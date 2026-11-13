@@ -61,7 +61,7 @@
 /* ---- edit these, and only these ---------------------------------- */
 
 #define SUITE_VERSION_MAJOR   1
-#define SUITE_VERSION_MINOR   0
+#define SUITE_VERSION_MINOR   5
 #define SUITE_VERSION_PATCH   0
 
 /* Pre-release suffix, including its leading hyphen. Set to "" for a
@@ -78,7 +78,7 @@
  * lower, so an unbumped exe is silently KEPT (observed 2026-10-29,
  * docs/2026-10-30_NAVIGATOR_PHASE2_BUILD.md 5.1). Reset to 0 with a new
  * version. */
-#define SUITE_VERSION_BUILD   9
+#define SUITE_VERSION_BUILD   0
 
 /* ---- everything below is derived; do not edit --------------------- */
 

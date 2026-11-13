@@ -10,7 +10,7 @@ speaking the real protocol to a real server rather than imitating it.
 
 ## Status
 
-**1.0**, November 2026.
+**1.5**, November 2026.
 
 ---
 
@@ -26,6 +26,8 @@ speaking the real protocol to a real server rather than imitating it.
 | ARPANET FTP-Mail | RFC 765 and RFC 691 | arpanet.teletext.ca:2121 |
 | WAIS | Z39.50-1988, freeWAIS-sf | wais.teletext.ca:210, database `teletext` |
 | Archie | Prospero ARDP over UDP | archie.teletext.ca:1525, telnet on 2323 |
+| FTP | RFC 959, anonymous, download only | ftp.teletext.ca:21 |
+| Newsgroups | NNTP, RFC 3977, read-only | news.teletext.ca:119 |
 | IRC | RFC 1459, read-only view | irc.teletext.ca:6667, channel `#retro` |
 | CU-SeeMe Live TV | Cornell CU-SeeMe over UDP | cu-seeme.teletext.ca:7648 |
 | Terminal | Telnet VT220 with Zmodem, Finger and QOTD | telnet.teletext.ca |
@@ -41,9 +43,9 @@ runs Microsoft's own 1983 GW-BASIC, unmodified, on the libx86emu x86 core.
 ## Download
 
 The installer, with its SHA-256, is on the download page:
-http://www.teletext.ca/navigator/
+http://www.teletext.ca/software
 
-Run `Teletext_Navigator_1.0.0.msi`. It installs to
+Run `Teletext_Navigator_1.5.0.msi`. It installs to
 `Program Files\Teletext Navigator` for all users.
 
 **The installer is not code-signed.** Windows SmartScreen will probably show

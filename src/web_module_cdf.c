@@ -32,6 +32,7 @@
 #include "WWWLib.h"
 
 #include "web_module_cdf.h"
+#include "suite_w31.h"
 
 /* ------------------------------------------------------------------ */
 /* Small string helpers (local; Navigator has no string library).      */
@@ -667,13 +668,10 @@ static LRESULT CALLBACK CdfDlgProc(HWND hwnd, UINT msg,
         HWND h;
         int  i;
 
-        if (!g_cdf_font) {
-            NONCLIENTMETRICSA ncm;
-            ncm.cbSize = sizeof(ncm);
-            if (SystemParametersInfoA(SPI_GETNONCLIENTMETRICS,
-                                      sizeof(ncm), &ncm, 0))
-                g_cdf_font = CreateFontIndirectA(&ncm.lfMessageFont);
-        }
+        /* Navigator 1.1: MS Sans Serif 8, the Windows 3.1 dialog face,
+         * rather than the system message font. g_w31_font is shared and
+         * owned by suite_w31.c, so it is borrowed, never deleted here. */
+        if (!g_cdf_font) g_cdf_font = g_w31_font;
 
         h = CreateWindowExA(0, "STATIC",
                             g_cdf_doc && g_cdf_doc->title
@@ -758,6 +756,12 @@ static LRESULT CALLBACK CdfDlgProc(HWND hwnd, UINT msg,
         break;
     }
 
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
+        return (LRESULT)w31_ctlcolor(msg, (HDC)wParam, (HWND)lParam);
+
     case WM_CLOSE:
         DestroyWindow(hwnd);
         return 0;
@@ -788,7 +792,7 @@ static void cdf_register_class(HINSTANCE hInst)
     wc.lpfnWndProc   = CdfDlgProc;
     wc.hInstance     = hInst;
     wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+    wc.hbrBackground = g_w31_br_face;   /* 1.1: Windows 3.1 face */
     wc.lpszClassName = CDF_DIALOG_CLASS;
     RegisterClassA(&wc);
     g_cdf_class_registered = 1;

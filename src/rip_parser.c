@@ -658,12 +658,16 @@ static int rip_exec(RipParser *p, const char *level, char cmd,
         p->stats.flood_cmds++;
         return 0;
 
+    case '#':                       /* RIP_NO_MORE: end of a page */
+        p->stats.no_more++;
+        p->stats.tty_cmds++;
+        return 0;
+
     case 'w':                       /* RIP_TEXT_WINDOW       */
     case 'e':                       /* RIP_ERASE_WINDOW      */
     case 'g':                       /* RIP_GOTOXY            */
     case 'H':                       /* RIP_HOME              */
     case '>':                       /* RIP_ERASE_EOL         */
-    case '#':                       /* RIP_NO_MORE           */
         /* The TTY text window is a later phase. Arguments are consumed
          * correctly, which is what keeps the rest of the line parsing. */
         p->stats.tty_cmds++;

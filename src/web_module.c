@@ -59,6 +59,8 @@
 #include <olectl.h>
 #include <winhttp.h>     /* .ram external-handoff download */
 #include <shellapi.h>    /* ShellExecuteW for the file-association handoff */
+#include "suite_w31.h"   /* the Windows 3.1 scrollbar (scroll calls redirected) */
+#include "gopher_module.h" /* gopher:// links open in the Gopher tab */
 
 /* GDI+ flat C entry points. The vendor's <gdiplus.h> is C++-only
  * (uses namespace Gdiplus + a class wrapper), so we declare the four
@@ -251,6 +253,14 @@ static int g_b_cell_gap_suppress = 0;
 #define SEL_DRAG_THRESHOLD     4         /* px; sqrt(SQ) */
 #define SEL_DRAG_THRESHOLD_SQ  (SEL_DRAG_THRESHOLD * SEL_DRAG_THRESHOLD)
 #define SEL_HIGHLIGHT_RGB      RGB(178, 215, 255)
+
+/* The page colour when a page sets none: RGB(192,192,192), the early-web
+ * gray NCSA Mosaic and Netscape Navigator 1.x shipped (Mosaic's X11
+ * #bfbfbf is the same 192 triplet quantized). Operator decision
+ * 2026-11-10 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the Retro Web
+ * default stays the period browser gray, not the white of the other
+ * 1.1 document windows. Pages with bgcolor are unaffected. */
+#define WEB_DEFAULT_BG         RGB(192, 192, 192)
 
 /* Pass 9d: auto-scroll during active drag. Standard browser behavior:
  * while the user is drag-selecting and the cursor reaches/leaves the
@@ -1925,6 +1935,7 @@ PRIVATE void web_HText_beginElement(HText *text, int element_number,
                     if (rs > 0) cell->rowspan = rs;
                 }
                 cell->align = cell_align;
+                cell->center_base = doc->style.center_depth;
                 doc->open_cell = cell;
                 doc->parse_mode = PARSE_IN_CELL;
                 /* Start a fresh BLK_PARA inside the cell. */
@@ -2108,11 +2119,15 @@ PRIVATE void web_HText_endElement(HText *text, int element_number)
                  * and does NOT inherit the page's ambient <center>, matching
                  * period browsers -- a <center> around the page centers the
                  * outer table but not tables sitting inside a <td>. Only a
-                 * top-level table inherits center_depth. */
+                 * top-level table inherits center_depth. But a <center>
+                 * opened INSIDE the cell, around this table, does centre it,
+                 * as Netscape 4 does (2026-11-11: the badge row of the
+                 * www.teletext.ca fallback, ref11). */
                 if (t->align != 0)
                     b->align = t->align;
                 else if (parent_cell != NULL)
-                    b->align = parent_cell->align;
+                    b->align = (doc->style.center_depth > parent_cell->center_base)
+                               ? 1 : parent_cell->align;
                 else
                     b->align = (doc->style.center_depth > 0) ? 1 : 0;
                 b->table_data = t;
@@ -4340,7 +4355,7 @@ static int web_render_table(WebRenderView *view, HDC hdc, WebBlock *blk, int x0,
         return y + total_h;
     }
 
-    body_bg = RGB(192, 192, 192);
+    body_bg = WEB_DEFAULT_BG;
     if (view->view_doc && view->view_doc->body_bg != WEB_NOCOLOR)
         body_bg = view->view_doc->body_bg;
 
@@ -4597,13 +4612,12 @@ void web_paint_to(WebRenderView *view, HDC hdc, RECT *client, BOOL measure_only,
     SetBkMode(hdc, TRANSPARENT);
 
     if (!measure_only) {
-        /* Default canvas: early-web gray, RGB 192,192,192 (#C0C0C0) as
-         * shipped by NCSA Mosaic and Netscape Navigator 1.x. The Mosaic
-         * X11 #bfbfbf value is an 8-bit-server quantization of the same
-         * 192 triplet, not a different color. Overridden when the page
-         * sets a <body bgcolor=...> or a body { background-color: ... }
-         * rule in a top-level <style> block. */
-        COLORREF bg = RGB(192, 192, 192);
+        /* Default canvas: WEB_DEFAULT_BG (see its definition for why it
+         * is white since 1.1, and the one-line way back to Mosaic gray).
+         * Overridden when the page sets a <body bgcolor=...> or a
+         * body { background-color: ... } rule in a top-level <style>
+         * block. */
+        COLORREF bg = WEB_DEFAULT_BG;
         HBRUSH   bg_brush;
         if (view->view_doc && view->view_doc->body_bg != WEB_NOCOLOR)
             bg = view->view_doc->body_bg;
@@ -5178,6 +5192,16 @@ typedef struct WebFetchCtx {
      * needing inter-thread libwww abort plumbing, which is the
      * observed failing case. */
     volatile LONG cancelled;
+    /* Status bar progress (2026-11-11, docs/2026-11-11_STATUS_PROGRESS.md):
+     * the page request's body bytes read and its Content-Length (-1 when
+     * the server sent none), written by the worker's libwww progress
+     * callback, read by the UI poll timer. page_req identifies the page
+     * request; image fetches after it are not counted. shown_body is UI
+     * only: the last value put on the status line. */
+    HTRequest    *page_req;
+    volatile LONG prog_body;
+    volatile LONG prog_total;
+    LONG          shown_body;
     /* Phase 6: this fetch is a CDF / Active Channel resource, not
      * HTML. The worker takes the WWW_SOURCE / HTLoadToChunk branch
      * (same raw-bytes path as the renderer's image fetch); the
@@ -5189,6 +5213,10 @@ typedef struct WebFetchCtx {
     int           is_cdf;
     CdfDoc       *cdf_doc;
 } WebFetchCtx;
+
+/* the fetch the progress callback reports (defined with the callback) */
+static WebFetchCtx * volatile g_web_prog_ctx;
+static void web_progress_tick(WebFetchCtx *c);
 
 static WebFetchCtx *g_b_fetch          = NULL;
 static UINT_PTR     g_b_fetch_timer_id = 0;
@@ -5509,8 +5537,12 @@ static DWORD WINAPI web_fetch_worker(LPVOID arg)
     HTNet_addAfter(web_terminate_filter, NULL, NULL, HT_ALL, HT_FILTER_LAST);
 
     g_b_active_doc = NULL;
+    ctx->page_req = request;
+    ctx->prog_total = -1;
+    g_web_prog_ctx = ctx;
     ok = HTLoadAbsolute(abs_url, request);
     if (ok) HTEventList_loop(request);
+    g_web_prog_ctx = NULL;
 
     if (g_b_active_doc) {
         WebDoc *d = g_b_active_doc;
@@ -5523,9 +5555,8 @@ static DWORD WINAPI web_fetch_worker(LPVOID arg)
         ctx->outcome = 0;
         /* Fetch images. */
         fetch_all_images(ctx->doc, abs_url);
-        _snprintf(ctx->status_msg, sizeof(ctx->status_msg),
-                  "Loaded %lu blocks from %s",
-                  (unsigned long)ctx->doc->blocks_n, ctx->url);
+        /* Completion, as Netscape says it (refshots/ref19). */
+        _snprintf(ctx->status_msg, sizeof(ctx->status_msg), "Document: Done");
     } else {
         ctx->outcome = 2;
         _snprintf(ctx->status_msg, sizeof(ctx->status_msg),
@@ -5545,10 +5576,12 @@ static void CALLBACK web_fetch_timer_proc(HWND hwnd, UINT msg,
 {
     WebFetchCtx *ctx;
     (void)msg; (void)time;
-    if (!g_b_fetch || !g_b_fetch->done) return;
+    if (!g_b_fetch) return;
+    if (!g_b_fetch->done) { web_progress_tick(g_b_fetch); return; }
 
     KillTimer(hwnd, id);
     g_b_fetch_timer_id = 0;
+    suite_set_progress(SUITE_ID_BTN_WEB, -1);
 
     ctx = g_b_fetch;
     g_b_fetch = NULL;
@@ -5662,10 +5695,55 @@ static void CALLBACK web_fetch_timer_proc(HWND hwnd, UINT msg,
     free(ctx);
 }
 
+/* The fetch whose page request the progress callback reports; set by the
+ * worker around its load, NULL otherwise. */
+static WebFetchCtx * volatile g_web_prog_ctx = NULL;
+
+/* libwww's read progress (HT_PROG_READ, called from its socket reader on
+ * the worker thread for every read): the page's body bytes and its
+ * Content-Length. HTRequest_bodyRead excludes the header bytes, so it is
+ * measured against Content-Length like for like. */
+PRIVATE BOOL web_progress_alert(HTRequest *request, HTAlertOpcode op,
+                                int msgnum, const char *dfault,
+                                void *input, HTAlertPar *reply)
+{
+    WebFetchCtx *c = g_web_prog_ctx;
+    (void)msgnum; (void)dfault; (void)input; (void)reply;
+    if (op == HT_PROG_READ && c && request == c->page_req) {
+        long total = HTAnchor_length(HTRequest_anchor(request));
+        long body  = HTRequest_bodyRead(request);
+        InterlockedExchange(&c->prog_total, total > 0 ? total : -1);
+        InterlockedExchange(&c->prog_body, body > 0 ? body : 0);
+    }
+    return YES;
+}
+
+/* On the UI thread, from the poll timer: a true percentage bar only when
+ * the server gave a length; otherwise the byte count, and no bar. */
+static void web_progress_tick(WebFetchCtx *c)
+{
+    LONG body  = InterlockedCompareExchange(&c->prog_body, 0, 0);
+    LONG total = InterlockedCompareExchange(&c->prog_total, 0, 0);
+    char m[160];
+    if (body <= 0 || body == c->shown_body) return;
+    c->shown_body = body;
+    if (total > 0) {
+        int pct = (int)((long long)body * 100 / total);
+        if (pct > 100) pct = 100;
+        _snprintf(m, sizeof m, "Reading document: %ld of %ld bytes", (long)body, (long)total);
+        suite_set_progress(SUITE_ID_BTN_WEB, pct);
+    } else {
+        _snprintf(m, sizeof m, "Reading document: %ld bytes", (long)body);
+    }
+    m[sizeof m - 1] = '\0';
+    web_status(c->content, m);
+}
+
 static void web_ensure_libwww_inited(void)
 {
     if (g_b_libwww_inited) return;
     HTProfile_newPreemptiveClient(SUITE_UA_PRODUCT, SUITE_VERSION_STR);
+    HTAlert_add(web_progress_alert, HT_PROG_READ);
     HTMLInit(HTFormat_conversion());
     HText_registerCDCallback     (web_HText_new,          web_HText_delete);
     HText_registerBuildCallback  (web_HText_build);
@@ -5852,6 +5930,42 @@ static void web_navigate(HWND content, const char *url, int push_history)
             ctx->url[sizeof(ctx->url) - 1] = '\0';
             HT_FREE(resolved);
         }
+    }
+
+    /* gopher:// opens in the Gopher tab (2026-11-11, operator): a link
+     * on a web page, or an address typed here. The Web tab used to fetch
+     * the menu itself through libwww and render it as a page. Nothing
+     * changes for the page or its server: the link stays gopher://, which
+     * browsers with built-in Gopher (Netscape, Mosaic) open themselves;
+     * this is only where Navigator sends it. The web page and its URL bar
+     * stay as they were, so Back on the Web tab is unaffected. */
+    if (_strnicmp(ctx->url, "gopher://", 9) == 0) {
+        char gurl[sizeof(ctx->url)];
+        strncpy(gurl, ctx->url, sizeof(gurl) - 1);
+        gurl[sizeof(gurl) - 1] = '\0';
+        SetWindowTextA(g_b_url_edit, g_b_current_url);   /* keep page URL */
+        free(ctx);
+        suite_set_active_module(SUITE_ID_BTN_GOPHER);
+        gopher_module_open_url(gurl);
+        return;
+    }
+
+    /* ftp:// opens in the FTP tab (2026-11-12, operator; docs/2026-11-12_FTP_TAB.md),
+     * exactly as gopher:// opens in Gopher. Before this the Web tab fetched it
+     * through libwww's HTFTP, whose anonymous password was built by
+     * HTGetMailAddress as "libwww@" plus this PC's DNS domain (its Windows
+     * branch never uses the GetUserName result): the FTP tab sends the one
+     * client-wide FTPC_ANON_PASSWORD instead. HTFTP stays compiled, unused
+     * for links. The page and its URL bar stay as they were. */
+    if (_strnicmp(ctx->url, "ftp://", 6) == 0) {
+        char furl[sizeof(ctx->url)];
+        strncpy(furl, ctx->url, sizeof(furl) - 1);
+        furl[sizeof(furl) - 1] = '\0';
+        SetWindowTextA(g_b_url_edit, g_b_current_url);   /* keep page URL */
+        free(ctx);
+        suite_set_active_module(SUITE_ID_BTN_FTP);
+        ftp_module_open_url(furl);
+        return;
     }
 
     /* Polish pass: divert Sun .au URLs to the shared audio service.

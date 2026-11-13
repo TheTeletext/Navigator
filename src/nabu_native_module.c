@@ -78,6 +78,7 @@
 
 #include "suite_shell.h"
 #include "nabu_native_module.h"
+#include "suite_w31.h"   /* the Connect/Disconnect toggle */
 #include "nabu_core.h"
 #include "nabu_serial.h"
 
@@ -269,8 +270,8 @@ static int nn_reg_read(const char *name, char *out, size_t cap)
 }
 
 static HWND g_hContent   = NULL;
-static HWND g_hStartBtn  = NULL;   /* "Connect"    */
-static HWND g_hStopBtn   = NULL;   /* "Disconnect" */
+static HWND g_hStartBtn  = NULL;   /* the Connect/Disconnect toggle (2026-11-11) */
+static HWND g_hStopBtn   = NULL;   /* retired 2026-11-11 (one toggle); stays NULL */
 static HWND g_hScreen    = NULL;
 static HWND g_hHostLbl   = NULL;
 static HWND g_hHostEdit  = NULL;
@@ -1155,6 +1156,12 @@ static void nn_screen_paint(HWND hwnd, HDC hdc)
      * the bars a different colour from the surround and drew a visible
      * rectangle around the picture. The border colour is still tracked in
      * g_border, it is simply no longer painted here.
+     *
+     * Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the surround
+     * is now the gray Windows 3.1 face and this window sits in a sunken
+     * frame, so the bars are no longer the surround. They stay black:
+     * the framed screen reads as one dark canvas (a television) inside
+     * the bright app, which is what the brief asks of the emulators.
      */
     FillRect(mem, &rc, g_hBrushBlack);
 
@@ -1364,7 +1371,14 @@ static int nn_text_w(HWND ref, const char *s)
     if (!ref || !s) return 0;
     dc = GetDC(ref);
     if (!dc) return 0;
-    if (g_hFontUI) old = (HFONT)SelectObject(dc, g_hFontUI);
+    /* 2026-11-11: a label ending in a colon is drawn in the bold chrome
+     * face (the suite_w31.c field rule), so measure it in that face, or
+     * the bold text overruns its box ("Serial port:" lost its colon). */
+    {
+        size_t n = strlen(s);
+        HFONT  f = (n && s[n - 1] == ':' && g_w31_font_bold) ? g_w31_font_bold : g_hFontUI;
+        if (f) old = (HFONT)SelectObject(dc, f);
+    }
     GetTextExtentPoint32A(dc, s, (int)strlen(s), &sz);
     if (old) SelectObject(dc, old);
     ReleaseDC(ref, dc);
@@ -2042,8 +2056,10 @@ static void nn_start(void)
         nn_enable_fields(TRUE);
         return;
     }
-    if (g_hStartBtn) EnableWindow(g_hStartBtn, FALSE);
-    if (g_hStopBtn)  EnableWindow(g_hStopBtn,  TRUE);
+    /* The toggle reads Disconnect from the moment the worker starts, as
+     * the separate Disconnect was enabled then: cancelling while connecting
+     * is nn_stop, which signals the worker and waits for it (5 s cap). */
+    w31_toggle_set(g_hStartBtn, TRUE);
     if (g_hScreen)   { SetFocus(g_hScreen); InvalidateRect(g_hScreen, NULL, FALSE); }
 }
 
@@ -2079,8 +2095,7 @@ static void nn_stop(void)
         LeaveCriticalSection(&g_lock);
     }
 
-    if (g_hStartBtn) EnableWindow(g_hStartBtn, TRUE);
-    if (g_hStopBtn)  EnableWindow(g_hStopBtn,  FALSE);
+    w31_toggle_set(g_hStartBtn, FALSE);
     /* Back to idle: the connection is gone, so the fields describe the
      * NEXT connection again and are editable. */
     if (g_controls_created) nn_enable_fields(TRUE);
@@ -2231,9 +2246,13 @@ void nabu_native_module_resize(HWND content, int w, int h)
         x += w_comlbl + 4;
         MoveWindow(g_hComCombo,   x, y2_fld, w_com, fld_h + 200, TRUE);
         x += w_com + gap;
-        MoveWindow(g_hStartBtn,   x, y2, w_btn, btn_h, TRUE);
-        x += w_btn + gap;
-        MoveWindow(g_hStopBtn,    x, y2, w_btn, btn_h, TRUE);
+        /* The Connect/Disconnect toggle: right end of row 2 (the place
+         * every service tab uses since 2026-11-11), never over the COM
+         * combo when the window is narrow; centred on the 30 px row. */
+        if (x < w - margin - W31_TOGGLE_W) x = w - margin - W31_TOGGLE_W;
+        MoveWindow(g_hStartBtn,   x, y2 + (btn_h - W31_TOGGLE_H) / 2,
+                   W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
+        (void)w_btn;
     }
 
     /* The picture runs from under the connection row to the bottom of the
@@ -2307,12 +2326,9 @@ void nabu_native_module_activate(HWND content)
             0, 0, 10, 10, content, (HMENU)(INT_PTR)IDC_NN_CHAN, hInst, NULL);
         g_hStartBtn = CreateWindowA("BUTTON", "Connect",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-            0, 0, 95, 30, content,
+            0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content,
             (HMENU)(INT_PTR)IDC_NN_CONNECT, hInst, NULL);
-        g_hStopBtn = CreateWindowA("BUTTON", "Disconnect",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED,
-            0, 0, 95, 30, content,
-            (HMENU)(INT_PTR)IDC_NN_DISCONN, hInst, NULL);
+        g_hStopBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
         /* WS_TABSTOP so the screen can take the keyboard; the guest
          * needs it and the key handling above depends on focus. */
         g_hScreen = CreateWindowExA(WS_EX_CLIENTEDGE, NN_SCREEN_CLASS, "",
@@ -2369,7 +2385,11 @@ BOOL nabu_native_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     (void)content; (void)lParam;
 
     if (code == BN_CLICKED) {
-        if (id == IDC_NN_CONNECT) { nn_start(); return TRUE; }
+        if (id == IDC_NN_CONNECT) {     /* the toggle: its label says which */
+            if (InterlockedCompareExchange(&g_running, 0, 0)) nn_disconnect_to_idle();
+            else                                               nn_start();
+            return TRUE;
+        }
         if (id == IDC_NN_DISCONN) { nn_disconnect_to_idle(); return TRUE; }
     }
     /*

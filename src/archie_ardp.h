@@ -108,6 +108,18 @@ archie_status_t archie_query(const char *server, int port,
                              int exact_first, int maxhits,
                              archie_result_t *out);
 
+/* The same, publishing the reply's packets as they arrive (2026-11-11,
+ * docs/2026-11-11_STATUS_PROGRESS.md): *prog_got the distinct packets
+ * received, *prog_total the reply's packet count from the ARDP header (1
+ * for a single-packet reply). Either may be NULL. For a status bar on
+ * another thread: written with InterlockedExchange. */
+archie_status_t archie_query_progress(const char *server, int port,
+                                      const char *term, archie_search_type_t type,
+                                      int exact_first, int maxhits,
+                                      archie_result_t *out,
+                                      volatile LONG *prog_got,
+                                      volatile LONG *prog_total);
+
 /* Release the hit array held by a result filled by archie_query. Safe to
  * call on a zeroed/failed result. Does not free the result struct itself. */
 void archie_result_free(archie_result_t *out);

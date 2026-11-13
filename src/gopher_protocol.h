@@ -52,6 +52,11 @@ int gopher_fetch_sync(const char *host, int port,
                       GopherFetchKind kind,
                       char **out_bytes, size_t *out_size);
 
+/* Bytes received so far by the running gopher_fetch_sync (reset at its
+ * start), for the status bar: RFC 1436 carries no length, so a count is
+ * all there is (2026-11-11, docs/2026-11-11_STATUS_PROGRESS.md). */
+extern volatile LONG g_gopher_bytes_read;
+
 /* Parse a gopher:// URL. Accepted forms:
  *   gopher://host[:port]
  *   gopher://host[:port]/

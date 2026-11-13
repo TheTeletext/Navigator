@@ -99,6 +99,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "suite_w31.h"
+#include "ftp_ctrl.h"
 
 /* Server defaults (editable; user can change via Server/Port fields +
  * Connect). The default port 2121 is the live FTP-Mail control port,
@@ -123,7 +125,8 @@
 
 static HWND g_a_server_lbl, g_a_server_edit;
 static HWND g_a_port_lbl,   g_a_port_edit;
-static HWND g_a_connect_btn, g_a_disconnect_btn;
+static HWND g_a_connect_btn, g_a_disconnect_btn;   /* 2026-11-11: Disconnect
+                                                     retired (one toggle); NULL */
 static HWND g_a_proto_lbl;
 static HWND g_a_to_lbl,     g_a_to_edit;
 static HWND g_a_body_lbl,   g_a_body_edit;
@@ -249,9 +252,8 @@ static void arpa_set_connected_state(BOOL connected)
 
     EnableWindow(g_a_server_edit,    !connected);
     EnableWindow(g_a_port_edit,      !connected);
-    EnableWindow(g_a_connect_btn,    !connected);
-
-    EnableWindow(g_a_disconnect_btn,  connected);
+    /* 2026-11-11: one Connect/Disconnect toggle (docs/2026-11-11_W31_BUTTONS.md). */
+    w31_toggle_set(g_a_connect_btn, connected);
     EnableWindow(g_a_to_edit,         connected);
     EnableWindow(g_a_body_edit,       connected);
     EnableWindow(g_a_clear_btn,       connected);
@@ -266,27 +268,6 @@ static void arpa_set_connected_state(BOOL connected)
 /* ------------------------------------------------------------------ */
 
 /* Read up to a CRLF (or LF) terminated line, or until buffer full. */
-static int arpa_read_line(SOCKET s, char *buf, int buflen)
-{
-    int total = 0;
-    while (total < buflen - 1) {
-        int n = recv(s, buf + total, 1, 0);
-        if (n <= 0) break;
-        total += n;
-        if (buf[total - 1] == '\n') break;
-    }
-    buf[total] = '\0';
-    return total;
-}
-
-/* Parse the leading 3-digit reply code from an FTP-style line. */
-static int arpa_parse_reply(const char *line)
-{
-    int code;
-    if (sscanf(line, "%d", &code) != 1) return -1;
-    return code;
-}
-
 /* First-digit reply class per RFC 765 Section 4.2: 1xx preliminary,
  * 2xx positive completion, 3xx positive intermediate, 4xx transient
  * negative, 5xx permanent negative. Returns 1/2/3/4/5, or 0 on a
@@ -297,29 +278,6 @@ static int arpa_class(int code)
 {
     if (code < 100 || code > 599) return 0;
     return code / 100;
-}
-
-/* Write all bytes; returns number sent or -1 on error. */
-static int arpa_send_all(SOCKET s, const char *buf, int len)
-{
-    int sent = 0;
-    while (sent < len) {
-        int n = send(s, buf + sent, len - sent, 0);
-        if (n == SOCKET_ERROR || n == 0) return -1;
-        sent += n;
-    }
-    return sent;
-}
-
-/* Send a command line with CRLF appended. */
-static int arpa_send_cmd(SOCKET s, const char *fmt, const char *arg)
-{
-    char line[512];
-    int len;
-    if (arg) _snprintf(line, sizeof(line), "%s %s\r\n", fmt, arg);
-    else     _snprintf(line, sizeof(line), "%s\r\n", fmt);
-    len = (int)strlen(line);
-    return arpa_send_all(s, line, len);
 }
 
 /* ------------------------------------------------------------------ */
@@ -341,79 +299,60 @@ static void arpa_status_from_line(HWND content, const char *line)
 }
 
 /* ------------------------------------------------------------------ */
-/* TCP connect with a bounded timeout. Returns INVALID_SOCKET on       */
-/* failure. The returned socket is in blocking mode.                   */
+/* The wire, since 2026-11-12, is the shared core src/ftp_ctrl.c (the  */
+/* FTP tab and Archie's Download use the same one): a MAIL session's   */
+/* allowlist is MAIL and QUIT, nothing else can be sent; replies are   */
+/* RFC 959 multi-line aware; the connect runs in 200 ms slices. The   */
+/* bytes this client sends are unchanged: the before/after transcript  */
+/* diff is in docs/2026-11-12_FTP_TAB.md. Every server line still    */
+/* becomes the status verbatim, through the core's log callback.      */
 /* ------------------------------------------------------------------ */
 
-static SOCKET arpa_connect_timeout(const struct sockaddr_in *addr, int seconds)
+static void arpa_log(void *user, int kind, const char *line)
 {
-    SOCKET         s = socket(AF_INET, SOCK_STREAM, 0);
-    u_long         mode;
-    int            rc;
-    fd_set         wfds, efds;
-    struct timeval tv;
-    int            err = 0, errlen = sizeof(err), sel;
-
-    if (s == INVALID_SOCKET) return INVALID_SOCKET;
-
-    mode = 1;
-    if (ioctlsocket(s, FIONBIO, &mode) != 0) {
-        closesocket(s);
-        return INVALID_SOCKET;
-    }
-
-    rc = connect(s, (const struct sockaddr *)addr, sizeof(*addr));
-    if (rc == 0) {
-        mode = 0;
-        ioctlsocket(s, FIONBIO, &mode);
-        return s;
-    }
-    if (WSAGetLastError() != WSAEWOULDBLOCK) {
-        closesocket(s);
-        return INVALID_SOCKET;
-    }
-
-    FD_ZERO(&wfds); FD_SET(s, &wfds);
-    FD_ZERO(&efds); FD_SET(s, &efds);
-    tv.tv_sec  = seconds;
-    tv.tv_usec = 0;
-    sel = select(0, NULL, &wfds, &efds, &tv);
-    if (sel <= 0 || FD_ISSET(s, &efds)) {
-        closesocket(s);
-        return INVALID_SOCKET;
-    }
-    if (getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&err, &errlen) != 0 || err != 0) {
-        closesocket(s);
-        return INVALID_SOCKET;
-    }
-
-    mode = 0;
-    ioctlsocket(s, FIONBIO, &mode);
-    return s;
+    if (kind == FTPC_LOG_SERVER) arpa_status_from_line((HWND)user, line);
 }
 
-/* ------------------------------------------------------------------ */
-/* Read replies in a loop, consuming preliminary 1xx replies and       */
-/* surfacing each one verbatim to the status surface, until we read a  */
-/* non-1xx reply. Stores the final reply line in `line` and returns    */
-/* the parsed code, or -1 on a read or parse failure. This is the      */
-/* multi-line reply handling RFC 765 requires for the MAIL path, where */
-/* an unknown well-formed recipient yields 152 then 354 (matrix Item   */
-/* 7).                                                                 */
-/* ------------------------------------------------------------------ */
-
-static int arpa_read_reply_loop(SOCKET s, HWND content,
-                                char *line, int linelen)
+/* Connect to the active host:port and read the greeting. NULL when the
+ * connect failed (status set). Otherwise the session, with *greet the
+ * greeting's code, or below zero when none came ("No FTP-Mail banner"
+ * status set; an unparseable line is already the status). */
+static ftp_ctrl_t *arpa_open(HWND content, int *greet)
 {
-    int code;
-    for (;;) {
-        if (arpa_read_line(s, line, linelen) <= 0) return -1;
-        arpa_status_from_line(content, line);
-        code = arpa_parse_reply(line);
-        if (code < 0) return -1;
-        if (arpa_class(code) != 1) return code;
-        /* 1xx preliminary: surfaced; loop for the next reply. */
+    ftp_ctrl_t *c;
+    char        line[1024];
+    int         port_int, rc;
+
+    port_int = atoi(g_a_active_port);
+    if (port_int <= 0 || port_int > 65535) port_int = 2121;
+
+    c = ftpc_new(FTPC_VERBS_MAIL, arpa_log, content);
+    if (!c) { arpa_status(content, "Out of memory."); return NULL; }
+    ftpc_set_reply_timeout(c, ARPA_NET_TIMEOUT * 1000);
+
+    arpa_status(content, "Connecting...");
+    rc = ftpc_connect(c, g_a_active_host, port_int, ARPA_NET_TIMEOUT * 1000);
+    if (rc != 0) {
+        char m[300];
+        if (rc == FTPC_ERR_RESOLVE)
+            _snprintf(m, sizeof(m), "Cannot resolve %s.", g_a_active_host);
+        else
+            _snprintf(m, sizeof(m), "Cannot connect to %s:%s.",
+                      g_a_active_host, g_a_active_port);
+        m[sizeof(m) - 1] = '\0';
+        arpa_status(content, m);
+        ftpc_release(c);
+        return NULL;
     }
+    *greet = ftpc_reply(c, line, sizeof(line));
+    if (*greet < 0 && *greet != FTPC_ERR_PROTO) {
+        char m[300];
+        _snprintf(m, sizeof(m), "No FTP-Mail banner from %s:%s.",
+                  g_a_active_host, g_a_active_port);
+        m[sizeof(m) - 1] = '\0';
+        arpa_status(content, m);
+    }
+    return c;
 }
 
 /* ------------------------------------------------------------------ */
@@ -432,15 +371,11 @@ static BOOL arpa_send_mail(HWND content,
                            const char *recipient,
                            const char *raw_body, size_t raw_len)
 {
-    SOCKET             ctrl = INVALID_SOCKET;
-    struct sockaddr_in srv;
-    struct hostent    *he;
-    unsigned long      addr;
+    ftp_ctrl_t        *c = NULL;
     char               line[1024];
     char              *clean = NULL;
     size_t             clean_len = 0;
     int                code;
-    int                port_int;
     BOOL               crlf_ended;
     const char        *term;
     int                term_len;
@@ -448,62 +383,17 @@ static BOOL arpa_send_mail(HWND content,
     BOOL               has_period = FALSE;
     BOOL               ok = FALSE;
 
-    port_int = atoi(g_a_active_port);
-    if (port_int <= 0 || port_int > 65535) port_int = 2121;
-
-    memset(&srv, 0, sizeof(srv));
-    addr = inet_addr(g_a_active_host);
-    if (addr != INADDR_NONE) {
-        srv.sin_addr.s_addr = addr;
-        srv.sin_family = AF_INET;
-    } else {
-        he = gethostbyname(g_a_active_host);
-        if (!he) {
-            char m[300];
-            _snprintf(m, sizeof(m), "Cannot resolve %s.", g_a_active_host);
-            arpa_status(content, m);
-            return FALSE;
-        }
-        srv.sin_family = he->h_addrtype;
-        memcpy(&srv.sin_addr, he->h_addr_list[0], he->h_length);
-    }
-    srv.sin_port = htons((unsigned short)port_int);
-
-    arpa_status(content, "Connecting...");
-
-    ctrl = arpa_connect_timeout(&srv, ARPA_NET_TIMEOUT);
-    if (ctrl == INVALID_SOCKET) {
-        char m[300];
-        _snprintf(m, sizeof(m), "Cannot connect to %s:%s.",
-                  g_a_active_host, g_a_active_port);
-        arpa_status(content, m);
-        goto cleanup;
-    }
-
-    {
-        DWORD tmo_ms = ARPA_NET_TIMEOUT * 1000;
-        setsockopt(ctrl, SOL_SOCKET, SO_RCVTIMEO,
-                   (const char *)&tmo_ms, sizeof(tmo_ms));
-    }
-
     /* Greeting: 220, first-digit 2. */
-    if (arpa_read_line(ctrl, line, sizeof(line)) <= 0) {
-        char m[300];
-        _snprintf(m, sizeof(m),
-                  "No FTP-Mail banner from %s:%s.",
-                  g_a_active_host, g_a_active_port);
-        arpa_status(content, m);
-        goto cleanup;
-    }
-    arpa_status_from_line(content, line);
-    if (arpa_class(arpa_parse_reply(line)) != 2) goto cleanup;
+    c = arpa_open(content, &code);
+    if (!c) goto cleanup;
+    if (code < 0 || arpa_class(code) != 2) goto cleanup;
 
     /* MAIL <recipient>: expect any 1xx preliminary (152 for an unknown
      * well-formed recipient routed to the editorial catch-all) then
      * 354 (mail-input start). Any non-354 terminal reply ends the
      * send; 4xx/5xx surface verbatim via the reply-loop helper. */
-    if (arpa_send_cmd(ctrl, "MAIL", recipient) < 0) goto cleanup;
-    code = arpa_read_reply_loop(ctrl, content, line, sizeof(line));
+    if (ftpc_send_cmd(c, "MAIL", recipient) < 0) goto cleanup;
+    code = ftpc_reply_final(c, line, sizeof(line));
     if (code != 354) goto cleanup;
 
     /* Sanitize and frame the wire bytes after 354 per the 2026-05-18
@@ -550,22 +440,22 @@ static BOOL arpa_send_mail(HWND content,
          * (period at offset 0) sends only ".\r\n". Nothing after
          * the period line is transmitted. */
         if (period_off > 0) {
-            if (arpa_send_all(ctrl, clean, (int)period_off) < 0) goto cleanup;
+            if (ftpc_send_mail_text(c, clean, (int)period_off) < 0) goto cleanup;
         }
-        if (arpa_send_all(ctrl, ".\r\n", 3) < 0) goto cleanup;
+        if (ftpc_send_mail_text(c, ".\r\n", 3) < 0) goto cleanup;
     } else {
         /* No-period path: preserve the existing behavior byte for
          * byte. Send the sanitized body if non-empty, then the
          * crlf_ended choice of ".\r\n" or "\r\n.\r\n". */
         if (clean_len > 0) {
-            if (arpa_send_all(ctrl, clean, (int)clean_len) < 0) goto cleanup;
+            if (ftpc_send_mail_text(c, clean, (int)clean_len) < 0) goto cleanup;
         }
         crlf_ended = (clean_len >= 2 &&
                       clean[clean_len - 2] == '\r' &&
                       clean[clean_len - 1] == '\n');
         term     = crlf_ended ? ".\r\n" : "\r\n.\r\n";
         term_len = crlf_ended ? 3       : 5;
-        if (arpa_send_all(ctrl, term, term_len) < 0) goto cleanup;
+        if (ftpc_send_mail_text(c, term, term_len) < 0) goto cleanup;
     }
 
     /* Final reply: 250 or another 2xx for success. On a 2xx the
@@ -575,7 +465,7 @@ static BOOL arpa_send_mail(HWND content,
      * naturally freezes because the read-only edit emits no further
      * EN_CHANGE. On a non-2xx no lock is applied; the literal reply
      * stays in the status surface and the box remains editable. */
-    code = arpa_read_reply_loop(ctrl, content, line, sizeof(line));
+    code = ftpc_reply_final(c, line, sizeof(line));
     if (code < 0) goto cleanup;
     if (arpa_class(code) == 2) {
         ok = TRUE;
@@ -585,10 +475,10 @@ static BOOL arpa_send_mail(HWND content,
     }
 
 cleanup:
-    if (ctrl != INVALID_SOCKET) {
+    if (c) {
         /* Best-effort QUIT. Server emits 221; not read. */
-        arpa_send_cmd(ctrl, "QUIT", NULL);
-        closesocket(ctrl);
+        if (ftpc_connected(c)) ftpc_send_cmd(c, "QUIT", NULL);
+        ftpc_release(c);
     }
     if (clean) free(clean);
 
@@ -648,11 +538,8 @@ static void arpa_on_connect(HWND content)
 {
     char               host[256], port[16];
     int                port_int;
-    SOCKET             ctrl = INVALID_SOCKET;
-    struct sockaddr_in srv;
-    struct hostent    *he;
-    unsigned long      addr;
-    char               line[1024];
+    ftp_ctrl_t        *c;
+    int                code;
     BOOL               ok_banner = FALSE;
 
     GetWindowTextA(g_a_server_edit, host, sizeof(host));
@@ -673,55 +560,13 @@ static void arpa_on_connect(HWND content)
     g_a_active_host[sizeof(g_a_active_host) - 1] = '\0';
     g_a_active_port[sizeof(g_a_active_port) - 1] = '\0';
 
-    memset(&srv, 0, sizeof(srv));
-    addr = inet_addr(g_a_active_host);
-    if (addr != INADDR_NONE) {
-        srv.sin_addr.s_addr = addr;
-        srv.sin_family = AF_INET;
-    } else {
-        he = gethostbyname(g_a_active_host);
-        if (!he) {
-            char m[300];
-            _snprintf(m, sizeof(m), "Cannot resolve %s.", g_a_active_host);
-            arpa_status(content, m);
-            return;
-        }
-        srv.sin_family = he->h_addrtype;
-        memcpy(&srv.sin_addr, he->h_addr_list[0], he->h_length);
-    }
-    srv.sin_port = htons((unsigned short)port_int);
-
-    arpa_status(content, "Connecting...");
-
-    ctrl = arpa_connect_timeout(&srv, ARPA_NET_TIMEOUT);
-    if (ctrl == INVALID_SOCKET) {
-        char m[300];
-        _snprintf(m, sizeof(m), "Cannot connect to %s:%s.",
-                  g_a_active_host, g_a_active_port);
-        arpa_status(content, m);
-        return;
-    }
-
-    {
-        DWORD tmo_ms = ARPA_NET_TIMEOUT * 1000;
-        setsockopt(ctrl, SOL_SOCKET, SO_RCVTIMEO,
-                   (const char *)&tmo_ms, sizeof(tmo_ms));
-    }
-
     /* Banner: any 2xx first-digit on a fresh control connection
      * (220 from the live server) is the connected-state proof. */
-    if (arpa_read_line(ctrl, line, sizeof(line)) <= 0) {
-        char m[300];
-        _snprintf(m, sizeof(m),
-                  "No FTP-Mail banner from %s:%s.",
-                  g_a_active_host, g_a_active_port);
-        arpa_status(content, m);
-    } else {
-        arpa_status_from_line(content, line);
-        if (arpa_class(arpa_parse_reply(line)) == 2) ok_banner = TRUE;
-    }
+    c = arpa_open(content, &code);
+    if (!c) return;
+    if (code >= 0 && arpa_class(code) == 2) ok_banner = TRUE;
 
-    closesocket(ctrl);   /* no QUIT, no NOOP */
+    ftpc_release(c);     /* no QUIT, no NOOP */
 
     if (ok_banner) {
         arpa_set_connected_state(TRUE);
@@ -740,71 +585,20 @@ static void arpa_on_connect(HWND content)
 
 static void arpa_on_disconnect(HWND content)
 {
-    SOCKET             ctrl = INVALID_SOCKET;
-    struct sockaddr_in srv;
-    struct hostent    *he;
-    unsigned long      addr;
+    ftp_ctrl_t        *c = NULL;
     char               line[1024];
     int                code;
-    int                port_int;
 
-    port_int = atoi(g_a_active_port);
-    if (port_int <= 0 || port_int > 65535) port_int = 2121;
-
-    memset(&srv, 0, sizeof(srv));
-    addr = inet_addr(g_a_active_host);
-    if (addr != INADDR_NONE) {
-        srv.sin_addr.s_addr = addr;
-        srv.sin_family = AF_INET;
-    } else {
-        he = gethostbyname(g_a_active_host);
-        if (!he) {
-            char m[300];
-            _snprintf(m, sizeof(m), "Cannot resolve %s.", g_a_active_host);
-            arpa_status(content, m);
-            goto reset;
-        }
-        srv.sin_family = he->h_addrtype;
-        memcpy(&srv.sin_addr, he->h_addr_list[0], he->h_length);
-    }
-    srv.sin_port = htons((unsigned short)port_int);
-
-    arpa_status(content, "Connecting...");
-
-    ctrl = arpa_connect_timeout(&srv, ARPA_NET_TIMEOUT);
-    if (ctrl == INVALID_SOCKET) {
-        char m[300];
-        _snprintf(m, sizeof(m), "Cannot connect to %s:%s.",
-                  g_a_active_host, g_a_active_port);
-        arpa_status(content, m);
-        goto reset;
-    }
-
-    {
-        DWORD tmo_ms = ARPA_NET_TIMEOUT * 1000;
-        setsockopt(ctrl, SOL_SOCKET, SO_RCVTIMEO,
-                   (const char *)&tmo_ms, sizeof(tmo_ms));
-    }
-
-    if (arpa_read_line(ctrl, line, sizeof(line)) <= 0) {
-        char m[300];
-        _snprintf(m, sizeof(m),
-                  "No FTP-Mail banner from %s:%s.",
-                  g_a_active_host, g_a_active_port);
-        arpa_status(content, m);
-        goto reset;
-    }
-    arpa_status_from_line(content, line);
-    code = arpa_parse_reply(line);
-    if (arpa_class(code) != 2) goto reset;
+    c = arpa_open(content, &code);
+    if (!c) goto reset;
+    if (code < 0 || arpa_class(code) != 2) goto reset;
 
     /* QUIT. 2xx expected (221). */
-    if (arpa_send_cmd(ctrl, "QUIT", NULL) < 0) goto reset;
-    if (arpa_read_line(ctrl, line, sizeof(line)) <= 0) goto reset;
-    arpa_status_from_line(content, line);
+    if (ftpc_send_cmd(c, "QUIT", NULL) < 0) goto reset;
+    ftpc_reply(c, line, sizeof(line));
 
 reset:
-    if (ctrl != INVALID_SOCKET) closesocket(ctrl);
+    if (c) ftpc_release(c);
 
     /* Clear the post-submit lock as part of the disconnected
      * baseline. Disconnect was never gated on the lock, so this is
@@ -928,29 +722,29 @@ void arpamail_module_resize(HWND content, int w, int h)
     MoveWindow(g_a_server_edit, margin + 60,        y, 280, row_h, TRUE);
     MoveWindow(g_a_port_lbl,    margin + 60 + 290,  y + 2, 40, 22, TRUE);
     MoveWindow(g_a_port_edit,   margin + 60 + 330,  y, 60, row_h, TRUE);
-    MoveWindow(g_a_connect_btn, w - margin - connect_w, y - 2, connect_w, btn_h, TRUE);
+    /* The Connect/Disconnect toggle: right end of row 1, centred on it.
+     * (Through 2026-11-11 a separate Disconnect sat below Connect.) */
+    MoveWindow(g_a_connect_btn, w - margin - W31_TOGGLE_W, y + (row_h - W31_TOGGLE_H) / 2,
+               W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
+    (void)connect_w;
 
-    /* Disconnect button: directly below Connect, same width. */
-    MoveWindow(g_a_disconnect_btn,
-               w - margin - connect_w, y - 2 + btn_h + 4,
-               connect_w, btn_h, TRUE);
-
-    /* Row 2: Protocol label (left-aligned, shifted down below the
-     * stacked Connect/Disconnect column). */
-    y = 82;
+    /* Row 2: Protocol label (left-aligned). Rows 2 on moved up 32 px
+     * on 2026-11-11, when the Disconnect that stood below Connect was
+     * merged into the toggle (they were at 82 / 110 / 144 / 168). */
+    y = 50;
     MoveWindow(g_a_proto_lbl, margin, y, w - 2 * margin, 22, TRUE);
 
     /* Row 3: To: + edit. */
-    y = 110;
+    y = 78;
     MoveWindow(g_a_to_lbl,  margin,        y + 2, 50, 22, TRUE);
     MoveWindow(g_a_to_edit, margin + 55,   y, w - margin - 55 - margin, row_h, TRUE);
 
     /* Body label. */
-    y = 144;
+    y = 112;
     MoveWindow(g_a_body_lbl, margin, y, 80, 22, TRUE);
 
     /* Body edit fills the middle. */
-    y = 168;
+    y = 136;
     btn_y   = h - margin - btn_h;
     count_y = btn_y + (btn_h - 22) / 2;
     body_h  = btn_y - 16 - y;
@@ -1020,12 +814,9 @@ void arpamail_module_activate(HWND content)
     SendMessageA(g_a_port_edit, EM_SETLIMITTEXT, (WPARAM)4, 0);
     g_a_connect_btn = CreateWindowA("BUTTON", "Connect",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 85, 30, content, (HMENU)(INT_PTR)IDC_ARPA_CONNECT_BTN,
+        0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_ARPA_CONNECT_BTN,
         hInst, NULL);
-    g_a_disconnect_btn = CreateWindowA("BUTTON", "Disconnect",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 85, 30, content, (HMENU)(INT_PTR)IDC_ARPA_DISCONNECT_BTN,
-        hInst, NULL);
+    g_a_disconnect_btn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
 
     /* Row 2: Protocol label (hardwired). */
     g_a_proto_lbl = CreateWindowA("STATIC", "Protocol: FTP-Mail (RFC 765)",
@@ -1086,6 +877,15 @@ void arpamail_module_activate(HWND content)
     if (g_hFontOutput)
         SendMessageA(g_a_body_edit, WM_SETFONT, (WPARAM)g_hFontOutput, TRUE);
 
+    /* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md), operator
+     * decision 2026-11-10: the tab keeps its terminal look. The To: line
+     * and the message are white on black in fixed pitch, as in 1.0;
+     * labels, buttons and the strip are the Windows 3.1 chrome. */
+    w31_mark_terminal(g_a_to_edit);
+    w31_mark_terminal(g_a_body_edit);
+    if (g_w31_font_term)
+        SendMessageA(g_a_to_edit, WM_SETFONT, (WPARAM)g_w31_font_term, TRUE);
+
     /* Subclass To: edit (Enter -> body) and body edit (Ctrl+Enter -> Send). */
     g_orig_to_proc   = (WNDPROC)SetWindowLongPtrA(
         g_a_to_edit, GWLP_WNDPROC, (LONG_PTR)ToEditSub);
@@ -1141,8 +941,23 @@ BOOL arpamail_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     case IDC_ARPA_CLEAR_BTN:
         if (notif == BN_CLICKED) { arpa_on_clear(content); return TRUE; }
         break;
-    case IDC_ARPA_CONNECT_BTN:
-        if (notif == BN_CLICKED) { arpa_on_connect(content); return TRUE; }
+    case IDC_ARPA_CONNECT_BTN:      /* the toggle: its label says which */
+        if (notif == BN_CLICKED) {
+            if (g_a_connected) {
+                arpa_on_disconnect(content);
+            } else {
+                /* The connect is a synchronous banner probe on this thread
+                 * (bounded by ARPA_NET_TIMEOUT), so it cannot be cancelled
+                 * mid-way: the EXCEPTION to cancel-while-connecting. The
+                 * toggle shows Disconnect, grayed, while it runs, and goes
+                 * back to Connect if the probe fails. */
+                w31_toggle_busy(g_a_connect_btn);
+                UpdateWindow(g_a_connect_btn);
+                arpa_on_connect(content);
+                if (!g_a_connected) w31_toggle_set(g_a_connect_btn, FALSE);
+            }
+            return TRUE;
+        }
         break;
     case IDC_ARPA_DISCONNECT_BTN:
         if (notif == BN_CLICKED) { arpa_on_disconnect(content); return TRUE; }

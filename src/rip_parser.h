@@ -88,6 +88,7 @@ typedef struct RipStats {
     unsigned long button_undrawn;   /* RIP_BUTTON registered, NOT drawn */
     unsigned long download_blocked; /* downloads that did NOT complete  */
     unsigned long tty_cmds;         /* TTY text window group, deferred  */
+    unsigned long no_more;          /* RIP_NO_MORE: pages ended (status) */
     unsigned long unknown_cmds;     /* command char we do not know      */
     unsigned long raw_text_lines;   /* lines routed to the TTY window   */
     unsigned long unsup_fill_pat;   /* fill patterns 02-0B (drawn solid)*/

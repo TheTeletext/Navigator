@@ -11,6 +11,8 @@
  * always BINARY (TYPE I) so no file is ever corrupted by line-ending
  * translation. This mirrors xarchie's own default.
  *
+ * Since 2026-11-12 it is a wrapper over the shared core ftp_ctrl.c.
+ *
  * ftp_fetch_file blocks; it is meant to run on a worker thread, never the
  * UI thread. Winsock must already be initialized (Navigator calls
  * WSAStartup once in WinMain).
@@ -47,5 +49,17 @@ int ftp_fetch_file(const char *host, int port,
                    const char *remote_path, const char *local_path,
                    ftp_progress_cb progress, void *user,
                    long *out_total, char *errbuf, int errbuf_sz);
+
+/* As ftp_fetch_file, plus a cancel flag (2026-11-12): any thread may set
+ * *cancel to non-zero; the download stops within about 200 ms, removes its
+ * partial file and fails with "Download cancelled.". cancel may be NULL. */
+#ifndef _WINDEF_
+#include <windows.h>
+#endif
+int ftp_fetch_file_ex(const char *host, int port,
+                      const char *remote_path, const char *local_path,
+                      ftp_progress_cb progress, void *user,
+                      volatile LONG *cancel,
+                      long *out_total, char *errbuf, int errbuf_sz);
 
 #endif /* FTP_FETCH_H */

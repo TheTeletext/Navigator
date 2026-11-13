@@ -1,4 +1,4 @@
-TELETEXT NAVIGATOR 1.0
+TELETEXT NAVIGATOR 1.5
 The Teletext, November 2026
 
 Teletext Navigator is the retro internet client of The Teletext
@@ -20,6 +20,8 @@ in the 1980s and 1990s.
   Archie       Archie search of the anonymous FTP archive over
                the original Prospero/ARDP protocol
                (archie.teletext.ca)
+  FTP          anonymous FTP, download only (ftp.teletext.ca)
+  Newsgroups   a read-only Netnews reader, NNTP (news.teletext.ca)
   IRC          a read-only view of the #retro channel
                (irc.teletext.ca)
   CU-SeeMe     CU-SeeMe live television over UDP
@@ -62,7 +64,7 @@ Earlier versions are untested. Nothing else to install.
 
 INSTALL
 
-Run the installer, Teletext_Navigator_1.0.0.msi. It installs to
+Run the installer, Teletext_Navigator_1.5.0.msi. It installs to
 Program Files\Teletext Navigator for all users and adds a Start
 Menu entry; the desktop shortcut is optional and can be turned off
 during setup. Uninstall from Settings, Apps and features.

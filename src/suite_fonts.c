@@ -3,7 +3,9 @@
  *
  * Mirrors the WAIS GUI pattern at MGTWAIS/source/src/wais_gui_win32.c lines
  * 470-480 and 706: Consolas 16pt UI / 20pt output, FIXED_PITCH, Courier New
- * fallback, white-on-black brush for backgrounds.
+ * fallback, white-on-black brush for backgrounds. Since 1.1 the UI
+ * font is MS Sans Serif 8 (see suite_fonts_init); g_hBrushBlack stays
+ * for the emulation canvases that are black on the wire.
  *
  * Also: at init we register two embedded TTF blobs (Ubuntu Mono Regular
  * and Bold) as process-private fonts via AddFontMemResourceEx. The
@@ -64,11 +66,17 @@ void suite_fonts_init(void)
     g_ubuntu_mono_reg_handle  = load_embedded_font(hInst, IDR_UBUNTU_MONO_REGULAR);
     g_ubuntu_mono_bold_handle = load_embedded_font(hInst, IDR_UBUNTU_MONO_BOLD);
 
-    g_hFontUI = CreateFontA(16, 0, 0, 0, FW_NORMAL, 0, 0, 0,
-        DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, "Consolas");
+    /* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the chrome
+     * font is MS Sans Serif 8, the Windows 3.1 system face, for every
+     * button, label and field. It was Consolas 16 through 1.0. Protocol
+     * output keeps its own fixed-pitch fonts (g_hFontOutput, Gopher's
+     * Ubuntu Mono, the terminal faces), so only the chrome changes. */
+    g_hFontUI = CreateFontA(-11, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        NONANTIALIASED_QUALITY, DEFAULT_PITCH | FF_SWISS, "MS Sans Serif");
     if (!g_hFontUI)
         g_hFontUI = CreateFontA(16, 0, 0, 0, FW_NORMAL, 0, 0, 0,
-            DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, "Courier New");
+            DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, "Consolas");
 
     g_hFontOutput = CreateFontA(20, 0, 0, 0, FW_NORMAL, 0, 0, 0,
         DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH, "Consolas");

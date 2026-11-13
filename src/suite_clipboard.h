@@ -33,4 +33,8 @@ char *suite_clipboard_get_text(HWND owner);
 /* True if CF_TEXT is currently available. Cheap probe, no Open/Close. */
 int   suite_clipboard_has_text(void);
 
+/* Put UTF-16 text on the clipboard as CF_UNICODETEXT (2026-11-13, the
+ * Newsgroups article pane). Returns 1 on success, 0 on failure. */
+int   suite_clipboard_put_wtext(HWND owner, const wchar_t *text);
+
 #endif /* SUITE_CLIPBOARD_H */

@@ -84,7 +84,29 @@ struct TelnetProto {
 
     /* Send-side serialization. */
     CRITICAL_SECTION send_lock;
+
+    /* Lifetime (2026-11-12, docs/2026-11-12_FTP_TAB.md section 0): two
+     * references, the owner's and the worker thread's. telnet_proto_close
+     * drops the owner's, the thread drops its own when it returns, and
+     * whichever is LAST frees the context. So however long a connect or a
+     * DNS lookup blocks, the thread never writes into freed memory: before
+     * this, close waited 3 s and freed regardless, while a connect to an
+     * unreachable host could block about 21 s and then write t->sock and
+     * enter the deleted critical section. */
+    volatile LONG refs;
 };
+
+static void tp_release(TelnetProto *t)
+{
+    if (InterlockedDecrement(&t->refs) == 0) {
+        DeleteCriticalSection(&t->send_lock);
+        free(t->host);
+        free(t);
+    }
+}
+
+#define TP_CONNECT_TIMEOUT_MS  20000   /* about what a blocking connect gave up after */
+#define TP_CONNECT_SLICE_MS      200
 
 /* ---------------------------------------------------------------------- */
 /* Tiny socket helpers.                                                   */
@@ -246,11 +268,28 @@ typedef struct WorkerArgs {
     int          port;
 } WorkerArgs;
 
-static SOCKET connect_to(const char *host, int port, const char **errmsg_out)
+/* Give up a socket this thread opened: close it only if it is still the
+ * published one (telnet_proto_close may already have closed it, and a
+ * closed handle number can be reused by then). */
+static void tp_drop_sock(TelnetProto *t, SOCKET s)
+{
+    EnterCriticalSection(&t->send_lock);
+    if (t->sock == s) {
+        closesocket(s);
+        t->sock = INVALID_SOCKET;
+    }
+    LeaveCriticalSection(&t->send_lock);
+}
+
+/* Bounded, interruptible TCP connect, the irc_client.c pattern: the socket
+ * is published into t->sock BEFORE connecting, so telnet_proto_close can
+ * close it; the connect is non-blocking and waited for in 200 ms slices,
+ * each checking stop_request, up to TP_CONNECT_TIMEOUT_MS. On success the
+ * connected socket is published and returned, back in blocking mode. */
+static SOCKET connect_to(TelnetProto *t, const char *host, int port, const char **errmsg_out)
 {
     struct addrinfo hints, *res = NULL, *ai;
     char            portbuf[8];
-    SOCKET          s = INVALID_SOCKET;
     int             rc;
 
     memset(&hints, 0, sizeof(hints));
@@ -265,20 +304,65 @@ static SOCKET connect_to(const char *host, int port, const char **errmsg_out)
         *errmsg_out = "Host not found";
         return INVALID_SOCKET;
     }
+    *errmsg_out = "Connection refused";
 
     for (ai = res; ai != NULL; ai = ai->ai_next) {
+        SOCKET  s;
+        u_long  nb = 1;
+        int     waited = 0, done = 0, ok = 0;
+
+        if (InterlockedCompareExchange(&t->stop_request, 0, 0)) { *errmsg_out = "Cancelled"; break; }
         s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (s == INVALID_SOCKET) continue;
-        if (connect(s, ai->ai_addr, (int)ai->ai_addrlen) == 0) break;
-        closesocket(s);
-        s = INVALID_SOCKET;
+
+        /* publish before connecting, unless a close already came */
+        EnterCriticalSection(&t->send_lock);
+        if (InterlockedCompareExchange(&t->stop_request, 0, 0)) {
+            LeaveCriticalSection(&t->send_lock);
+            closesocket(s);
+            *errmsg_out = "Cancelled";
+            break;
+        }
+        t->sock = s;
+        LeaveCriticalSection(&t->send_lock);
+
+        ioctlsocket(s, FIONBIO, &nb);
+        rc = connect(s, ai->ai_addr, (int)ai->ai_addrlen);
+        if (rc == 0) ok = 1;
+        else if (WSAGetLastError() != WSAEWOULDBLOCK) done = 1;
+
+        while (!ok && !done) {
+            fd_set  wfds, efds;
+            struct timeval tv;
+            int     sel;
+            if (InterlockedCompareExchange(&t->stop_request, 0, 0)) { *errmsg_out = "Cancelled"; done = 1; break; }
+            if (waited >= TP_CONNECT_TIMEOUT_MS) { *errmsg_out = "Connection timed out"; done = 1; break; }
+            FD_ZERO(&wfds); FD_SET(s, &wfds);
+            FD_ZERO(&efds); FD_SET(s, &efds);
+            tv.tv_sec = 0; tv.tv_usec = TP_CONNECT_SLICE_MS * 1000;
+            sel = select(0, NULL, &wfds, &efds, &tv);
+            if (sel == SOCKET_ERROR) { done = 1; break; }        /* closed under us, or an error */
+            if (sel == 0) { waited += TP_CONNECT_SLICE_MS; continue; }
+            if (FD_ISSET(s, &efds)) { done = 1; break; }
+            if (FD_ISSET(s, &wfds)) {
+                int err = 0, elen = (int)sizeof(err);
+                if (getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&err, &elen) != 0 || err != 0)
+                    done = 1;
+                else
+                    ok = 1;
+            }
+        }
+        if (ok && !InterlockedCompareExchange(&t->stop_request, 0, 0)) {
+            nb = 0; ioctlsocket(s, FIONBIO, &nb);
+            freeaddrinfo(res);
+            return s;                       /* connected, and still published */
+        }
+        tp_drop_sock(t, s);
+        if (InterlockedCompareExchange(&t->stop_request, 0, 0)) { *errmsg_out = "Cancelled"; break; }
+        if (waited >= TP_CONNECT_TIMEOUT_MS) break;   /* do not churn other addresses after a timeout */
     }
     freeaddrinfo(res);
-
-    if (s == INVALID_SOCKET) {
-        *errmsg_out = "Connection refused";
-    }
-    return s;
+    return INVALID_SOCKET;
 }
 
 static DWORD WINAPI rx_thread_proc(LPVOID lp)
@@ -291,16 +375,19 @@ static DWORD WINAPI rx_thread_proc(LPVOID lp)
     unsigned char outbuf[RECV_BUF];
     int           closed_normally = 1;
 
-    s = connect_to(w->host, w->port, &errmsg);
+    s = connect_to(t, w->host, w->port, &errmsg);
     if (s == INVALID_SOCKET) {
-        PostMessageA(t->notify_hwnd, t->notify_msg,
-                     TELNET_EVT_ERROR,
-                     (LPARAM)(errmsg ? errmsg : "Connection failed"));
-        PostMessageA(t->notify_hwnd, t->notify_msg, TELNET_EVT_CLOSED, 0);
+        /* a close that came first wants no events */
+        if (!InterlockedCompareExchange(&t->stop_request, 0, 0)) {
+            PostMessageA(t->notify_hwnd, t->notify_msg,
+                         TELNET_EVT_ERROR,
+                         (LPARAM)(errmsg ? errmsg : "Connection failed"));
+            PostMessageA(t->notify_hwnd, t->notify_msg, TELNET_EVT_CLOSED, 0);
+        }
         free(w);
+        tp_release(t);
         return 0;
     }
-    t->sock = s;
     PostMessageA(t->notify_hwnd, t->notify_msg, TELNET_EVT_CONNECTED, 0);
 
     while (!InterlockedCompareExchange(&t->stop_request, 0, 0)) {
@@ -328,17 +415,13 @@ static DWORD WINAPI rx_thread_proc(LPVOID lp)
                      TELNET_EVT_DATA, (LPARAM)chunk);
     }
 
-    /* Close the socket if still open, and post CLOSED. */
-    EnterCriticalSection(&t->send_lock);
-    if (t->sock != INVALID_SOCKET) {
-        closesocket(t->sock);
-        t->sock = INVALID_SOCKET;
-    }
-    LeaveCriticalSection(&t->send_lock);
+    /* Close the socket if this thread still owns it, and post CLOSED. */
+    tp_drop_sock(t, s);
 
     PostMessageA(t->notify_hwnd, t->notify_msg,
                  TELNET_EVT_CLOSED, closed_normally ? 0 : 1);
     free(w);
+    tp_release(t);
     return 0;
 }
 
@@ -365,6 +448,7 @@ int telnet_proto_open(const char *host, int port,
     t->port        = port;
     t->host        = _strdup(host);
     t->is_state    = IS_NORMAL;
+    t->refs        = 2;            /* the owner's and the worker's */
     InitializeCriticalSection(&t->send_lock);
 
     w = (WorkerArgs *)calloc(1, sizeof(*w));
@@ -434,14 +518,16 @@ void telnet_proto_close(TelnetProto *t)
     }
     LeaveCriticalSection(&t->send_lock);
 
+    /* The worker sees stop_request within one 200 ms connect slice, or
+     * at once from a blocking recv on the closed socket; it is waited for
+     * briefly so the caller usually gets a joined thread, but the context
+     * is freed only by the last reference, never out from under it. */
     if (t->rx_thread) {
         WaitForSingleObject(t->rx_thread, 3000);
         CloseHandle(t->rx_thread);
         t->rx_thread = NULL;
     }
-    DeleteCriticalSection(&t->send_lock);
-    free(t->host);
-    free(t);
+    tp_release(t);
 }
 
 void telnet_proto_free_chunk(TelnetDataChunk *chunk)

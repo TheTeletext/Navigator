@@ -83,7 +83,7 @@ set CFLAGS_GWB=-O2 -fstack-protector-strong -D_WIN32 -Isrc ^
 @REM verifies a downloaded installer (src\suite_sha256.c); -lwinhttp serves
 @REM the updater and the HTTPS fetches; -lshell32 opens outbound links in
 @REM the system browser. No vendored crypto.
-set LDFLAGS=-s -Wl,--no-insert-timestamp -lbcrypt -lws2_32 -lcomctl32 -lcomdlg32 -lgdi32 -lgdiplus -lmsimg32 -lole32 -loleaut32 -luuid -lwinmm -lwinhttp -lshell32 -static -mwindows -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va -lssp
+set LDFLAGS=-s -Wl,--no-insert-timestamp -lbcrypt -lws2_32 -lcomctl32 -lcomdlg32 -lgdi32 -lgdiplus -lmsimg32 -lole32 -loleaut32 -luuid -lwinmm -lwinhttp -lusp10 -lshell32 -static -mwindows -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va -lssp
 
 set TARGET=TeletextNavigator.exe
 
@@ -132,7 +132,7 @@ for %%f in (sockets_win win_stubs) do (
 )
 
 echo Compiling Navigator shell and modules...
-for %%f in (suite_shell suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module ftp_fetch vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_module audio_meter_service) do (
+for %%f in (suite_shell suite_w31 home_module suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service) do (
     echo   %%f.c
     %CC% %CFLAGS_SUITE% -c -o src\%%f.o src\%%f.c
     if errorlevel 1 exit /b 1
@@ -234,11 +234,12 @@ echo Linking %TARGET%...
     src\wais\ustubs.o src\wais\ui_win.o ^
     %LWWW_OBJS% ^
     src\sockets_win.o src\win_stubs.o ^
-    src\suite_shell.o src\suite_fonts.o src\suite_branding.o ^
+    src\suite_shell.o src\suite_w31.o src\home_module.o src\suite_fonts.o src\suite_branding.o ^
     src\suite_clipboard.o src\suite_logo.o ^
     src\http_fetch.o src\suite_sha256.o src\suite_update.o ^
     src\wais_module.o src\arpamail_module.o src\web_module.o ^
-    src\archie_ardp.o src\archie_module.o src\ftp_fetch.o ^
+    src\archie_ardp.o src\archie_module.o src\line_conn.o src\ftp_ctrl.o src\ftp_fetch.o src\ftp_list.o src\ftp_module.o ^
+    src\nntp_client.o src\news_mime.o src\newsgroups_module.o ^
     src\web_module_cdf.o %FLASH_OBJS% ^
     src\audio_service.o src\audio_format_detect.o ^
     src\wav_parser.o src\tsp_metafile.o src\truespeech_decoder.o ^
@@ -268,7 +269,7 @@ echo Linking %TARGET%...
     third_party\mbzm\znumbers.o ^
     third_party\mbzm\crc16.o third_party\mbzm\crc32.o ^
     src\cuseeme_proto.o src\cuseeme_video.o src\cuseeme_deltamod.o ^
-    src\cuseeme_mulaw.o src\cuseeme_idvi.o src\cuseeme_module.o ^
+    src\cuseeme_mulaw.o src\cuseeme_idvi.o src\cuseeme_mac.o src\cuseeme_module.o ^
     src\audio_meter_service.o ^
     src\suite_res.o ^
     %LDFLAGS%

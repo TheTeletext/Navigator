@@ -38,6 +38,18 @@
 #include <stdint.h>
 
 #define VT_FLAG_NONE  0x00
+/* Row marks, kept on a row's FIRST cell (2026-11-11, the IRC zebra
+ * stripes, docs/2026-11-11_W31_SCROLLBARS.md section 8). A "message" is a
+ * run of rows that starts with a printable at column 0 after a line break
+ * and continues through the rows auto-wrap adds to it.
+ *   VT_FLAG_WRAPCONT  the row was started by auto-wrap (a continuation)
+ *   VT_FLAG_STRIPE    the message's stripe parity: it alternates from one
+ *                     message to the next and is the same on all the rows
+ *                     of one message. Kept with the row, so it does not
+ *                     shift when old rows leave the scrollback.
+ * Nothing in the Terminal reads them. */
+#define VT_FLAG_WRAPCONT 0x01
+#define VT_FLAG_STRIPE   0x02
 
 typedef struct VTCell {
     char    ch;
@@ -57,6 +69,7 @@ typedef struct VTTerm {
     int       cursor_y;
 
     int       scrollback_max;       /* maximum number of scrollback rows kept */
+    int       stripe;               /* the last message's stripe parity (VT_FLAG_STRIPE) */
 
     /* Ring of rows. `lines` holds (scrollback_count + rows) rows, each
      * `cols` cells wide. New rows append at the bottom; once we hit

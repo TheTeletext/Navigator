@@ -55,6 +55,9 @@ extern "C" {
 #define IRC_EVT_FAILED   3   /* terminal pre-registration failure on a manual
                               * connect; `text` holds the human reason. The
                               * worker stops after this -- no silent retry. */
+#define IRC_EVT_JOINED   5   /* the channel JOIN completed (numeric 366, end of
+                              * NAMES); LPARAM unused. For the status stage text
+                              * (2026-11-11, docs/2026-11-11_STATUS_PROGRESS.md). */
 #define IRC_EVT_REGISTERED 4 /* the session reached numeric 001 (registered
                               * and JOINing). LPARAM is unused (NULL) -- the
                               * viewer updates its status from its own host/

@@ -74,6 +74,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "suite_w31.h"
 
 #define MTL_CANVAS_CLASS "MGTMinitelCanvasV1"
 #define IDT_MTL_BLINK    1
@@ -753,9 +754,9 @@ BOOL minitel_view_on_drawitem(const DRAWITEMSTRUCT *di)
     green = (k == MTL_K_ENVOI);
     rc = di->rcItem;
     /* The rounded corners leave four tiny areas outside the key: paint
-     * them with the panel's black, or a key that moved keeps whatever
-     * was under its corners before. */
-    FillRect(di->hDC, &rc, (HBRUSH)GetStockObject(BLACK_BRUSH));
+     * them with the panel's colour (the Windows 3.1 face since 1.1), or a
+     * key that moved keeps whatever was under its corners before. */
+    FillRect(di->hDC, &rc, g_w31_br_face);
     if (k == K_CNX)
         br = CreateSolidBrush(down ? MTL_KEY_RED_DOWN : MTL_KEY_RED);
     else
@@ -859,7 +860,7 @@ void minitel_view_open_file(HWND owner)
     ofn.nMaxFile    = sizeof path;
     ofn.lpstrTitle  = "Open a Minitel page";
     ofn.Flags       = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
-    if (!GetOpenFileNameA(&ofn)) return;
+    if (!W31_UNHOOKED(GetOpenFileNameA(&ofn))) return;
 
     f = fopen(path, "rb");
     if (!f) { if (g_host.status) g_host.status("Cannot open that file"); return; }

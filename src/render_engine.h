@@ -166,6 +166,9 @@ typedef struct WebCell {
     int         width_pct;
     int         valign;
     int         rowspan;
+    int         center_base; /* <center> depth when the cell opened: a
+                              * <center> opened INSIDE the cell centres a
+                              * table nested in it (2026-11-11) */
 } WebCell;
 
 typedef struct WebRow {

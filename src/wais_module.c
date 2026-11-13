@@ -23,6 +23,7 @@
 #include "win_platform.h"
 
 #include "wais_module.h"
+#include "suite_w31.h"   /* the Connect/Disconnect toggle */
 #include "suite_shell.h"
 
 #include "wais/cdialect.h"
@@ -77,7 +78,8 @@ static HWND g_w_search_lbl, g_w_search_edit, g_w_search_btn;
 static HWND g_w_server_lbl, g_w_server_edit;
 static HWND g_w_port_lbl,   g_w_port_edit;
 static HWND g_w_db_lbl,     g_w_db_edit;
-static HWND g_w_connect_btn, g_w_disconnect_btn;
+static HWND g_w_connect_btn, g_w_disconnect_btn;   /* 2026-11-11: Disconnect
+                                                     retired (one toggle); NULL */
 static HWND g_w_proto_lbl;
 static HWND g_w_back_btn, g_w_fwd_btn;
 static HWND g_w_doc_lbl, g_w_doc_edit;
@@ -127,6 +129,8 @@ static void wais_set_output_text(const char *utf8);
 static void wais_clear_results(void);
 static void wais_status(HWND content, const char *text);
 static void wais_set_connected_state(BOOL connected);
+static void wais_cancel_job(BOOL discard);
+static int  wais_job_running(void);
 
 /* ------------------------------------------------------------------ */
 /* Status line helper: set and flush so the user sees the transition. */
@@ -152,13 +156,15 @@ static LRESULT CALLBACK SearchEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
         if (pmsg && pmsg->message == WM_KEYDOWN &&
             (pmsg->wParam == VK_RETURN ||
              pmsg->wParam == VK_UP    || pmsg->wParam == VK_DOWN ||
-             pmsg->wParam == VK_PRIOR || pmsg->wParam == VK_NEXT))
+             pmsg->wParam == VK_PRIOR || pmsg->wParam == VK_NEXT ||
+             (pmsg->wParam == VK_ESCAPE && wais_job_running())))
             return base | DLGC_WANTMESSAGE;
         return base;
     }
     if (m == WM_KEYDOWN) {
         switch (w) {
         case VK_RETURN: wais_on_search(GetParent(h)); return 0;
+        case VK_ESCAPE: if (wais_job_running()) { wais_cancel_job(FALSE); wais_status(GetParent(h), "Cancelling..."); } return 0;
         /* Up/Down/PgUp/PgDn forward to the output pane so the user can
          * scroll the body without first clicking inside it. Left/Right
          * stay normal so the caret can move within the text field. */
@@ -207,6 +213,7 @@ static LRESULT CALLBACK OutputSub(HWND h, UINT m, WPARAM w, LPARAM l)
         case VK_HOME:  SendMessageA(h, WM_VSCROLL, SB_TOP,       0); return 0;
         case VK_END:   SendMessageA(h, WM_VSCROLL, SB_BOTTOM,    0); return 0;
         case VK_LEFT:  SendMessageA(h, WM_HSCROLL, SB_LINELEFT,  0); return 0;
+        case VK_ESCAPE: if (wais_job_running()) { wais_cancel_job(FALSE); wais_status(GetParent(h), "Cancelling..."); } return 0;
         case VK_RIGHT: SendMessageA(h, WM_HSCROLL, SB_LINERIGHT, 0); return 0;
         }
         break;
@@ -291,13 +298,15 @@ static LRESULT CALLBACK DocEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
         if (pmsg && pmsg->message == WM_KEYDOWN &&
             (pmsg->wParam == VK_RETURN ||
              pmsg->wParam == VK_UP    || pmsg->wParam == VK_DOWN ||
-             pmsg->wParam == VK_PRIOR || pmsg->wParam == VK_NEXT))
+             pmsg->wParam == VK_PRIOR || pmsg->wParam == VK_NEXT ||
+             (pmsg->wParam == VK_ESCAPE && wais_job_running())))
             return base | DLGC_WANTMESSAGE;
         return base;
     }
     if (m == WM_KEYDOWN) {
         switch (w) {
         case VK_RETURN: wais_on_view(GetParent(h)); return 0;
+        case VK_ESCAPE: if (wais_job_running()) { wais_cancel_job(FALSE); wais_status(GetParent(h), "Cancelling..."); } return 0;
         case VK_UP:    if (g_w_output) SendMessageA(g_w_output, WM_VSCROLL, SB_LINEUP,   0); return 0;
         case VK_DOWN:  if (g_w_output) SendMessageA(g_w_output, WM_VSCROLL, SB_LINEDOWN, 0); return 0;
         case VK_PRIOR: if (g_w_output) SendMessageA(g_w_output, WM_VSCROLL, SB_PAGEUP,   0); return 0;
@@ -404,9 +413,8 @@ static void wais_set_connected_state(BOOL connected)
     EnableWindow(g_w_server_edit,    !connected);
     EnableWindow(g_w_port_edit,      !connected);
     EnableWindow(g_w_db_edit,        !connected);
-    EnableWindow(g_w_connect_btn,    !connected);
-
-    EnableWindow(g_w_disconnect_btn,  connected);
+    /* 2026-11-11: one Connect/Disconnect toggle (docs/2026-11-11_W31_BUTTONS.md). */
+    w31_toggle_set(g_w_connect_btn, connected);
     EnableWindow(g_w_search_edit,     connected);
     EnableWindow(g_w_search_btn,      connected);
     EnableWindow(g_w_doc_edit,        connected);
@@ -640,8 +648,8 @@ static void CALLBACK wais_probe_timer_proc(HWND hwnd, UINT msg,
         wais_set_connected_state(TRUE);
         SetFocus(g_w_search_edit);
     } else {
-        /* Failure path: stay pre-connect, re-enable Connect button. */
-        EnableWindow(g_w_connect_btn, TRUE);
+        /* Failure path: stay pre-connect, the toggle back to Connect. */
+        w31_toggle_set(g_w_connect_btn, FALSE);
     }
 
     free(ctx);
@@ -682,6 +690,10 @@ static void wais_on_connect(HWND content)
     /* Single probe in flight at a time. The Connect button is also */
     /* disabled below; this is the belt to that suspenders.          */
     if (g_w_probe) return;
+    if (wais_job_running()) {
+        wais_status(content, "WAIS is busy: press Esc to cancel.");
+        return;
+    }
 
     GetWindowTextA(g_w_server_edit, host, sizeof(host));
     GetWindowTextA(g_w_port_edit,   port, sizeof(port));
@@ -716,15 +728,18 @@ static void wais_on_connect(HWND content)
 
     g_w_probe = ctx;
 
-    /* Lock Connect and show the pre-banner transient. The UI stays
-     * fully responsive (the worker runs on its own thread). */
-    EnableWindow(g_w_connect_btn, FALSE);
+    /* The toggle reads Disconnect but stays grayed while the probe runs:
+     * the EXCEPTION to cancel-while-connecting (2026-11-11). The probe is
+     * bounded (about 9 s) but runs freeWAIS on the process-global
+     * g_wais_socket, so abandoning it would let a second probe race the
+     * first on that socket. The UI stays responsive (worker thread). */
+    w31_toggle_busy(g_w_connect_btn);
     wais_status(content, "Connecting...");
 
     thr = CreateThread(NULL, 0, wais_probe_worker, ctx, 0, NULL);
     if (!thr) {
         wais_status(content, "Cannot start probe thread.");
-        EnableWindow(g_w_connect_btn, TRUE);
+        w31_toggle_set(g_w_connect_btn, FALSE);
         free(ctx);
         g_w_probe = NULL;
         return;
@@ -746,6 +761,8 @@ static void wais_on_connect(HWND content)
 
 static void wais_on_disconnect(HWND content)
 {
+    /* a search or view in flight: cancel it and drop its result */
+    wais_cancel_job(TRUE);
     SetWindowTextA(g_w_search_edit, "");
     SetWindowTextA(g_w_doc_edit,    "");
     SetWindowTextA(g_w_output,      "");
@@ -762,275 +779,159 @@ static void wais_on_disconnect(HWND content)
 /* Search: open Z39.50-1988, send Search APDU, parse, render results. */
 /* ------------------------------------------------------------------ */
 
-static void wais_on_search(HWND content)
+/* ------------------------------------------------------------------ */
+/* Search and document view on a worker thread (2026-11-11,           */
+/* docs/2026-11-11_STATUS_PROGRESS.md). They used to run on the UI    */
+/* thread, freezing the window for the whole exchange. Now one WAIS   */
+/* job at a time (search OR view; never while the Connect probe runs: */
+/* all three use freeWAIS's single g_wais_socket) runs on a worker;   */
+/* a 100 ms timer on the UI thread shows its stage and, for a view,   */
+/* a true percentage against the document's DocumentLength, and       */
+/* applies the result exactly once when it is done.                   */
+/*   Cancel: Esc (search field, Doc # field, output pane), and        */
+/*   Disconnect. The UI thread never closes the socket (the worker    */
+/*   owns it): it sets the job's cancel flag and shutdown()s the      */
+/*   socket, which makes the worker's blocked recv return; the worker */
+/*   then closes it itself through close_connection as always.        */
+/*   A view job works on its own copy of the document id, so a        */
+/*   Disconnect that clears the results cannot free it under it.      */
+/* ------------------------------------------------------------------ */
+
+#define WAIS_JOB_TIMER_ID  0xA002
+#define WAIS_JOB_SEARCH    1
+#define WAIS_JOB_VIEW      2
+
+typedef struct WAISJob {
+    int           kind;
+    HWND          content;
+    char          host[256];
+    int           port;
+    char          db[128];
+    char          query[1024];            /* search */
+    any          *docID;                  /* view: the job's own copy */
+    long          doc_size;               /* view: DocumentLength, 0 unknown */
+    char          type[64];               /* view */
+
+    volatile LONG done;
+    volatile LONG cancel;
+    volatile LONG stage;                  /* 1 connecting, 2 init, 3 searching / loading */
+    volatile LONG got;                    /* view: bytes received so far */
+
+    int           outcome;                /* 0 ok, 1 failed, 2 cancelled */
+    char          status_msg[200];
+    SearchResponseAPDU *response;         /* search result, for the UI */
+    char         *body;                   /* view result, raw */
+    size_t        body_len;
+
+    BOOL          discard;                /* UI only: Disconnect came; drop the result */
+    LONG          shown_stage, shown_got; /* UI only */
+} WAISJob;
+
+static WAISJob  *g_w_job          = NULL;
+static UINT_PTR  g_w_job_timer_id = 0;
+
+static int wais_job_running(void) { return g_w_job != NULL; }
+
+static BOOL wais_tab_active(void) { return g_w_output && IsWindowVisible(g_w_output); }
+
+/* Status text only while the WAIS tab is the one showing. */
+static void wais_status_if_active(HWND content, const char *text)
 {
-    char       query[1024];
-    char      *req = NULL, *resp = NULL;
-    long       msglen = BUFSZ, reqlen;
-    FILE      *conn = NULL;
-    char       userInfo[500];
-    char       hostname[80];
-    long       init_result;
-    SearchResponseAPDU *response = NULL;
-    WAISSearchResponse *info;
-    long       i;
-    char       line[1024];
-    char      *out_buf = NULL;
-    size_t     out_cap = 0, out_len = 0;
-    char       status[96];
-    int        port_int;
-
-    GetWindowTextA(g_w_search_edit, query, sizeof(query));
-    if (!query[0]) {
-        wais_status(content, "Enter a query and press Search.");
-        return;
-    }
-
-    wais_clear_results();
-
-    /* Pre-allocate output buffer for the results listing. */
-    out_cap = 8192;
-    out_buf = (char *)malloc(out_cap);
-    if (!out_buf) {
-        wais_status(content, "Out of memory.");
-        return;
-    }
-    out_buf[0] = '\0';
-
-    wais_status(content, "Connecting...");
-
-    req  = (char *)s_malloc((size_t)msglen);
-    resp = (char *)s_malloc((size_t)msglen);
-    if (!req || !resp) {
-        wais_status(content, "Out of memory.");
-        if (req)  s_free(req);
-        if (resp) s_free(resp);
-        free(out_buf);
-        return;
-    }
-
-    port_int = atoi(g_w_active_port);
-    if (port_int <= 0) port_int = 210;
-
-    conn = connect_to_server(g_w_active_host, (long)port_int);
-    if (!conn) {
-        _snprintf(status, sizeof(status), "Cannot connect to %s:%d.",
-                  g_w_active_host, port_int);
-        wais_status(content, status);
-        s_free(req); s_free(resp); free(out_buf);
-        return;
-    }
-
-    mygethostname(hostname, 80);
-    _snprintf(userInfo, sizeof(userInfo),
-              SUITE_UA_PRODUCT "/" SUITE_VERSION_STR " %s", hostname);
-
-    wais_status(content, "Initializing Z39.50-1988...");
-    init_result = init_connection(req, resp, msglen, conn, userInfo);
-    if (init_result <= 0) {
-        wais_status(content, "Z39.50-1988 Init failed.");
-        close_connection(conn);
-        s_free(req); s_free(resp); free(out_buf);
-        return;
-    }
-
-    wais_status(content, "Searching...");
-
-    reqlen = msglen;
-    if (!generate_search_apdu(req + HEADER_LENGTH, &reqlen,
-                              query, g_w_active_db, NULL, (long)WAIS_MAX_DOCS)) {
-        wais_status(content, "Failed to generate Search APDU.");
-        close_connection(conn);
-        s_free(req); s_free(resp); free(out_buf);
-        return;
-    }
-
-    if (interpret_message(req, msglen - reqlen, resp, msglen,
-                          conn, (boolean)false) == 0) {
-        wais_status(content, "No response from server.");
-        close_connection(conn);
-        s_free(req); s_free(resp); free(out_buf);
-        return;
-    }
-
-    readSearchResponseAPDU(&response, resp + HEADER_LENGTH);
-
-    g_w_response = response;
-    g_w_info = response
-               ? (WAISSearchResponse *)response->DatabaseDiagnosticRecords
-               : NULL;
-    info = g_w_info;
-
-    /* Compose the formatted results listing. */
-    _snprintf(line, sizeof(line),
-              "Search Response:\r\n  Number of Records Returned: %d\r\n\r\n",
-              response ? response->NumberOfRecordsReturned : 0);
-    {
-        size_t need = strlen(line) + 1;
-        if (need > out_cap) {
-            char *nb = (char *)realloc(out_buf, need + 8192);
-            if (nb) { out_buf = nb; out_cap = need + 8192; }
-        }
-        strcpy(out_buf, line);
-        out_len = strlen(out_buf);
-    }
-
-    g_w_count = 0;
-    if (info && info->DocHeaders) {
-        i = 0;
-        while (info->DocHeaders[i] != 0) {
-            char *headline = info->DocHeaders[i]->Headline
-                             ? trim_junk(info->DocHeaders[i]->Headline)
-                             : NULL;
-            long score = info->DocHeaders[i]->Score;
-            int bars, j;
-            char bar[12];
-            size_t need;
-
-            /* Match the standalone's FormatResults clamp exactly: raw
-             * score clamped to [0,9]. Real WAIS scores are usually well
-             * above 9, so most results render with the full 9-block bar. */
-            if (score < 0) score = 0;
-            bars = (int)score;
-            if (bars > 9) bars = 9;
-            for (j = 0; j < bars; j++)  bar[j] = '\x01';
-            for (; j < 9; j++)          bar[j] = ' ';
-            bar[9] = '\0';
-
-            _snprintf(line, sizeof(line),
-                      "%2ld: [%s]  %s\r\n",
-                      i + 1, bar,
-                      headline && *headline ? headline : "(no title)");
-
-            need = out_len + strlen(line) + 1;
-            if (need > out_cap) {
-                size_t new_cap = out_cap * 2;
-                char *nb;
-                while (new_cap < need) new_cap *= 2;
-                nb = (char *)realloc(out_buf, new_cap);
-                if (!nb) break;
-                out_buf = nb; out_cap = new_cap;
-            }
-            strcpy(out_buf + out_len, line);
-            out_len += strlen(line);
-            i++;
-        }
-        g_w_count = (int)i;
-    }
-
-    close_connection(conn);
-    s_free(req); s_free(resp);
-
-    g_w_results_text = out_buf;
-    wais_show_view(1);
-
-    /* Doc# always stays blank; user types the desired document number
-     * manually. No auto-fill, even after a successful search. */
-    SetWindowTextA(g_w_doc_edit, "");
-    if (g_w_count > 0)
-        _snprintf(status, sizeof(status), "%d results", g_w_count);
-    else
-        _snprintf(status, sizeof(status), "0 results");
-    wais_status(content, status);
-
-    /* Return focus to the search edit so arrow keys keep working as
-     * scroll forwards even when Search was triggered by button click. */
-    SetFocus(g_w_search_edit);
+    if (wais_tab_active()) wais_status(content, text);
 }
 
-/* ------------------------------------------------------------------ */
-/* View: read Doc # entry, retrieve that document, render in output.  */
-/* ------------------------------------------------------------------ */
-
-static void wais_on_view(HWND content)
+static void wais_job_failed(WAISJob *j, const char *msg)
 {
-    char       doc_str[16];
-    int        doc_num;
-    any       *docID;
-    long       doc_size;
-    char      *type;
-    char      *req = NULL, *resp = NULL;
-    long       msglen = BUFSZ, reqlen;
-    FILE      *conn = NULL;
-    char       userInfo[500];
-    char       hostname[80];
-    long       init_result;
-    long       count;
-    char      *body = NULL;
-    size_t     body_len = 0, body_cap = 0;
-    boolean    skipped_separator = (boolean)false;
-    SearchResponseAPDU *rr = NULL;
-    WAISSearchResponse *ri;
-    char       status[96];
-    int        port_int;
+    j->outcome = InterlockedCompareExchange(&j->cancel, 0, 0) ? 2 : 1;
+    strncpy(j->status_msg, msg, sizeof j->status_msg - 1);
+    j->status_msg[sizeof j->status_msg - 1] = '\0';
+}
 
-    if (!g_w_info || !g_w_info->DocHeaders || g_w_count <= 0) {
-        wais_status(content, "Run a search first.");
-        return;
-    }
-
-    GetWindowTextA(g_w_doc_edit, doc_str, sizeof(doc_str));
-    doc_num = atoi(doc_str);
-    if (doc_num < 1 || doc_num > g_w_count) {
-        _snprintf(status, sizeof(status),
-                  "Enter a Doc # from 1 to %d.", g_w_count);
-        wais_status(content, status);
-        return;
-    }
-
-    docID    = g_w_info->DocHeaders[doc_num - 1]->DocumentID;
-    doc_size = g_w_info->DocHeaders[doc_num - 1]->DocumentLength;
-    type     = g_w_info->DocHeaders[doc_num - 1]->Types
-               ? g_w_info->DocHeaders[doc_num - 1]->Types[0]
-               : "TEXT";
-
-    wais_status(content, "Loading...");
-
-    req  = (char *)s_malloc((size_t)msglen);
-    resp = (char *)s_malloc((size_t)msglen);
-    if (!req || !resp) {
-        wais_status(content, "Out of memory.");
-        if (req)  s_free(req);
-        if (resp) s_free(resp);
-        return;
-    }
-
-    port_int = atoi(g_w_active_port);
-    if (port_int <= 0) port_int = 210;
-
-    conn = connect_to_server(g_w_active_host, (long)port_int);
+/* Connect and Z39.50-1988 Init; NULL (and the job marked failed) on error. */
+static FILE *wais_job_open(WAISJob *j, char *req, char *resp, long msglen)
+{
+    FILE *conn;
+    char  userInfo[500], hostname[80], m[200];
+    InterlockedExchange(&j->stage, 1);
+    conn = connect_to_server(j->host, (long)j->port);
     if (!conn) {
-        _snprintf(status, sizeof(status),
-                  "Cannot connect to %s:%d.",
-                  g_w_active_host, port_int);
-        wais_status(content, status);
-        s_free(req); s_free(resp);
-        return;
+        _snprintf(m, sizeof m, "Cannot connect to %s:%d.", j->host, j->port);
+        m[sizeof m - 1] = '\0';
+        wais_job_failed(j, m);
+        return NULL;
     }
-
+    if (InterlockedCompareExchange(&j->cancel, 0, 0)) {
+        close_connection(conn);
+        wais_job_failed(j, "Cancelled.");
+        return NULL;
+    }
     mygethostname(hostname, 80);
     _snprintf(userInfo, sizeof(userInfo),
               SUITE_UA_PRODUCT "/" SUITE_VERSION_STR " %s", hostname);
-
-    init_result = init_connection(req, resp, msglen, conn, userInfo);
-    if (init_result <= 0) {
-        wais_status(content, "Z39.50-1988 Init failed.");
+    InterlockedExchange(&j->stage, 2);
+    if (init_connection(req, resp, msglen, conn, userInfo) <= 0) {
         close_connection(conn);
-        s_free(req); s_free(resp);
-        return;
+        wais_job_failed(j, "Z39.50-1988 Init failed.");
+        return NULL;
     }
+    return conn;
+}
+
+static void wais_job_search(WAISJob *j)
+{
+    long  msglen = BUFSZ, reqlen;
+    char *req  = (char *)s_malloc((size_t)msglen);
+    char *resp = (char *)s_malloc((size_t)msglen);
+    FILE *conn;
+    SearchResponseAPDU *response = NULL;
+    if (!req || !resp) { wais_job_failed(j, "Out of memory."); goto out; }
+    conn = wais_job_open(j, req, resp, msglen);
+    if (!conn) goto out;
+    InterlockedExchange(&j->stage, 3);
+    reqlen = msglen;
+    if (!generate_search_apdu(req + HEADER_LENGTH, &reqlen,
+                              j->query, j->db, NULL, (long)WAIS_MAX_DOCS)) {
+        wais_job_failed(j, "Failed to generate Search APDU.");
+        close_connection(conn);
+        goto out;
+    }
+    if (interpret_message(req, msglen - reqlen, resp, msglen,
+                          conn, (boolean)false) == 0) {
+        wais_job_failed(j, "No response from server.");
+        close_connection(conn);
+        goto out;
+    }
+    readSearchResponseAPDU(&response, resp + HEADER_LENGTH);
+    close_connection(conn);
+    j->response = response;
+    j->outcome = InterlockedCompareExchange(&j->cancel, 0, 0) ? 2 : 0;
+out:
+    if (req)  s_free(req);
+    if (resp) s_free(resp);
+}
+
+static void wais_job_view(WAISJob *j)
+{
+    long     msglen = BUFSZ, reqlen, count;
+    char    *req  = (char *)s_malloc((size_t)msglen);
+    char    *resp = (char *)s_malloc((size_t)msglen);
+    FILE    *conn = NULL;
+    char    *body = NULL;
+    size_t   body_len = 0, body_cap;
+    boolean  skipped_separator = (boolean)false;
+    SearchResponseAPDU *rr = NULL;
+    WAISSearchResponse *ri;
+    long     doc_size = j->doc_size;
+
+    if (!req || !resp) { wais_job_failed(j, "Out of memory."); goto out; }
+    conn = wais_job_open(j, req, resp, msglen);
+    if (!conn) goto out;
+    InterlockedExchange(&j->stage, 3);
 
     body_cap = (doc_size > 0 && doc_size < WAIS_DOC_MAX_BYTES)
-               ? (size_t)doc_size + 1024
-               : 16384;
+               ? (size_t)doc_size + 1024 : 16384;
     body = (char *)malloc(body_cap);
-    if (!body) {
-        wais_status(content, "Out of memory.");
-        close_connection(conn);
-        s_free(req); s_free(resp);
-        return;
-    }
-    body_len = 0;
+    if (!body) { wais_job_failed(j, "Out of memory."); close_connection(conn); goto out; }
 
     for (count = 0;
          (doc_size == 0) || (count * WAIS_CHARS_PER_PAGE < doc_size);
@@ -1040,11 +941,12 @@ static void wais_on_view(HWND content)
                         ? MINIMUM((count + 1) * WAIS_CHARS_PER_PAGE, doc_size)
                         : (count + 1) * WAIS_CHARS_PER_PAGE;
 
+        if (InterlockedCompareExchange(&j->cancel, 0, 0)) break;
         reqlen = msglen;
         if (!generate_retrieval_apdu(req + HEADER_LENGTH, &reqlen,
-                                     docID, CT_byte,
+                                     j->docID, CT_byte,
                                      count * WAIS_CHARS_PER_PAGE, end_byte,
-                                     type, g_w_active_db))
+                                     j->type, j->db))
             break;
 
         if (interpret_message(req, msglen - reqlen, resp, msglen,
@@ -1059,17 +961,16 @@ static void wais_on_view(HWND content)
             if (text && text->DocumentText) {
                 char *bytes = text->DocumentText->bytes;
                 long  size  = text->DocumentText->size;
-                long  start = 0, j;
+                long  start = 0, k;
 
                 if (count == 0 && !skipped_separator) {
-                    /* Find the first "----" record-separator line. Keep it
-                     * (start AT the dashes, not after) so the document's
-                     * own |title|/----- header box renders as a full
-                     * frame. Matches the standalone cli_engine pattern. */
-                    for (j = 0; j < size - 4; j++) {
-                        if (bytes[j]=='-' && bytes[j+1]=='-' &&
-                            bytes[j+2]=='-' && bytes[j+3]=='-') {
-                            start = j;
+                    /* Keep from the first "----" record-separator line, so
+                     * the document's own header box renders as a frame
+                     * (the standalone cli_engine pattern). */
+                    for (k = 0; k < size - 4; k++) {
+                        if (bytes[k]=='-' && bytes[k+1]=='-' &&
+                            bytes[k+2]=='-' && bytes[k+3]=='-') {
+                            start = k;
                             break;
                         }
                     }
@@ -1099,6 +1000,10 @@ static void wais_on_view(HWND content)
             rr = NULL;
         }
 
+        /* progress: the document's bytes requested so far, against its
+         * DocumentLength (a true total) */
+        InterlockedExchange(&j->got, (LONG)end_byte);
+
         if (doc_size == 0) break;
         if (body_len >= WAIS_DOC_MAX_BYTES) break;
     }
@@ -1107,19 +1012,185 @@ static void wais_on_view(HWND content)
         freeWAISSearchResponse(rr->DatabaseDiagnosticRecords);
         freeSearchResponseAPDU(rr);
     }
-
     close_connection(conn);
-    s_free(req); s_free(resp);
+    if (InterlockedCompareExchange(&j->cancel, 0, 0)) {
+        free(body);
+        wais_job_failed(j, "Cancelled.");
+        goto out;
+    }
+    j->body = body;
+    j->body_len = body_len;
+    j->outcome = 0;
+out:
+    if (req)  s_free(req);
+    if (resp) s_free(resp);
+}
 
-    /* Sanitize body: CRLF normalization, ESC strip. */
-    {
-        char *clean = (char *)malloc(body_len * 2 + 1);
+static DWORD WINAPI wais_job_worker(LPVOID arg)
+{
+    WAISJob *j = (WAISJob *)arg;
+    if (j->kind == WAIS_JOB_SEARCH) wais_job_search(j);
+    else                            wais_job_view(j);
+    InterlockedExchange(&j->done, 1);
+    return 0;
+}
+
+/* Cancel the running job, if any: flag it and unblock its recv. */
+static void wais_cancel_job(BOOL discard)
+{
+    if (!g_w_job) return;
+    InterlockedExchange(&g_w_job->cancel, 1);
+    if (discard) g_w_job->discard = TRUE;
+    if (g_wais_socket != INVALID_SOCKET) shutdown(g_wais_socket, SD_BOTH);
+}
+
+static void wais_job_buttons(BOOL busy)
+{
+    if (g_w_search_btn) EnableWindow(g_w_search_btn, !busy && g_w_connected);
+    if (g_w_view_btn)   EnableWindow(g_w_view_btn,   !busy && g_w_connected);
+}
+
+/* The formatted results listing (as the standalone MGTWAIS lays it out). */
+static char *wais_format_results(SearchResponseAPDU *response, WAISSearchResponse *info, int *out_count)
+{
+    char   line[1024];
+    char  *out_buf;
+    size_t out_cap = 8192, out_len;
+    long   i;
+    out_buf = (char *)malloc(out_cap);
+    if (!out_buf) return NULL;
+    _snprintf(line, sizeof(line),
+              "Search Response:\r\n  Number of Records Returned: %d\r\n\r\n",
+              response ? response->NumberOfRecordsReturned : 0);
+    line[sizeof line - 1] = '\0';
+    strcpy(out_buf, line);
+    out_len = strlen(out_buf);
+    *out_count = 0;
+    if (info && info->DocHeaders) {
+        i = 0;
+        while (info->DocHeaders[i] != 0) {
+            char *headline = info->DocHeaders[i]->Headline
+                             ? trim_junk(info->DocHeaders[i]->Headline)
+                             : NULL;
+            long score = info->DocHeaders[i]->Score;
+            int bars, k;
+            char bar[12];
+            size_t need;
+            /* the standalone's FormatResults clamp: raw score in [0,9] */
+            if (score < 0) score = 0;
+            bars = (int)score;
+            if (bars > 9) bars = 9;
+            for (k = 0; k < bars; k++)  bar[k] = '\x01';
+            for (; k < 9; k++)          bar[k] = ' ';
+            bar[9] = '\0';
+            _snprintf(line, sizeof(line), "%2ld: [%s]  %s\r\n", i + 1, bar,
+                      headline && *headline ? headline : "(no title)");
+            line[sizeof line - 1] = '\0';
+            need = out_len + strlen(line) + 1;
+            if (need > out_cap) {
+                size_t new_cap = out_cap * 2;
+                char *nb;
+                while (new_cap < need) new_cap *= 2;
+                nb = (char *)realloc(out_buf, new_cap);
+                if (!nb) break;
+                out_buf = nb; out_cap = new_cap;
+            }
+            strcpy(out_buf + out_len, line);
+            out_len += strlen(line);
+            i++;
+        }
+        *out_count = (int)i;
+    }
+    return out_buf;
+}
+
+static void wais_job_free(WAISJob *j)
+{
+    if (!j) return;
+    if (j->response) {
+        if (j->response->DatabaseDiagnosticRecords)
+            freeWAISSearchResponse(j->response->DatabaseDiagnosticRecords);
+        freeSearchResponseAPDU(j->response);
+    }
+    if (j->docID) freeAny(j->docID);
+    free(j->body);
+    free(j);
+}
+
+static void CALLBACK wais_job_timer_proc(HWND hwnd, UINT msg, UINT_PTR id, DWORD t)
+{
+    WAISJob *j = g_w_job;
+    char     status[200];
+    (void)msg; (void)t;
+    if (!j) { KillTimer(hwnd, id); g_w_job_timer_id = 0; return; }
+
+    if (!InterlockedCompareExchange(&j->done, 0, 0)) {
+        LONG st  = InterlockedCompareExchange(&j->stage, 0, 0);
+        LONG got = InterlockedCompareExchange(&j->got, 0, 0);
+        if (InterlockedCompareExchange(&j->cancel, 0, 0)) return;
+        if (st != j->shown_stage || got != j->shown_got) {
+            j->shown_stage = st; j->shown_got = got;
+            if (st == 1)      wais_status_if_active(j->content, "Connecting...");
+            else if (st == 2) wais_status_if_active(j->content, "Initializing Z39.50-1988...");
+            else if (st == 3 && j->kind == WAIS_JOB_SEARCH)
+                wais_status_if_active(j->content, "Searching...");
+            else if (st == 3) {
+                if (j->doc_size > 0) {
+                    int pct = (int)((long long)got * 100 / j->doc_size);
+                    _snprintf(status, sizeof status, "Loading document: %ld of %ld bytes",
+                              (long)got, (long)j->doc_size);
+                    suite_set_progress(SUITE_ID_BTN_WAIS, pct);
+                } else {
+                    _snprintf(status, sizeof status, "Loading document: %ld bytes", (long)got);
+                }
+                status[sizeof status - 1] = '\0';
+                wais_status_if_active(j->content, status);
+            }
+        }
+        return;
+    }
+
+    /* done: apply exactly once */
+    KillTimer(hwnd, id);
+    g_w_job_timer_id = 0;
+    g_w_job = NULL;
+    suite_set_progress(SUITE_ID_BTN_WAIS, -1);
+
+    if (j->discard) {                         /* Disconnect came: nothing to show */
+        wais_job_free(j);
+        wais_job_buttons(FALSE);
+        return;
+    }
+    if (j->outcome == 2) {
+        wais_status_if_active(j->content, "Cancelled.");
+    } else if (j->outcome != 0) {
+        wais_status_if_active(j->content, j->status_msg);
+    } else if (j->kind == WAIS_JOB_SEARCH) {
+        int n = 0;
+        g_w_response = j->response;
+        j->response  = NULL;                  /* owned by the module now */
+        g_w_info = g_w_response
+                   ? (WAISSearchResponse *)g_w_response->DatabaseDiagnosticRecords
+                   : NULL;
+        g_w_results_text = wais_format_results(g_w_response, g_w_info, &n);
+        g_w_count = n;
+        wais_show_view(1);
+        /* Doc# always stays blank; the user types the document number. */
+        SetWindowTextA(g_w_doc_edit, "");
+        _snprintf(status, sizeof status, "Search: Done (%d document%s)", g_w_count,
+                  g_w_count == 1 ? "" : "s");
+        status[sizeof status - 1] = '\0';
+        wais_status_if_active(j->content, status);
+        if (wais_tab_active()) SetFocus(g_w_search_edit);
+    } else {
+        /* Sanitize body: CRLF normalization, ESC strip. */
+        char *clean = (char *)malloc(j->body_len * 2 + 1);
         size_t ci = 0, k;
         if (clean) {
-            for (k = 0; k < body_len; k++) {
-                unsigned char c = (unsigned char)body[k];
+            for (k = 0; k < j->body_len; k++) {
+                unsigned char c = (unsigned char)j->body[k];
                 if (c == 27) continue;
-                if (c == '\n' && (k == 0 || body[k-1] != '\r')) {
+                if (c == '\n' && (k == 0 || j->body[k-1] != '\r')) {
                     clean[ci++] = '\r';
                     clean[ci++] = '\n';
                 } else {
@@ -1131,17 +1202,100 @@ static void wais_on_view(HWND content)
             g_w_document_text = clean;
             wais_show_view(2);
         }
+        wais_status_if_active(j->content, "Document: Done");
+        /* focus the output pane so the keys scroll the document */
+        if (wais_tab_active()) SetFocus(g_w_output);
     }
-    free(body);
+    wais_job_free(j);
+    wais_job_buttons(FALSE);
+}
 
-    _snprintf(status, sizeof(status), "Loaded %lu bytes", (unsigned long)body_len);
-    wais_status(content, status);
+static void wais_start_job(HWND content, WAISJob *j)
+{
+    HANDLE thr;
+    int    port_int = atoi(g_w_active_port);
+    if (port_int <= 0) port_int = 210;
+    j->content = content;
+    j->port = port_int;
+    strncpy(j->host, g_w_active_host, sizeof j->host - 1);
+    strncpy(j->db,   g_w_active_db,   sizeof j->db - 1);
+    g_w_job = j;
+    wais_job_buttons(TRUE);
+    wais_status(content, "Connecting...");
+    thr = CreateThread(NULL, 0, wais_job_worker, j, 0, NULL);
+    if (!thr) {
+        g_w_job = NULL;
+        wais_job_free(j);
+        wais_job_buttons(FALSE);
+        wais_status(content, "Cannot start the WAIS thread.");
+        return;
+    }
+    CloseHandle(thr);
+    g_w_job_timer_id = SetTimer(content, WAIS_JOB_TIMER_ID, 100, wais_job_timer_proc);
+}
 
-    /* Move keyboard focus to the output pane so the user can immediately
-     * scroll the document with arrow keys (instead of leaving focus on
-     * the View button where keys do nothing). The output edit's caret
-     * is hidden on focus, so this looks like a viewer, not an editor. */
-    SetFocus(g_w_output);
+/* Search: read the query, start the job; the timer applies the result. */
+static void wais_on_search(HWND content)
+{
+    char     query[1024];
+    WAISJob *j;
+    if (g_w_job || g_w_probe) {
+        wais_status(content, "WAIS is busy: press Esc to cancel.");
+        return;
+    }
+    GetWindowTextA(g_w_search_edit, query, sizeof(query));
+    if (!query[0]) {
+        wais_status(content, "Enter a query and press Search.");
+        return;
+    }
+    wais_clear_results();
+    j = (WAISJob *)calloc(1, sizeof *j);
+    if (!j) { wais_status(content, "Out of memory."); return; }
+    j->kind = WAIS_JOB_SEARCH;
+    strncpy(j->query, query, sizeof j->query - 1);
+    j->shown_stage = -1;
+    wais_start_job(content, j);
+}
+
+/* ------------------------------------------------------------------ */
+/* View: read Doc # entry, retrieve that document, render in output.  */
+/* ------------------------------------------------------------------ */
+
+static void wais_on_view(HWND content)
+{
+    char     doc_str[16];
+    int      doc_num;
+    char     status[96];
+    WAISJob *j;
+    const char *type;
+
+    if (g_w_job || g_w_probe) {
+        wais_status(content, "WAIS is busy: press Esc to cancel.");
+        return;
+    }
+    if (!g_w_info || !g_w_info->DocHeaders || g_w_count <= 0) {
+        wais_status(content, "Run a search first.");
+        return;
+    }
+    GetWindowTextA(g_w_doc_edit, doc_str, sizeof(doc_str));
+    doc_num = atoi(doc_str);
+    if (doc_num < 1 || doc_num > g_w_count) {
+        _snprintf(status, sizeof(status),
+                  "Enter a Doc # from 1 to %d.", g_w_count);
+        wais_status(content, status);
+        return;
+    }
+    j = (WAISJob *)calloc(1, sizeof *j);
+    if (!j) { wais_status(content, "Out of memory."); return; }
+    j->kind = WAIS_JOB_VIEW;
+    j->docID = duplicateAny(g_w_info->DocHeaders[doc_num - 1]->DocumentID);
+    j->doc_size = g_w_info->DocHeaders[doc_num - 1]->DocumentLength;
+    type = g_w_info->DocHeaders[doc_num - 1]->Types
+           ? g_w_info->DocHeaders[doc_num - 1]->Types[0] : "TEXT";
+    strncpy(j->type, type ? type : "TEXT", sizeof j->type - 1);
+    j->shown_stage = -1;
+    if (!j->docID) { free(j); wais_status(content, "Out of memory."); return; }
+    wais_start_job(content, j);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1162,8 +1316,8 @@ void wais_module_resize(HWND content, int w, int h)
 
     if (!g_w_output) return;
 
-    /* Row 1: server/port/db fields on the left; Connect + Disconnect
-     * anchored right so they stay visible when the window is wider
+    /* Row 1: server/port/db fields on the left; the Connect/Disconnect
+     * toggle anchored right so it stays visible when the window is wider
      * than the fixed field block. Connect first, then search, then
      * view - read top-to-bottom matches the actual workflow. */
     MoveWindow(g_w_server_lbl,  margin,      18, 55, 22, TRUE);
@@ -1172,15 +1326,8 @@ void wais_module_resize(HWND content, int w, int h)
     MoveWindow(g_w_port_edit,   margin + 350, 14, 50, row_h, TRUE);
     MoveWindow(g_w_db_lbl,      margin + 410, 18, 70, 22, TRUE);
     MoveWindow(g_w_db_edit,     margin + 485, 14, 150, row_h, TRUE);
-    {
-        const int conn_w   = 85;
-        const int disc_w   = 95;
-        const int conn_gap = 8;
-        int disc_x = w - margin - disc_w;
-        int conn_x = disc_x - conn_gap - conn_w;
-        MoveWindow(g_w_connect_btn,    conn_x, 12, conn_w, btn_h, TRUE);
-        MoveWindow(g_w_disconnect_btn, disc_x, 12, disc_w, btn_h, TRUE);
-    }
+    MoveWindow(g_w_connect_btn, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2,
+               W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
 
     /* Row 2: Search edit stretches; Search button anchors right. */
     MoveWindow(g_w_search_lbl,
@@ -1290,10 +1437,8 @@ void wais_module_activate(HWND content)
         0, 0, 150, 26, content, (HMENU)(INT_PTR)IDC_WAIS_DB_EDIT, hInst, NULL);
     g_w_connect_btn = CreateWindowA("BUTTON", "Connect",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 85, 30, content, (HMENU)(INT_PTR)IDC_WAIS_CONNECT_BTN, hInst, NULL);
-    g_w_disconnect_btn = CreateWindowA("BUTTON", "Disconnect",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 95, 30, content, (HMENU)(INT_PTR)IDC_WAIS_DISCONNECT_BTN, hInst, NULL);
+        0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_WAIS_CONNECT_BTN, hInst, NULL);
+    g_w_disconnect_btn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
 
     /* Row 3 */
     g_w_proto_lbl = CreateWindowA("STATIC", "Protocol: Z39.50-1988",
@@ -1420,8 +1565,12 @@ BOOL wais_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     case IDC_WAIS_SEARCH_BTN:
         if (notif == BN_CLICKED) { wais_on_search(content); return TRUE; }
         break;
-    case IDC_WAIS_CONNECT_BTN:
-        if (notif == BN_CLICKED) { wais_on_connect(content); return TRUE; }
+    case IDC_WAIS_CONNECT_BTN:      /* the toggle: its label says which */
+        if (notif == BN_CLICKED) {
+            if (g_w_connected) wais_on_disconnect(content);
+            else               wais_on_connect(content);
+            return TRUE;
+        }
         break;
     case IDC_WAIS_DISCONNECT_BTN:
         if (notif == BN_CLICKED) { wais_on_disconnect(content); return TRUE; }

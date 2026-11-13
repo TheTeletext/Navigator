@@ -446,7 +446,12 @@ PRIVATE int HTMIME_put_block (HTStream * me, const char * b, int l)
 		return status;
 	    }
 	}
-	return (*me->target->isa->put_block)(me->target, b, l);
+	/* Teletext Navigator, 2026-11-11 (docs/2026-11-11_STATUS_PROGRESS.md):
+	** with no Content-Length the body was passed on uncounted, so read
+	** progress could not report it; count it as the branch above does. */
+	if ((status = (*me->target->isa->put_block)(me->target, b, l)) >= 0)
+	    HTNet_addBytesRead(net, l);
+	return status;
     } else {
         HTAlertCallback * cbf = HTAlert_find(HT_PROG_DONE);
         if (cbf) (*cbf)(me->request, HT_PROG_DONE, HT_MSG_NULL, NULL, NULL, NULL);

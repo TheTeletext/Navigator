@@ -506,6 +506,8 @@ static void handle_line(IrcClient *c, Session *ss, char *line)
             forward_numeric(c, rest);
             return;
         }
+        if (strcmp(cmd, "366") == 0)        /* end of NAMES: the JOIN completed */
+            PostMessageA(c->notify_hwnd, c->notify_msg, IRC_EVT_JOINED, 0);
         if (strcmp(cmd, "353") == 0 || strcmp(cmd, "366") == 0) return;
         if (ss->banner) {
             forward_numeric(c, rest);

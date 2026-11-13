@@ -67,6 +67,11 @@ typedef struct suite_module {
 #define SUITE_ID_BTN_NABUNAT  (SUITE_ID_BTN_BASE + 11)
 #define SUITE_ID_BTN_NAPLPS   (SUITE_ID_BTN_BASE + 12)
 #define SUITE_ID_BTN_GWBASIC  (SUITE_ID_BTN_BASE + 13)  /* 2026-10-20 */
+#define SUITE_ID_BTN_FTP      (SUITE_ID_BTN_BASE + 14)  /* 2026-11-12, docs/2026-11-12_FTP_TAB.md */
+#define SUITE_ID_BTN_NEWSGROUPS (SUITE_ID_BTN_BASE + 15) /* 2026-11-13, docs/2026-11-13_NETNEWS_TAB.md */
+/* Navigator 1.1: the Home launcher, the first ribbon button and the
+ * launch default. Kept apart from the tab block so no old id moves. */
+#define SUITE_ID_HOME         150
 
 /* Amendment 4: drag-resize gate. The shell sets a flag while the user
  * is in a continuous window-edge drag (WM_ENTERSIZEMOVE ..
@@ -97,6 +102,16 @@ void suite_center_popup(HWND hint_hwnd, int w, int h, int *out_x, int *out_y);
  * confirmation discipline in switch_to_module still applies. */
 void suite_set_active_module(int command_id);
 
+/* The status bar's progress well (2026-11-11,
+ * docs/2026-11-11_STATUS_PROGRESS.md): pct 0..100 shows the Windows 3.1
+ * bar (refshots/ref18: a sunken well, a dark fill, the percentage in bold)
+ * at the status bar's right end; pct -1 hides it. A bar is shown ONLY for
+ * a load with a real total (never an estimate). owner is the calling
+ * tab's ribbon id (SUITE_ID_BTN_*): ignored unless that tab is active, and
+ * a tab switch hides the bar. UI thread only; workers report through
+ * their tab's own timer. */
+void suite_set_progress(int owner, int pct);
+
 /* Shared GDI resources, owned by suite_fonts. */
 extern HFONT  g_hFontUI;
 extern HFONT  g_hFontOutput;
@@ -112,6 +127,25 @@ void suite_about_show(HWND parent);
 #include "suite_update.h"
 
 /* Module entry points, implemented in <module>_module.c. */
+/* The FTP tab (2026-11-12): anonymous, download-only; ftp_module.c. */
+void ftp_module_activate(HWND content);
+void ftp_module_deactivate(HWND content);
+void ftp_module_resize(HWND content, int w, int h);
+BOOL ftp_module_on_command(HWND content, WPARAM wParam, LPARAM lParam);
+BOOL ftp_module_has_unsaved(void);
+void ftp_module_shutdown(void);
+/* Open an ftp:// URL in the FTP tab (the Web tab diverts them here). */
+void ftp_module_open_url(const char *url);
+
+/* The Newsgroups tab (2026-11-13): a read-only Netnews reader (RFC 3977);
+ * newsgroups_module.c. */
+void newsgroups_module_activate(HWND content);
+void newsgroups_module_deactivate(HWND content);
+void newsgroups_module_resize(HWND content, int w, int h);
+BOOL newsgroups_module_on_command(HWND content, WPARAM wParam, LPARAM lParam);
+BOOL newsgroups_module_has_unsaved(void);
+void newsgroups_module_shutdown(void);
+
 void wais_module_activate(HWND content);
 void wais_module_deactivate(HWND content);
 void wais_module_resize(HWND content, int w, int h);

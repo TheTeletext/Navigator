@@ -69,6 +69,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "suite_w31.h"
 
 /* Module-local control IDs (6600+, clear of the RIPscrip 6400 block). */
 #define IDC_NAP_HOST_EDIT   6601
@@ -103,7 +104,8 @@ static HWND g_hPanel    = NULL;
 static HWND g_hCanvas   = NULL;
 static HWND g_hHostLbl  = NULL, g_hHostEdit = NULL;
 static HWND g_hPortLbl  = NULL, g_hPortEdit = NULL;
-static HWND g_hConnBtn  = NULL, g_hDiscBtn  = NULL;
+static HWND g_hConnBtn  = NULL, g_hDiscBtn  = NULL;   /* 2026-11-11: Disconnect
+                                                        retired (one toggle); NULL */
 static HWND g_hMonoChk  = NULL;
 static HWND g_hStatus   = NULL;
 static HWND g_hFmtLbl   = NULL, g_hFmtCmb   = NULL;
@@ -269,8 +271,9 @@ static void nap_set_session_ui(BOOL connected)
     g_connected = connected;
     if (!g_controls_created) return;
     had_focus = GetFocus();
-    EnableWindow(g_hConnBtn, !connected);
-    EnableWindow(g_hDiscBtn, connected);
+    /* 2026-11-11: one Connect/Disconnect toggle in NAPLPS format (Minitel
+     * keeps its own CONNEXION/FIN key, so there the toggle stays hidden). */
+    w31_toggle_set(g_hConnBtn, connected);
     EnableWindow(g_hHostEdit, !connected);
     EnableWindow(g_hPortEdit, !connected);
     /* The format can only change while disconnected. */
@@ -650,7 +653,7 @@ static void nap_open_file(void)
     ofn.lpstrTitle   = "Open a NAPLPS frame";
     ofn.Flags        = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
 
-    if (!GetOpenFileNameA(&ofn)) return;
+    if (!W31_UNHOOKED(GetOpenFileNameA(&ofn))) return;
 
     f = fopen(path, "rb");
     if (!f) { nap_status("Cannot open %s", path); return; }
@@ -843,16 +846,15 @@ static LRESULT CALLBACK NapPanelProc(HWND hwnd, UINT msg,
         HDC  hdc = (HDC)wParam;
         RECT rc;
         GetClientRect(hwnd, &rc);
-        FillRect(hdc, &rc, g_hBrushBlack);
+        FillRect(hdc, &rc, g_w31_br_face);
         return 1;
     }
-    /* The tab keeps Navigator's white-on-black retro chrome. */
+    /* Navigator 1.1: Windows 3.1 chrome round the videotex screen, which
+     * itself stays black, as a videotex terminal is, in a sunken frame. */
     case WM_CTLCOLORSTATIC:
     case WM_CTLCOLORBTN:
     case WM_CTLCOLOREDIT:
-        SetTextColor((HDC)wParam, RGB(255, 255, 255));
-        SetBkColor((HDC)wParam, RGB(0, 0, 0));
-        return (LRESULT)g_hBrushBlack;
+        return (LRESULT)w31_ctlcolor(msg, (HDC)wParam, (HWND)lParam);
 
     /*
      * The controls are children of THIS panel, so their WM_COMMAND
@@ -914,7 +916,7 @@ static void nap_register_classes(HINSTANCE hInst)
         wc.lpfnWndProc   = NapPanelProc;
         wc.hInstance     = hInst;
         wc.hCursor       = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
-        wc.hbrBackground = g_hBrushBlack;
+        wc.hbrBackground = g_w31_br_face;
         wc.lpszClassName = NAP_PANEL_CLASS;
         RegisterClassExA(&wc);
         g_panel_class_reg = TRUE;
@@ -985,8 +987,14 @@ static void nap_connect(void)
         nap_status("Cannot start a connection to %s:%d",
                    g_active_host, g_active_port);
         nap_set_session_ui(FALSE);
+        return;
     }
-    /* The buttons flip on TELNET_EVT_CONNECTED, not here. */
+    /* Until TELNET_EVT_CONNECTED the toggle reads Disconnect, grayed: the
+     * EXCEPTION to cancel-while-connecting (2026-11-11), the same
+     * telnet_proto handshake hazard as RIPscrip
+     * (docs/2026-11-11_W31_BUTTONS.md, finding). It goes live on CONNECTED
+     * and back to Connect on ERROR/CLOSED via nap_set_session_ui. */
+    w31_toggle_busy(g_hConnBtn);
 }
 
 /* Show the screen of the chosen format and set the controls to match. */
@@ -1174,15 +1182,16 @@ void naplps_module_resize(HWND content, int w, int h)
     } else {
         /* NAPLPS: the Phase 2a row, with the checkbox label shortened to
          * "Monochrome" so it is never clipped. */
-        const int conn_w = 85, disc_w = 95, mono_w = 105;
+        const int mono_w = 105;
         const int gap = 8;
-        int disc_x = w - margin - disc_w;
-        int conn_x = disc_x - gap - conn_w;
+        /* The Connect/Disconnect toggle at the right end, centred on the
+         * row the 30 px buttons used (y 12..42); Monochrome before it. */
+        int conn_x = w - margin - W31_TOGGLE_W;
         int mono_x = conn_x - gap - mono_w;
         if (mono_x < margin + 519) mono_x = margin + 519;
         MoveWindow(g_hMonoChk, mono_x, 16, mono_w, 22,    TRUE);
-        MoveWindow(g_hConnBtn, conn_x, 12, conn_w, btn_h, TRUE);
-        MoveWindow(g_hDiscBtn, disc_x, 12, disc_w, btn_h, TRUE);
+        MoveWindow(g_hConnBtn, conn_x, 12 + (btn_h - W31_TOGGLE_H) / 2,
+                   W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
     }
 
     if (g_format == FMT_MINITEL) {
@@ -1292,12 +1301,9 @@ void naplps_module_activate(HWND content)
         (HMENU)(INT_PTR)IDC_NAP_SCAN_CHK, hInst, NULL);
     g_hConnBtn = CreateWindowA("BUTTON", "Connect",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, 85, 30, g_hPanel,
+        0, 0, W31_TOGGLE_W, W31_TOGGLE_H, g_hPanel,
         (HMENU)(INT_PTR)IDC_NAP_CONNECT_BTN, hInst, NULL);
-    g_hDiscBtn = CreateWindowA("BUTTON", "Disconnect",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED,
-        0, 0, 95, 30, g_hPanel,
-        (HMENU)(INT_PTR)IDC_NAP_DISCONN_BTN, hInst, NULL);
+    g_hDiscBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
 
     g_hCanvas = CreateWindowExA(WS_EX_CLIENTEDGE, NAP_CANVAS_CLASS, "",
         WS_CHILD | WS_VISIBLE,
@@ -1361,8 +1367,13 @@ BOOL naplps_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     if (minitel_view_on_command(wParam)) return TRUE;
 
     switch (id) {
-    case IDC_NAP_CONNECT_BTN:
-        nap_connect();
+    case IDC_NAP_CONNECT_BTN:       /* the toggle: its label says which */
+        if (g_connected) {
+            nap_end_session(WHY_LOCAL);
+            nap_status("Disconnected");
+        } else if (!g_telnet) {
+            nap_connect();               /* mid-handshake it is grayed */
+        }
         return TRUE;
 
     case IDC_NAP_FORMAT_CMB:
