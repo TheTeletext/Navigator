@@ -35,9 +35,10 @@
  *
  * KEYBOARD. Typing in the scene sends raw characters to the host, which
  * is how a host command token such as RWX followed by Return reaches the
- * service. That is transport, not RIPscrip: RIP buttons, mouse regions
- * and hit-testing are still deferred, so a hotkey is not translated into
- * its button's host command for you. Characters are derived from the
+ * service. RIP buttons and mouse regions are hit-tested (click, press
+ * feedback, hotkeys) further down; on a screen with buttons only their
+ * hotkeys are sent, and free typing goes through on a plain text screen.
+ * Characters are derived from the
  * virtual key rather than WM_CHAR so a non-Latin keyboard layout still
  * produces ASCII tokens.
  */
@@ -1418,7 +1419,7 @@ static LRESULT CALLBACK RipPanelProc(HWND hwnd, UINT msg,
         FillRect(hdc, &rc, g_w31_br_face);
         return 1;
     }
-    /* Navigator 1.1: the strip is Windows 3.1 chrome, gray with black
+    /* Navigator 1.5: the strip is Windows 3.1 chrome, gray with black
      * labels and white fields. The RIPscrip canvas itself stays the
      * black of the protocol, in its sunken (WS_EX_CLIENTEDGE) frame. */
     case WM_CTLCOLORSTATIC:

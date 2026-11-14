@@ -1,0 +1,13 @@
+;; The foreword: DRAFT for the operator's approval, in his voice.
+@topic fw_foreword | Foreword | foreword | foreword:000
+The Internet I grew up with did not begin with the World Wide Web. Before it, and for years beside it, there were bulletin boards drawn in RIPscrip, videotex pages on the Minitel and on Bell's ALEX, Gopher menus, WAIS searches, Archie, anonymous FTP, Netnews, Internet Relay Chat, and live television over CU-SeeMe. Each of these protocols carried news and ideas in its day, and most of them have been all but forgotten.
+
+The purpose of this software is to preserve the legacy of these historically significant protocols, and to make them accessible on a modern computer. Every service in Teletext Navigator is the real thing: Navigator speaks each protocol the way its own clients did, to live servers that The Teletext keeps running today.
+
+You will notice the look at once. Navigator wears the skin of Windows 3.11: the navy title bars, the grey buttons, the Help files. That skin is deliberate. It was chosen for immersion in the Old Net, just as it was back in the day. But don't be fooled by the looks: under the skin, Teletext Navigator is a native x64 application, running natively on Windows 11.
+
+I hope you enjoy using it as much as I enjoyed architecting it.
+
+**Dimitri Papadopoulos**
+
+**The Teletext**

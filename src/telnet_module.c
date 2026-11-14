@@ -29,7 +29,7 @@
  */
 
 #include "telnet_module.h"
-#include "suite_w31.h"   /* the Connect/Disconnect toggle */
+#include "suite_w31.h"
 #include "vt_term.h"
 #include "telnet_proto.h"
 #include "finger_proto.h"
@@ -64,7 +64,6 @@
 #define IDC_TELNET_STATUS        6105
 #define IDC_TELNET_RENDER        6106
 #define IDC_TELNET_BTN_ARCHIE    6107
-#define IDC_TELNET_BTN_TOGGLE    6108   /* Connect/Disconnect, 2026-11-11 */
 
 #define TELNET_RENDER_CLASS  "MGTTelnetTerminalV1"
 
@@ -105,11 +104,11 @@ static HWND   g_hBtnFingerNews = NULL;
 static HWND   g_hBtnFingerWx   = NULL;
 static HWND   g_hBtnQotd       = NULL;
 static HWND   g_hBtnArchie     = NULL;
-/* The Connect/Disconnect toggle every service tab has since 2026-11-11
- * (docs/2026-11-11_W31_BUTTONS.md). Connect opens the tab's primary
- * service, telnet.teletext.ca, exactly as the Telnet shortcut does;
- * Disconnect ends the session. The five shortcuts are unchanged. */
-static HWND   g_hBtnToggle     = NULL;
+/* No Connect/Disconnect toggle since 2026-11-13 (Navigator 1.6, operator):
+ * each shortcut opens its own connection and Connect only repeated the
+ * Telnet one. A session now ends from the server's side (its own logout
+ * or quit); nothing in the tab closes it. The toggle it had from 2026-11-11 to 1.5
+ * (docs/2026-11-11_W31_BUTTONS.md) is gone with its id 6108. */
 static HWND   g_hStatus        = NULL;
 static HWND   g_hRender        = NULL;
 
@@ -504,22 +503,6 @@ static void emit_boot_banner(void)
 
 /* ---------- shell mode entry ---------- */
 
-/* Shell: Connect. A Telnet session: Disconnect. Mid-handshake and while
- * a Finger or QOTD read runs: Disconnect, grayed, the EXCEPTION to
- * cancel-while-connecting. telnet_proto connects with a blocking
- * getaddrinfo/connect and frees its context 3 s into a close, so closing
- * mid-handshake to an unreachable host could let its thread write into
- * freed memory; the Finger and QOTD reads are one-shot and end by
- * themselves within seconds, and their close paths were not audited for a
- * mid-connect cancel. */
-static void term_sync_toggle(void)
-{
-    if (!g_hBtnToggle) return;
-    if (g_mode == F6_SHELL)              w31_toggle_set(g_hBtnToggle, FALSE);
-    else if (g_mode == F6_TELNET_ACTIVE) w31_toggle_set(g_hBtnToggle, TRUE);
-    else                                 w31_toggle_busy(g_hBtnToggle);
-}
-
 static void enter_shell_mode(BOOL write_prompt)
 {
     g_mode = F6_SHELL;
@@ -531,7 +514,6 @@ static void enter_shell_mode(BOOL write_prompt)
     }
     set_status_line("Local shell");
     enable_macro_buttons(TRUE);
-    term_sync_toggle();
     terminal_request_repaint();
 }
 
@@ -598,7 +580,6 @@ static void open_telnet(const char *spec)
         return;
     }
     g_mode = F6_TELNET_CONNECTING;
-    term_sync_toggle();
     enable_macro_buttons(FALSE);
     terminal_request_repaint();
 }
@@ -651,7 +632,6 @@ static void open_finger(const char *user_at_host)
         return;
     }
     g_mode = F6_FINGER_READING;
-    term_sync_toggle();
     enable_macro_buttons(FALSE);
     terminal_request_repaint();
 }
@@ -675,7 +655,6 @@ static void open_qotd_raw(const char *host, int port)
         return;
     }
     g_mode = F6_QOTD_READING;
-    term_sync_toggle();
     enable_macro_buttons(FALSE);
     terminal_request_repaint();
 }
@@ -864,6 +843,11 @@ static void shell_commit_enter(void)
         g_shell_input[0]  = '\0';
         shell_dispatch(tmp);
     }
+    /* 1.6 (WinHelp phase 2b report s3.4): a command that opened no session
+     * (help, clear, an error) leaves us at the prompt, so the shortcut
+     * buttons a click had dimmed come back; a session keeps them dimmed
+     * until enter_shell_mode. */
+    if (g_mode == F6_SHELL) enable_macro_buttons(TRUE);
     terminal_request_repaint();
 }
 
@@ -903,7 +887,12 @@ static void shell_render_edit(int prev_cursor_off, int prev_len)
 
 static void handle_char_shell(int ch)
 {
-    if (g_macro_pending) cancel_macro_timer();
+    if (g_macro_pending) {
+        /* a key in the second before the auto-Enter takes the command back
+         * to the user: the buttons come back with it (1.6) */
+        cancel_macro_timer();
+        enable_macro_buttons(TRUE);
+    }
 
     if (ch == '\r') {
         shell_commit_enter();
@@ -1108,7 +1097,6 @@ static void on_evt_connected(void)
     char buf[320];
     if (g_mode == F6_TELNET_CONNECTING) {
         g_mode = F6_TELNET_ACTIVE;
-        term_sync_toggle();
         _snprintf(buf, sizeof(buf), "Connected to %s:%d",
                   g_active_host, g_active_port);
         set_status_line(buf);
@@ -1449,8 +1437,9 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         pt.y = GET_Y_LPARAM(lParam);
         ClientToScreen(hwnd, &pt);
         SetFocus(hwnd);
-        TrackPopupMenu(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                       pt.x, pt.y, 0, hwnd, NULL);
+        /* the Windows 3.1 popup since 2026-11-13 (w31_track_popup, suite_w31.c) */
+        w31_track_popup(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                        pt.x, pt.y, hwnd);
         DestroyMenu(hm);
         return 0;
     }
@@ -1684,7 +1673,6 @@ void telnet_module_activate(HWND content)
         ShowWindow(g_hBtnFingerWx,   SW_SHOW);
         ShowWindow(g_hBtnQotd,       SW_SHOW);
         ShowWindow(g_hBtnArchie,     SW_SHOW);
-        ShowWindow(g_hBtnToggle,     SW_SHOW);
         ShowWindow(g_hRender,        SW_SHOW);
         GetClientRect(content, &rc);
         telnet_module_resize(content, rc.right - rc.left, rc.bottom - rc.top);
@@ -1734,7 +1722,7 @@ void telnet_module_activate(HWND content)
      * the captions on 2026-07-24 when the suite retired the F1-F12
      * accelerator table (the retro section ran out of function keys); the
      * buttons are click-only now. Archie opens the interactive Archie
-     * service at archie.greektimes.ca:2323 (port 23 there is Telnet News,
+     * service at archie.teletext.ca:2323 (port 23 there is Telnet News,
      * so 2323 is explicit). */
     g_hBtnTelnet = CreateWindowA("BUTTON", "Telnet",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
@@ -1756,10 +1744,6 @@ void telnet_module_activate(HWND content)
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
         0, 0, 100, 36, content,
         (HMENU)(INT_PTR)IDC_TELNET_BTN_ARCHIE, hInst, NULL);
-    g_hBtnToggle = CreateWindowA("BUTTON", "Connect",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content,
-        (HMENU)(INT_PTR)IDC_TELNET_BTN_TOGGLE, hInst, NULL);
 
     if (g_hFontUI) {
         SendMessageA(g_hBtnTelnet,     WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
@@ -1767,7 +1751,6 @@ void telnet_module_activate(HWND content)
         SendMessageA(g_hBtnFingerWx,   WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         SendMessageA(g_hBtnQotd,       WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         SendMessageA(g_hBtnArchie,     WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
-        SendMessageA(g_hBtnToggle,     WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
     }
 
     /* Dispatch amendment 2026-06-15-2 (item 5): the "Local shell
@@ -1806,7 +1789,6 @@ void telnet_module_deactivate(HWND content)
     ShowWindow(g_hBtnFingerWx,   SW_HIDE);
     ShowWindow(g_hBtnQotd,       SW_HIDE);
     ShowWindow(g_hBtnArchie,     SW_HIDE);
-    ShowWindow(g_hBtnToggle,     SW_HIDE);
     ShowWindow(g_hRender,        SW_HIDE);
 }
 
@@ -1825,9 +1807,9 @@ void telnet_module_resize(HWND content, int w, int h)
     (void)content;
     if (!g_controls_created) return;
 
-    /* Five shortcuts, then the Connect/Disconnect toggle at the right end
-     * (2026-11-11), so the shortcuts share the width less the toggle. */
-    btn_w = (w - 2 * margin - 5 * btn_gap - W31_TOGGLE_W) / 5;
+    /* Five shortcuts share the whole width (2026-11-13: the Connect
+     * toggle that took the right end until 1.5 is gone). */
+    btn_w = (w - 2 * margin - 4 * btn_gap) / 5;
     if (btn_w < 80) btn_w = 80;
 
     /* Top: shortcut bar (Telnet / Finger News / Finger Weather /
@@ -1849,10 +1831,9 @@ void telnet_module_resize(HWND content, int w, int h)
     MoveWindow(g_hBtnFingerNews, x, y, btn_w, btn_h, TRUE); x += btn_w + btn_gap;
     MoveWindow(g_hBtnFingerWx,   x, y, btn_w, btn_h, TRUE); x += btn_w + btn_gap;
     MoveWindow(g_hBtnQotd,       x, y, btn_w, btn_h, TRUE); x += btn_w + btn_gap;
-    MoveWindow(g_hBtnArchie,     x, y, btn_w, btn_h, TRUE);
-    MoveWindow(g_hBtnToggle, w - margin - W31_TOGGLE_W, y + (btn_h - W31_TOGGLE_H) / 2,
-               W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
-    term_sync_toggle();
+    /* the last one takes the rounding, so the row ends on the margin */
+    MoveWindow(g_hBtnArchie,     x, y, (w - margin) - x > btn_w ? (w - margin) - x : btn_w,
+               btn_h, TRUE);
 }
 
 /* Shared shortcut trigger for the macro-button clicks. `id` is one of the
@@ -1877,12 +1858,6 @@ static void trigger_shortcut(int id)
      * and the open_*-failure branches) re-enables all four together
      * when the connection ends, so the UI never gets stuck. */
     enable_macro_buttons(FALSE);
-    /* And the toggle with them (2026-11-11): while the command is being
-     * typed the mode is still the shell, so without this the toggle read
-     * Connect and a second click typed the command again (found by
-     * test/verify_toggle_2026-11-11.ps1). The mode change that follows,
-     * or enter_shell_mode on failure, takes it from here. */
-    if (g_hBtnToggle) w31_toggle_busy(g_hBtnToggle);
     macro_inject(cmd);
     SetFocus(g_hRender);
 }
@@ -1902,14 +1877,6 @@ BOOL telnet_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
         case IDC_TELNET_BTN_QOTD:
         case IDC_TELNET_BTN_ARCHIE:
             trigger_shortcut(id);
-            return TRUE;
-        case IDC_TELNET_BTN_TOGGLE:     /* its label says which */
-            if (g_mode == F6_TELNET_ACTIVE) {
-                close_active_session(TRUE);
-                SetFocus(g_hRender);
-            } else if (g_mode == F6_SHELL) {
-                trigger_shortcut(IDC_TELNET_BTN_TELNET);
-            }
             return TRUE;
         default:
             return FALSE;

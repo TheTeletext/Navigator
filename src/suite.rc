@@ -38,7 +38,7 @@
 401 RCDATA "../assets/basic/RETRO649.BAS"
 402 RCDATA "../assets/basic/DIALUP.BAS"
 
-/* Navigator 1.1: the Windows 3.1 ribbon and launcher icons, 32x32 in
+/* Navigator 1.5: the Windows 3.1 ribbon and launcher icons, 32x32 in
  * the 16-colour VGA palette, drawn by tools/make_w31_icons.py. */
 500 BITMAP "../assets/w31icons/home.bmp"
 501 BITMAP "../assets/w31icons/ripscrip.bmp"

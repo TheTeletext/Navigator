@@ -10,7 +10,7 @@
  * The updater verifies a downloaded installer against the hash in the
  * update manifest, and that check is the entire security model of the
  * update path: the manifest and the MSI both come over TLS from
- * greektimes.ca, and the hash is what ties the bytes on disk to the
+ * apps.teletext.ca, and the hash is what ties the bytes on disk to the
  * bytes the manifest vouched for.
  *
  * NOT the Zmodem CRCs. third_party/mbzm/crc16.c and crc32.c are 16- and

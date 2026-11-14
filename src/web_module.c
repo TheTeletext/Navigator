@@ -61,6 +61,7 @@
 #include <shellapi.h>    /* ShellExecuteW for the file-association handoff */
 #include "suite_w31.h"   /* the Windows 3.1 scrollbar (scroll calls redirected) */
 #include "gopher_module.h" /* gopher:// links open in the Gopher tab */
+#include "suite_clipboard.h" /* the shared Copy / Select All context menu */
 
 /* GDI+ flat C entry points. The vendor's <gdiplus.h> is C++-only
  * (uses namespace Gdiplus + a class wrapper), so we declare the four
@@ -1436,14 +1437,14 @@ static void webdoc_flash_noembed_end(WebDoc *doc)
         doc->flash_fallback_cur = doc->flash_object;
 }
 
-/* Layout rule: a movie that cannot play takes no space; the fallback
- * content of a movie that can play takes no space either. */
+/* Layout rule (2026-11-13, D4): a movie keeps its box whether it plays or
+ * not (one that cannot play shows the placeholder there), and NOEMBED /
+ * OBJECT fallback content takes no space while a player is installed,
+ * as in a 1990s browser with the plug-in. Fallback is only ever tagged
+ * when the player is installed (the parse hooks are gated on it). */
 static int web_flash_block_hidden(const WebBlock *b)
 {
-    if (b->flash && web_flash_cannot_play(b->flash)) return 1;
-    if (b->flash_fallback && !web_flash_cannot_play(b->flash_fallback))
-        return 1;
-    return 0;
+    return b->flash_fallback != NULL;
 }
 
 /* Visit every movie of a page: top-level blocks, inline image runs and
@@ -2930,8 +2931,8 @@ static void web_emit_line(WebRenderView *view, HDC hdc, const WebLineTok *toks, 
             }
 #if NAV_FLASH
             if (t->flash)
-                web_flash_place(t->flash, start_x + t->x_off, draw_y,
-                                t->img_w, t->img_h);
+                web_flash_show(t->flash, hdc, start_x + t->x_off, draw_y,
+                               t->img_w, t->img_h);
 #endif
             if (t->href)
                 web_add_link_rect(view, start_x + t->x_off, draw_y,
@@ -4026,7 +4027,7 @@ static int web_render_image(WebRenderView *view, HDC hdc, WebBlock *b, int x0, i
     /* A movie box: its child window is laid over this rect by the paint. */
     if (b->flash) {
         if (!measure_only)
-            web_flash_place(b->flash, img_x, y, w, h);
+            web_flash_show(b->flash, hdc, img_x, y, w, h);
         return y + h;
     }
 #endif
@@ -4642,6 +4643,26 @@ void web_paint_to(WebRenderView *view, HDC hdc, RECT *client, BOOL measure_only,
         return;
     }
 
+#if NAV_FLASH
+    /* A .swf opened by its own address (D3): the movie, or its
+     * placeholder, covers the whole view, which never scrolls. */
+    if (view->view_doc->flash_full && view->view_doc->blocks_n > 0
+        && view->view_doc->blocks[0].flash) {
+        int cw = client->right - client->left;
+        int ch = client->bottom - client->top;
+        view->sel_map_n = 0;
+        view->scroll_y  = 0;
+        if (!measure_only)
+            web_flash_show(view->view_doc->blocks[0].flash, hdc,
+                           client->left, client->top, cw, ch);
+        /* 0, not ch: a range equal to the page still shows a scroll bar
+         * with a full-length thumb; nothing here ever scrolls. */
+        if (out_height) *out_height = 0;
+        SelectObject(hdc, old_font);
+        return;
+    }
+#endif
+
     /* Pass 9: regenerate the selection map this paint. Same layout
      * produces the same token order so anchor/extent doc indices
      * stay valid; sel_map coordinates always reflect the most
@@ -5069,28 +5090,18 @@ static LRESULT CALLBACK WebViewProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
         /* Standard right-click context: Copy (if a selection exists)
          * and Select All (if any selectable tokens exist in the
          * current paint). Both route to the same helpers as the
-         * keyboard accelerators (Ctrl+C and Ctrl+A). */
+         * keyboard accelerators (Ctrl+C and Ctrl+A). The menu itself is
+         * the shared one since 2026-11-13 (suite_clipboard.c). */
         POINT pt;
-        HMENU menu;
-        UINT  cmd;
+        int   cmd;
         pt.x = (int)(short)LOWORD(l);
         pt.y = (int)(short)HIWORD(l);
         ClientToScreen(hwnd, &pt);
-        menu = CreatePopupMenu();
-        if (!menu) return 0;
-        AppendMenuA(menu,
-                    MF_STRING | (g_b_view.sel_active ? 0u : (UINT)MF_GRAYED),
-                    1, "Copy\tCtrl+C");
-        AppendMenuA(menu,
-                    MF_STRING | (g_b_view.sel_map_n > 0 ? 0u : (UINT)MF_GRAYED),
-                    2, "Select All\tCtrl+A");
-        cmd = TrackPopupMenu(menu,
-                             TPM_RIGHTBUTTON | TPM_RETURNCMD
-                             | TPM_LEFTALIGN | TPM_TOPALIGN,
-                             pt.x, pt.y, 0, hwnd, NULL);
-        DestroyMenu(menu);
-        if (cmd == 1) web_sel_copy_to_clipboard(&g_b_view, hwnd);
-        else if (cmd == 2) web_sel_select_all(&g_b_view, hwnd);
+        cmd = suite_clipboard_context_menu(hwnd, pt.x, pt.y,
+                                           g_b_view.sel_active != 0,
+                                           g_b_view.sel_map_n > 0);
+        if (cmd == SUITE_CTX_COPY) web_sel_copy_to_clipboard(&g_b_view, hwnd);
+        else if (cmd == SUITE_CTX_SELECT_ALL) web_sel_select_all(&g_b_view, hwnd);
         return 0;
     }
     }
@@ -5212,6 +5223,11 @@ typedef struct WebFetchCtx {
      * fields above. */
     int           is_cdf;
     CdfDoc       *cdf_doc;
+#if NAV_FLASH
+    /* 2026-11-13 (D3): the address names a Flash movie by its file name;
+     * the worker makes a one-movie document that fills the view. */
+    int           is_swf;
+#endif
 } WebFetchCtx;
 
 /* the fetch the progress callback reports (defined with the callback) */
@@ -5531,6 +5547,33 @@ static DWORD WINAPI web_fetch_worker(LPVOID arg)
         }
         goto done;
     }
+
+#if NAV_FLASH
+    if (ctx->is_swf) {
+        /* A movie opened by its own address (D3): one movie box, laid
+         * over the whole view by web_paint_to; downloaded, checked and
+         * prewarmed exactly as an EMBED's movie is. */
+        WebDoc   *d = webdoc_new();
+        WebBlock *b = d ? append_block_to_doc(d) : NULL;
+        WebFlash *f = (b && abs_url) ? web_flash_new(abs_url, 0, 0) : NULL;
+        if (!f) {
+            if (d) webdoc_free(d);
+            ctx->outcome = 1;
+            _snprintf(ctx->status_msg, sizeof(ctx->status_msg), "Out of memory.");
+            goto done;
+        }
+        b->type    = BLK_IMG;
+        b->img_src = str_dup(abs_url);
+        b->img_alt = str_dup("");
+        b->flash   = f;
+        d->flash_full = 1;
+        fetch_flash_into_block(b, abs_url);
+        ctx->doc     = d;
+        ctx->outcome = 0;
+        _snprintf(ctx->status_msg, sizeof(ctx->status_msg), "Document: Done");
+        goto done;
+    }
+#endif
 
     HTRequest_setOutputFormat(request, WWW_PRESENT);
     HTRequest_addConnection(request, "close", "");
@@ -6038,6 +6081,12 @@ static void web_navigate(HWND content, const char *url, int push_history)
     /* Phase 6: discriminate CDF from HTML on the normalized URL.
      * The worker and the commit handler branch on this flag. */
     ctx->is_cdf = web_url_is_cdf(ctx->url);
+#if NAV_FLASH
+    /* Only with a player installed; without one a .swf address is
+     * fetched exactly as before Flash. */
+    ctx->is_swf = !ctx->is_cdf && web_flash_url_is_swf(ctx->url)
+                  && web_flash_available();
+#endif
 
     g_b_fetch = ctx;
 

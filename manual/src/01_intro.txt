@@ -1,0 +1,43 @@
+;; Chapter 1: Introduction (printed manual only). Facts: Navigator's code
+;; and installer; the OS statement is the one used on every channel.
+@topic intro_welcome | Introduction | introduction;Teletext Navigator;overview | intro:000
+Teletext Navigator connects your computer to the information services of The Teletext the way the networks of the 1980s and 1990s reached them. Each service has its own button on the ribbon:
+
+- **RIPscrip**, a graphical bulletin board drawn in RIPscrip 1.54.
+- **NABU**, the Canadian cable computer network of 1983, on an emulated NABU Personal Computer or on a real one.
+- **Videotex**, the Minitel and NAPLPS videotex services.
+- **Web**, a World Wide Web browser of the 1990s, with Flash.
+- **Gopher**, the menus of Gopherspace.
+- **ARPANET**, mail sent the FTP-Mail way.
+- **WAIS**, full-text search in Z39.50-1988 (Version 1).
+- **Archie**, the first Internet search engine, created in Montreal.
+- **FTP**, anonymous file downloads.
+- **Newsgroups**, a Netnews reader.
+- **IRC**, the #retro channel as it happens.
+- **CU-SeeMe**, live television over the Internet.
+- **Terminal**, Telnet, Finger and QOTD.
+- **GW-BASIC**, Microsoft's BASIC on a built-in PC.
+
+Each service is set up for The Teletext's own server, so you can connect at once; most of them also let you name another host.
+
+@topic intro_look | The Windows 3.1 Look and Feel | Windows 3.1 look;look and feel;native program;x64;Windows 11;skin;WinHelp;Help Compiler;The Teletext WinHelp | intro:010
+Teletext Navigator wears the look of Windows 3.11 on purpose. Its navy title bars, its grey push buttons, its menus with their black borders and its dialog boxes were drawn pixel by pixel against the real Windows 3.11, running side by side, so that the services of the Old Net can be used in the very setting they were made for. The look is only skin deep. Underneath it, Teletext Navigator is a **native 64-bit (x64) application** for Windows 11 and Windows 10. It is not an old program running in an emulator, and it needs no emulator to run: every protocol is spoken by Navigator's own code, directly over your computer's Internet connection.
+
+Two services do contain emulated machines, because their programs were written for a computer, not for a screen: the **NABU** service runs a NABU Personal Computer, and the **GW-BASIC** service runs an IBM PC compatible, so that the programs written for them run as they did. Navigator itself remains a native program around them.
+
+**WinHelp, brought back.** Microsoft no longer includes WinHelp, the Help system of Windows 3.1, in Windows 10 and Windows 11. The Teletext went out of its way to bring it back. Navigator's Help is a real WinHelp system: its Help files are authentic .HLP files, compiled with the original Microsoft Help Compiler of 1993, and they are shown by **The Teletext WinHelp**, The Teletext's open-source revival of the WinHelp viewer. Based on the WinHelp viewer of the Wine project, it is faithful to WinHelp 3.1 down to the Search dialog box and the shadows under its pop-up definitions, and it opens the Help files of other Windows 3.0 and 3.1 programs as well. Its source code is at https://github.com/TheTeletext/WinHelp. See [[helpuse_intro|Using Help]].
+
+@topic intro_need | What You Need | requirements;system requirements;Windows 10;Windows 11 | intro:020
+- A computer running a 64-bit edition of Windows. Teletext Navigator is tested on 64-bit Windows 10 22H2 and later, including Windows 11. Earlier versions are untested.
+- A connection to the Internet. Every service except GW-BASIC reaches a server on the Internet.
+- A sound device, for the sound of CU-SeeMe, NABU, GW-BASIC and the sounds in Gopher and the Web.
+- A screen of at least 1024 by 768 pixels. The Navigator window is never smaller than that.
+- For RealAudio links in the Web service, RealPlayer or another program that Windows uses for .ram files.
+
+@topic intro_conventions | Conventions Used in This Manual | conventions;typographic conventions;keys | intro:030
+- **Bold** text names something on the screen that you choose: a button, a box, a menu command or a list.
+- Names of keys are in capital letters, for example ENTER, ESC and F1.
+- A plus sign between key names, as in CTRL+C, means: hold down the first key while you press the second.
+- "Choose" means to click an item with the mouse, or to select it with the keyboard.
+- Addresses of services are given by their names, such as wais.teletext.ca, never by number.
+- The pictures show Teletext Navigator connected to The Teletext's live services; what you see when you connect will be that day's news.

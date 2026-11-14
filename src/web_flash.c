@@ -25,6 +25,7 @@
 
 #if NAV_FLASH
 
+#include "suite_w31.h"     /* placeholder: palette, bevel, MS Sans Serif 8 */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -199,6 +200,11 @@ static int wf_ends_with_swf(const char *s)
     return n >= 4 && _strnicmp(s + n - 4, ".swf", 4) == 0;
 }
 
+int web_flash_url_is_swf(const char *url)
+{
+    return wf_ends_with_swf(url);
+}
+
 int web_flash_is_flash(const char *src, const char *type, const char *classid)
 {
     if (type && (strstr(type, "shockwave-flash") || strstr(type, "futuresplash")))
@@ -301,6 +307,14 @@ void web_flash_box(const WebFlash *f, int *w, int *h)
             bh = (int)((long long)f->mk_w * f->st_h / f->st_w);
         if (f->mk_h && !f->mk_w && f->st_h > 0)
             bw = (int)((long long)f->mk_h * f->st_w / f->st_h);
+        /* A movie that cannot play still reserves its area for the
+         * placeholder; with no size anywhere, a 4:3 placeholder box. */
+        if (f->state == FL_FAILED) {
+            if (bw <= 0 && bh > 0) bw = bh * 4 / 3;
+            if (bh <= 0 && bw > 0) bh = bw * 3 / 4;
+            if (bw <= 0) bw = WEB_FLASH_PH_W;
+            if (bh <= 0) bh = WEB_FLASH_PH_H;
+        }
     }
     if (w) *w = bw;
     if (h) *h = bh;
@@ -650,6 +664,100 @@ void web_flash_place(WebFlash *f, int x, int y, int w, int h)
             /* Reported by the next tick, which tears it down. */
         }
     }
+}
+
+/* The placeholder (D4): what a 1990s browser with the plug-in installed
+ * showed for a movie it could not run, in the Windows 3.1 grammar of the
+ * rest of Navigator: a face-gray sunken well the size of the movie, a
+ * puzzle-piece plug-in glyph, "Flash movie / cannot be played" and the
+ * reason, in MS Sans Serif 8, clipped to the box. GDI only; nothing here
+ * can fail in a way that matters (a NULL object just draws less). */
+static void wf_draw_piece(HDC hdc, int ox, int oy)
+{
+    /* 32 x 32 cell: a square body with a knob on top and one on the right,
+     * dark cyan (VGA palette) outlined in black. */
+    HRGN body  = CreateRectRgn(ox + 6, oy + 11, ox + 24, oy + 29);
+    HRGN top   = CreateEllipticRgn(ox + 11, oy + 4, ox + 20, oy + 13);
+    HRGN right = CreateEllipticRgn(ox + 22, oy + 15, ox + 31, oy + 24);
+    HBRUSH fill = CreateSolidBrush(RGB(0, 128, 128));
+    HBRUSH line = CreateSolidBrush(W31_FRAME);
+    if (body && top && right) {
+        CombineRgn(body, body, top, RGN_OR);
+        CombineRgn(body, body, right, RGN_OR);
+        if (fill) FillRgn(hdc, body, fill);
+        if (line) FrameRgn(hdc, body, line, 1, 1);
+    }
+    if (body)  DeleteObject(body);
+    if (top)   DeleteObject(top);
+    if (right) DeleteObject(right);
+    if (fill)  DeleteObject(fill);
+    if (line)  DeleteObject(line);
+}
+
+static void wf_draw_placeholder(HDC hdc, const WebFlash *f,
+                                int x, int y, int w, int h)
+{
+    RECT   rc, tr, mr;
+    HBRUSH face;
+    HFONT  old;
+    int    saved, th = 0, mh = 0, icon, total, top;
+    char   why[300];
+
+    if (w < 4 || h < 4) return;
+    rc.left = x; rc.top = y; rc.right = x + w; rc.bottom = y + h;
+    saved = SaveDC(hdc);
+    IntersectClipRect(hdc, rc.left, rc.top, rc.right, rc.bottom);
+    face = CreateSolidBrush(W31_FACE);
+    FillRect(hdc, &rc, face ? face : (HBRUSH)GetStockObject(LTGRAY_BRUSH));
+    if (face) DeleteObject(face);
+    w31_sunken(hdc, &rc);
+
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, W31_TEXT);
+    tr.left = x + 6; tr.right = x + w - 6; tr.top = 0; tr.bottom = 0;
+    mr = tr;
+    old = (HFONT)SelectObject(hdc, g_w31_font_bold ? g_w31_font_bold
+                                   : GetStockObject(DEFAULT_GUI_FONT));
+    DrawTextA(hdc, "Flash movie", -1, &tr,
+              DT_CENTER | DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
+    th = tr.bottom - tr.top;
+    _snprintf(why, sizeof(why), "cannot be played%s%s%s",
+              f && f->why[0] ? " (" : "", f && f->why[0] ? f->why : "",
+              f && f->why[0] ? ")" : "");
+    why[sizeof(why) - 1] = '\0';
+    SelectObject(hdc, g_w31_font ? g_w31_font : GetStockObject(DEFAULT_GUI_FONT));
+    DrawTextA(hdc, why, -1, &mr,
+              DT_CENTER | DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
+    mh = mr.bottom - mr.top;
+
+    /* The glyph only when there is room for it and a line of text. */
+    icon  = (h >= 32 + 6 + th + 8 && w >= 40) ? 32 + 6 : 0;
+    total = icon + th + 2 + mh;
+    top   = y + (h - total) / 2;
+    if (top < y + 4) top = y + 4;
+    if (icon) wf_draw_piece(hdc, x + (w - 32) / 2, top);
+
+    tr.left = x + 6; tr.right = x + w - 6;
+    tr.top = top + icon; tr.bottom = tr.top + th;
+    SelectObject(hdc, g_w31_font_bold ? g_w31_font_bold
+                      : GetStockObject(DEFAULT_GUI_FONT));
+    DrawTextA(hdc, "Flash movie", -1, &tr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+    mr.left = x + 6; mr.right = x + w - 6;
+    mr.top = tr.bottom + 2; mr.bottom = y + h - 2;
+    SelectObject(hdc, g_w31_font ? g_w31_font : GetStockObject(DEFAULT_GUI_FONT));
+    DrawTextA(hdc, why, -1, &mr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+    SelectObject(hdc, old);
+    RestoreDC(hdc, saved);
+}
+
+void web_flash_show(WebFlash *f, HDC hdc, int x, int y, int w, int h)
+{
+    if (!f) return;
+    if (f->state == FL_FAILED) {
+        if (hdc) wf_draw_placeholder(hdc, f, x, y, w, h);
+        return;
+    }
+    web_flash_place(f, x, y, w, h);
 }
 
 void web_flash_paint_end(void)

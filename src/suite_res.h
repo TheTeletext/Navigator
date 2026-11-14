@@ -54,7 +54,7 @@
 #define IDR_GWB_RETRO649           401
 #define IDR_GWB_DIALUP             402
 
-/* Navigator 1.1 Windows 3.1 icon set, 32x32 16-colour BITMAPs from
+/* Navigator 1.5 Windows 3.1 icon set, 32x32 16-colour BITMAPs from
  * tools/make_w31_icons.py (assets/w31icons). */
 #define IDB_W31_HOME               500
 #define IDB_W31_RIPSCRIP           501

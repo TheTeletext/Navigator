@@ -17,12 +17,13 @@
  *
  * Video is decoded at native 160x120 (the wire's DataType 1, "small").
  *
- * 2026-11-10, Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md, 9):
+ * 2026-11-10, Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md, 9):
  * the render window is a little System 7 desktop, drawn by cuseeme_mac.c.
  * The video sits in a Mac window at 4x (640x480) nearest-pixel, or 3x, 2x or
  * 1x when the tab is too small for 4x, always an integer scale. Under it,
- * Cornell's button bar (eye = freeze, speaker = mute, microphone drawn
- * crossed out because this client cannot send, a live level bar,
+ * Cornell's button bar (eye = video off, since 2026-11-13 the test pattern
+ * while the sound plays on; speaker = mute; microphone drawn disabled and
+ * crossed out because this client cannot send; a live level bar,
  * Transmission Statistics, Version and IP) and a status line with the
  * measured fps and Kbps. Beside it the Participant List, built from the
  * OpenContinues the reflector relays, and the Audio window. The strip
@@ -497,7 +498,7 @@ static int session_run(void) {
                         else
                             ns = cusm_idvi_decode(pk.aud_data, pk.aud_len, pcm);
                         if (ns > 0) {
-                            /* Navigator 1.1 listener controls: the speaker
+                            /* Navigator 1.5 listener controls: the speaker
                              * button mutes (the chunk is not played), the
                              * Audio window's slider scales. The level bars
                              * show what reaches the speaker, so they fall
@@ -651,7 +652,7 @@ static void ensure_dib(void) {
     }
 }
 
-/* ---- The System 7 desktop (Navigator 1.1, 2026-11-10) ----
+/* ---- The System 7 desktop (Navigator 1.5, 2026-11-10) ----
  *
  * One paint draws everything from a snapshot of the shared state taken
  * under g_lock, and records where it put each clickable thing in g_lay so
@@ -915,14 +916,15 @@ static void paint_video_window(HDC mem, const cusm_snap_t *s, const cusm_layout_
 
     cmac_window(mem, &L->vwin, title, 1, 0, CMAC_WHITE, NULL, NULL);
 
-    /* The picture. A live frame while receiving, or the held frame while
-     * the eye is shut (the pattern never covers either), at an integer
+    /* The picture. A live frame while receiving, at an integer
      * nearest-pixel scale (COLORONCOLOR replicates pixels, never
-     * interpolates) so its squares stay chunky. Otherwise, idle before any
-     * connect, after Disconnect, while waiting for the first frame and on
-     * TIMED OUT, the full-resolution test pattern filling the same area. */
+     * interpolates) so its squares stay chunky. Otherwise the
+     * full-resolution test pattern filling the same area: idle before any
+     * connect, after Disconnect, while waiting for the first frame, on
+     * TIMED OUT, and (2026-11-13, Navigator 1.6, operator) while the eye is
+     * shut, which used to hold the last frame; the sound plays on. */
     if (s->ui == CUSM_UI_LIVE && s->have && g_dibBits &&
-        (g_frozen || s->state == ST_RECEIVING)) {
+        !g_frozen && s->state == ST_RECEIVING) {
         SetStretchBltMode(mem, COLORONCOLOR);
         StretchDIBits(mem, L->video.left, L->video.top,
                       CUSM_VID_W * L->scale, CUSM_VID_H * L->scale,
@@ -941,8 +943,10 @@ static void paint_video_window(HDC mem, const cusm_snap_t *s, const cusm_layout_
     cmac_glyph(mem, L->b_eye.left + 2, L->b_eye.top + 2, g_frozen ? CUSM_G_EYE_SHUT : CUSM_G_EYE);
     cmac_bevel(mem, &L->b_spk, 1);
     cmac_glyph(mem, L->b_spk.left + 2, L->b_spk.top + 2, g_muted ? CUSM_G_SPEAKER_OFF : CUSM_G_SPEAKER);
-    cmac_bevel(mem, &L->b_mic, 1);
-    cmac_glyph(mem, L->b_mic.left + 2, L->b_mic.top + 2, CUSM_G_MIC_X);   /* cannot transmit */
+    /* the microphone: disabled with a red X, as in every other place it
+     * appears (2026-11-13): Navigator receives only */
+    cmac_bevel(mem, &L->b_mic, 0);
+    cmac_glyph(mem, L->b_mic.left + 2, L->b_mic.top + 2, CUSM_G_MIC_OFF);
     cmac_meter_v(mem, &L->b_meter, g_meter, RGB(255, 0, 0), 1);
     cmac_bevel(mem, &L->b_stats, 1);
     cmac_glyph(mem, L->b_stats.left + 2, L->b_stats.top + 2, CUSM_G_STATS);
@@ -974,15 +978,18 @@ static void paint_video_window(HDC mem, const cusm_snap_t *s, const cusm_layout_
 }
 
 /* One Participant List row (refs 2, 4): eye, speaker and microphone each in
- * a small raised box, a thin level bar, then the name. */
-static void paint_row(HDC mem, int x, int y, int ge, int gs, int gm, int level,
+ * a small raised box, a thin level bar, then the name. The microphone box is
+ * always the disabled one with the red-X glyph (2026-11-13, Navigator 1.6,
+ * operator): Navigator is receive-only, so no microphone in the tab is a
+ * control. */
+static void paint_row(HDC mem, int x, int y, int ge, int gs, int level,
                       const char *name) {
     RECT r, m;
     int i, g[3];
-    g[0] = ge; g[1] = gs; g[2] = gm;
+    g[0] = ge; g[1] = gs; g[2] = CUSM_G_MIC_OFF;
     for (i = 0; i < 3; i++) {
         SetRect(&r, x + i * 19, y, x + i * 19 + 18, y + 18);
-        cmac_bevel(mem, &r, 1);
+        cmac_bevel(mem, &r, i < 2);
         cmac_glyph(mem, r.left + 1, r.top + 1, g[i]);
     }
     SetRect(&m, x + 59, y + 1, x + 64, y + 17);
@@ -992,21 +999,41 @@ static void paint_row(HDC mem, int x, int y, int ge, int gs, int gm, int level,
                  DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
+/* The Participant List is live only inside a session; disconnected it is
+ * drawn disabled and its triangles do nothing (2026-11-13). */
+static int list_live(const cusm_snap_t *s) {
+    return s->connected && s->state != ST_DISCONNECTED;
+}
+static int list_live_now(void) {
+    return g_connected && g_state != ST_DISCONNECTED;
+}
+
+/* Panel titles (2026-11-13, refs 26/27): the four panels' titles are BLACK
+ * while connected (CMAC_WIN_LIT) and gray while disconnected; the video
+ * window keeps its own always-dark title (front window). Same predicate as
+ * the list graying (list_live). docs/2026-11-13_CUSeeMe_Title_State_Colors.md */
 static void paint_participants(HDC mem, const cusm_snap_t *s, cusm_layout_t *L) {
     static const char *names[3] = { "Visible Users", "Hidden Users", "Lurkers" };
     RECT cl, r;
     int cnt[3], sec, i, y, x;
     char buf[48];
 
-    cmac_window(mem, &L->plist, "Participant List", 0, 0, CMAC_LTGRAY, &cl, NULL);
+    /* Disconnected (2026-11-13, Navigator 1.6, operator; ref22): the whole
+     * list is drawn disabled, gray text, gray triangles and rule, and the
+     * triangles are locked (desk_click ignores them, list_live()). */
+    int live = list_live(s);
+    COLORREF ink = live ? CMAC_BLACK : CMAC_GRAY;
+
+    cmac_window(mem, &L->plist, "Participant List", list_live(s) ? CMAC_WIN_LIT : 0, 0, CMAC_LTGRAY, &cl, NULL);
     section_counts(s, cnt);
     y = cl.top + 4;
     for (sec = 0; sec < 3; sec++) {
+        int tri = g_sect_open[sec] ? CUSM_G_TRI_DOWN : CUSM_G_TRI_RIGHT;
         SetRect(&L->sect_hdr[sec], cl.left, y, cl.right, y + CUSM_ROW_H);
-        cmac_glyph(mem, cl.left + 2, y + 1, g_sect_open[sec] ? CUSM_G_TRI_DOWN : CUSM_G_TRI_RIGHT);
+        cmac_glyph(mem, cl.left + 2, y + 1, live ? tri : tri + 1);   /* the _GRAY twin */
         snprintf(buf, sizeof(buf), "%s (%d)", names[sec], cnt[sec]);
         SetRect(&r, cl.left + 20, y, cl.right - 4, y + 18);
-        cmac_text_rc(mem, &r, buf, cmac_font_title(), CMAC_BLACK, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        cmac_text_rc(mem, &r, buf, cmac_font_title(), ink, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         y += CUSM_ROW_H;
         if (!g_sect_open[sec]) continue;
         x = cl.left + 8;
@@ -1024,28 +1051,27 @@ static void paint_participants(HDC mem, const cusm_snap_t *s, cusm_layout_t *L) 
                 paint_row(mem, x, y, g_frozen ? CUSM_G_EYE_SHUT : CUSM_G_EYE,
                           sends_audio ? (g_muted ? CUSM_G_SPEAKER_OFF : CUSM_G_SPEAKER)
                                       : CUSM_G_SPEAKER_GRAY,
-                          sends_audio ? CUSM_G_MIC : CUSM_G_MIC_GRAY,
                           g_meter, p->name[0] ? p->name : "(no name)");
             } else {
                 paint_row(mem, x, y, CUSM_G_EYE_GRAY, CUSM_G_SPEAKER_GRAY,
-                          sends_audio ? CUSM_G_MIC : CUSM_G_MIC_GRAY, 0,
+                          0,
                           p->name[0] ? p->name : "(no name)");
             }
             y += CUSM_ROW_H;
         }
         if (sec == 2 && s->connected) {
             /* Navigator itself: the reflector never echoes our own OC */
-            paint_row(mem, x, y, CUSM_G_EYE_GRAY, CUSM_G_SPEAKER_GRAY, CUSM_G_MIC_GRAY, 0,
+            paint_row(mem, x, y, CUSM_G_EYE_GRAY, CUSM_G_SPEAKER_GRAY, 0,
                       SUITE_APP_NAME);
             y += CUSM_ROW_H;
         }
     }
     /* footer: the participant count, bold, under a rule */
-    fill_rc(mem, cl.left, cl.bottom - CUSM_PLIST_FOOT, cl.right, cl.bottom - CUSM_PLIST_FOOT + 1, CMAC_BLACK);
+    fill_rc(mem, cl.left, cl.bottom - CUSM_PLIST_FOOT, cl.right, cl.bottom - CUSM_PLIST_FOOT + 1, live ? CMAC_BLACK : CMAC_GRAY);
     snprintf(buf, sizeof(buf), "%d participant%s", cnt[0] + cnt[1] + cnt[2],
              (cnt[0] + cnt[1] + cnt[2]) == 1 ? "" : "s");
     SetRect(&r, cl.left + 6, cl.bottom - CUSM_PLIST_FOOT + 1, cl.right - 4, cl.bottom);
-    cmac_text_rc(mem, &r, buf, cmac_font_title(), CMAC_BLACK, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    cmac_text_rc(mem, &r, buf, cmac_font_title(), ink, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 }
 
 /* The Audio window (refs 1, 2): big bevelled speaker and microphone
@@ -1055,7 +1081,7 @@ static void paint_participants(HDC mem, const cusm_snap_t *s, cusm_layout_t *L) 
 static void paint_audio(HDC mem, cusm_layout_t *L) {
     RECT cl, r, mic_m, mic_s;
     int ty, mt, mh = L->meter_h;
-    cmac_window(mem, &L->audio, "Audio", 0, 0, CMAC_LTGRAY, &cl, NULL);
+    cmac_window(mem, &L->audio, "Audio", list_live_now() ? CMAC_WIN_LIT : 0, 0, CMAC_LTGRAY, &cl, NULL);
     ty = cl.top + 6;
     mt = ty + 44;
     /* speaker column: live */
@@ -1067,10 +1093,11 @@ static void paint_audio(HDC mem, cusm_layout_t *L) {
     cmac_db_scale(mem, L->a_meter.left, &L->a_meter, 1);
     cmac_meter_v(mem, &L->a_meter, g_meter, RGB(0, 192, 0), 1);
     cmac_slider_v(mem, &L->a_slider, (int)g_volume, 1);
-    /* microphone column: a receive-only client has nothing to send */
+    /* microphone column: a receive-only client has nothing to send; the
+     * disabled mic with the red X (2026-11-13) */
     SetRect(&r, cl.left + 86, ty, cl.left + 122, ty + 36);
     cmac_bevel(mem, &r, 0);
-    cmac_glyph2(mem, r.left + 2, r.top + 2, CUSM_G_MIC_GRAY);
+    cmac_glyph2(mem, r.left + 2, r.top + 2, CUSM_G_MIC_OFF);
     SetRect(&mic_m, cl.left + 104, mt, cl.left + 112, mt + mh);
     SetRect(&mic_s, cl.left + 116, mt, cl.left + 130, mt + mh);
     cmac_db_scale(mem, mic_m.left, &mic_m, 0);
@@ -1101,7 +1128,7 @@ static void paint_stats(HDC mem, const cusm_snap_t *s, cusm_layout_t *L) {
     unsigned el = (s->t0 && s->connected) ? (GetTickCount() - s->t0) / 1000 : 0;
     /* the full title needs the full column; a squeezed one (800x600) says less */
     cmac_window(mem, &L->stats, (L->stats.right - L->stats.left >= CUSM_INFO_W)
-                ? "Transmission Statistics" : "Statistics", 0, 0, CMAC_WHITE,
+                ? "Transmission Statistics" : "Statistics", list_live(s) ? CMAC_WIN_LIT : 0, 0, CMAC_WHITE,
                 &cl, &L->stats_close);
     snprintf(b, sizeof(b), "%02u:%02u:%02u", el / 3600, (el / 60) % 60, el % 60);
     paint_kv(mem, &cl, 0, "Connected for", b);
@@ -1121,7 +1148,7 @@ static void paint_info(HDC mem, const cusm_snap_t *s, cusm_layout_t *L) {
     RECT cl;
     char b[300], ip[24];
     const cusm_peer_t *snd = watched_sender(s);
-    cmac_window(mem, &L->info, "Version and IP", 0, 0, CMAC_WHITE, &cl, &L->info_close);
+    cmac_window(mem, &L->info, "Version and IP", list_live(s) ? CMAC_WIN_LIT : 0, 0, CMAC_WHITE, &cl, &L->info_close);
     paint_kv(mem, &cl, 0, SUITE_APP_NAME, SUITE_VERSION_STR);
     snprintf(b, sizeof(b), "%s:%d", g_reflector, g_port);
     paint_kv(mem, &cl, 1, "Reflector", b);
@@ -1201,7 +1228,10 @@ static int desk_click(int x, int y) {
     if (PtInRect(&g_lay.b_stats, pt)) { g_show_stats = !g_show_stats; return 1; }
     if (PtInRect(&g_lay.b_info, pt))  { g_show_info = !g_show_info;   return 1; }
     for (sec = 0; sec < 3; sec++)
-        if (PtInRect(&g_lay.sect_hdr[sec], pt)) { g_sect_open[sec] = !g_sect_open[sec]; return 1; }
+        if (PtInRect(&g_lay.sect_hdr[sec], pt)) {
+            if (list_live_now()) g_sect_open[sec] = !g_sect_open[sec];   /* locked when disconnected */
+            return 1;
+        }
     /* The microphone, Push to Talk and the footer have no handlers: a
      * receive-only client cannot transmit. */
     return 0;
@@ -1211,8 +1241,10 @@ static const char *state_text(int st, int retry) {
     static char buf[160];
     switch (st) {
         case ST_CONNECTING:
+            /* 1.6: the reflector Connect committed, not the built-in
+             * default (WinHelp phase 2b report, s3.4) */
             snprintf(buf, sizeof(buf), "Connecting to %s:%d...",
-                     CUSEEME_HOST, CUSEEME_PORT);
+                     g_reflector, g_port);
             return buf;
         case ST_HANDSHAKING:
             return "Handshaking...";

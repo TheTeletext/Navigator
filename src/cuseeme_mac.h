@@ -40,11 +40,18 @@ void  cmac_desktop(HDC dc, const RECT *rc);
 /* A System 7 document window: 1px black frame, 1px drop shadow right and
  * bottom (drawn OUTSIDE rc), title centred. ACTIVE (one window, the
  * front one, as on a Mac; refs 4 and 5): striped title bar, black title,
- * close box left (if has_close), zoom and collapse boxes right. INACTIVE
+ * close box left (if has_close); no zoom or collapse box (removed
+ * 2026-11-13, they did nothing), the stripes run to the right end. INACTIVE
  * (refs 1, 2, 4): plain light-gray bar, gray title, no boxes. The
  * interior below the title bar is filled with interior_bg. *client
  * receives the interior. *closebox (may be NULL) receives the close box
- * rect, empty when none is drawn. */
+ * rect, empty when none is drawn.
+ * active is a flag set: CMAC_WIN_ACTIVE (1) = the front window as above;
+ * CMAC_WIN_LIT (2) = an inactive window (plain bar, no boxes) whose title
+ * is BLACK, used by the four panels while connected (2026-11-13, refs 26
+ * and 27, docs/2026-11-13_CUSeeMe_Title_State_Colors.md). */
+#define CMAC_WIN_ACTIVE 1
+#define CMAC_WIN_LIT    2
 void  cmac_window(HDC dc, const RECT *rc, const char *title, int active,
                   int has_close, COLORREF interior_bg,
                   RECT *client, RECT *closebox);

@@ -13,7 +13,7 @@
  * visible region (0-indexed). Decoupled from any specific transport
  * (Telnet, SSH, serial) so the same core can back any of them.
  *
- * Subset implemented (matches what telnet.greektimes.ca sends):
+ * Subset implemented (matches what telnet.teletext.ca sends):
  *   ESC [ 2 J         clear entire screen
  *   ESC [ H / [ ; H   cursor home (1;1)
  *   ESC [ r ; c H     cursor to (row, col) (1-indexed VT)

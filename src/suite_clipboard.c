@@ -13,6 +13,7 @@
  */
 
 #include "suite_clipboard.h"
+#include "suite_w31.h"   /* w31_track_popup: the Windows 3.1 popup */
 
 #include <stdlib.h>
 #include <string.h>
@@ -115,4 +116,24 @@ int suite_clipboard_put_wtext(HWND owner, const wchar_t *text)
     }
     CloseClipboard();
     return 1;
+}
+
+/* The Copy / Select All context menu; see the header. This is the Web
+ * tab's menu as it was (web_module.c, WM_RBUTTONUP), moved here when the
+ * Newsgroups article pane became its second user (2026-11-13). */
+int suite_clipboard_context_menu(HWND owner, int x, int y,
+                                 int can_copy, int can_select_all)
+{
+    HMENU menu = CreatePopupMenu();
+    UINT  cmd;
+    if (!menu) return 0;
+    AppendMenuA(menu, MF_STRING | (can_copy ? 0u : (UINT)MF_GRAYED),
+                SUITE_CTX_COPY, "Copy\tCtrl+C");
+    AppendMenuA(menu, MF_STRING | (can_select_all ? 0u : (UINT)MF_GRAYED),
+                SUITE_CTX_SELECT_ALL, "Select All\tCtrl+A");
+    /* the Windows 3.1 popup since 2026-11-13 (w31_track_popup, suite_w31.c) */
+    cmd = (UINT)w31_track_popup(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
+                                x, y, owner);
+    DestroyMenu(menu);
+    return (int)cmd;
 }

@@ -1,0 +1,214 @@
+%map term_overview 1400
+%map term_connect 1401
+%map term_settings 1402
+%map term_usage 1403
+%map term_trouble 1404
+%map term_commands 1405
+%map gwb_overview 1500
+%map gwb_connect 1501
+%map gwb_settings 1502
+%map gwb_usage 1503
+%map gwb_trouble 1504
+
+@topic term_overview | Terminal | Terminal;Telnet;Finger;QOTD;command prompt;overview | term
+= About Telnet, Finger and QOTD
+{{gl_telnet|Telnet}} is one of the original Internet protocols for using a remote, text-based service from a terminal. The Teletext runs a Telnet news service for quick, menu-driven reading: daily news, weather, traffic, markets and numbers, public alerts and service information. Public information services reached by Telnet appear to be extremely rare today, likely numbering only in the dozens in the world.
+
+{{gl_finger|Finger}} is one of the earliest Internet services, from the late 1970s. It returns plain text, and early Internet users turned it into a bulletin: headlines, weather, storm updates, science and launch news. It declined because it could expose personal information; The Teletext's Finger service gives only public news, like a wire-service stub, with no personal lookup.
+
+{{gl_qotd|QOTD}}, the Quote of the Day (RFC 865, 1983), is the smallest service of all: opening a connection to port 17 is the request, and the reply is the whole message. The Teletext's sends a rotating "News of the Day": one headline summary and a Montreal weather line, with public alerts added when they are in force.
+
+= The Terminal in Navigator
+The Terminal is a text terminal with a small command prompt of its own. From it you can open a Telnet session, ask a Finger server for a bulletin, or read a QOTD message. Five buttons above it type the commands for The Teletext's services: **Telnet**, **Finger News**, **Finger Weather**, **QOTD** and **Archie** (the Archie server's own console). The terminal shows amber text on a black screen, and understands the {{gl_vt220|VT220}} control sequences.
+
+- [[term_connect|Connecting from the Terminal]]
+- [[term_commands|Terminal Commands]]
+- [[term_settings|Terminal Settings]]
+- [[term_usage|Using the Terminal]]
+- [[term_trouble|Terminal Troubleshooting]]
+
+@topic term_connect | Connecting from the Terminal | Terminal;Telnet;connecting;shortcut buttons;Finger;QOTD;Archie console;ending a session | term
+= With a shortcut button
+Click a button at the top of the Terminal. Navigator types its command at the $ prompt and, one second later, presses ENTER for you:
+
+- **Telnet**: telnet telnet.teletext.ca, The Teletext's menu-driven news service.
+- **Finger News**: finger news@finger.teletext.ca, the headlines.
+- **Finger Weather**: finger weather@finger.teletext.ca, the Montreal weather briefing.
+- **QOTD**: nc qotd.teletext.ca 17, the news of the day.
+- **Archie**: telnet archie.teletext.ca:2323, the Archie server's own console.
+
+If you press a key during that second, the automatic ENTER is cancelled, so you can change the command first.
+
+= By typing a command
+At the $ prompt, type a command and press ENTER. See [[term_commands|Terminal Commands]].
+
+= What you see
+For Telnet, the Terminal prints "Connecting to" and the host and port; then the remote computer's screen appears. Finger and QOTD print their answer, and the server closes the connection.
+
+When a session ends, the Terminal prints "Connection closed." and a new $ prompt, and the buttons can be used again. While a session is open the buttons are dimmed.
+
+= Ending a Telnet session
+The Terminal has no Disconnect button. End the session the way the remote service asks: choose its logout or quit command, or type quit at the Archie console. Everything you type during a session goes to the remote computer.
+
+The session stays open if you choose another service.
+
+@topic term_commands | Terminal Commands | Terminal;commands;telnet command;finger command;nc command;help;clear;exit | term
+Type these at the $ prompt:
+
+> telnet host
+> telnet host:port
+
+Opens a Telnet session. The port is 23 unless you give another.
+
+> finger name@host
+
+Asks the Finger server on the host (port 79) about the name, and prints its answer.
+
+> nc host port
+
+Opens a connection to the port and prints whatever the service sends, until it closes. Use it for QOTD (port 17).
+
+> clear
+
+Clears the screen.
+
+> help
+
+Lists the commands.
+
+> exit
+> quit
+
+Closes the active connection.
+
+= The Archie console
+After telnet archie.teletext.ca:2323, the Archie server shows its own archie> prompt. Its commands include find (a substring search), exact (an exact file name), prog, help and quit. For a graphical search use the [[archie_overview|Archie]] service.
+
+@topic term_settings | Terminal Settings | Terminal;settings;font;colours;screen size | term
+The Terminal has no settings, and remembers nothing after Navigator closes.
+
+The screen is at least 80 columns by 24 rows and grows with the window. The text is drawn in Cascadia Mono, or Consolas if Cascadia Mono is not installed, at the largest size that fits. To the remote computer, the Terminal always reports a VT220 of 80 columns by 24 rows.
+
+@topic term_usage | Using the Terminal | Terminal;keyboard;scrolling;copying text;pasting;mouse wheel | term
+= At the $ prompt
+- ENTER runs the command. BACKSPACE deletes the character before the cursor.
+- LEFT ARROW and RIGHT ARROW move in the line; HOME and END go to its ends.
+- PAGE UP and PAGE DOWN scroll back through earlier lines.
+- CTRL+L clears the screen and keeps the line you are typing.
+- CTRL+C (with no text selected) abandons the line.
+
+The prompt keeps no history of commands.
+
+= In a Telnet session
+- What you type is sent to the remote computer. ENTER sends a carriage return and line feed; BACKSPACE sends DEL.
+- The arrow keys, HOME, END, PAGE UP and PAGE DOWN send the VT220 keys, for the remote program to use.
+- CTRL+C (with no text selected) sends CTRL+C.
+- The mouse wheel sends UP ARROW or DOWN ARROW three times a notch, which moves through most menus.
+- Characters outside plain ASCII are not sent.
+
+= Scrolling back
+The Terminal keeps the last 1000 lines. When you are not in a Telnet session, PAGE UP, PAGE DOWN and the mouse wheel scroll back through them. New text returns you to the bottom.
+
+= Copying and pasting
+- Drag across text to select it. CTRL+A selects everything.
+- CTRL+C copies the selection.
+- CTRL+V pastes text at the prompt or into a Telnet session; each line break is sent as ENTER.
+- Or click with the right mouse button and choose Copy, Paste or Select All.
+
+= What the screen shows
+The Terminal understands the VT220 sequences that clear the screen, move the cursor and erase lines. Colours and bold text are shown in plain amber, and the bell is silent. Characters outside plain ASCII appear as spaces.
+
+@topic term_trouble | Terminal Troubleshooting | Terminal;troubleshooting;errors;command not found;Connection closed | term
+= "command not found"
+The prompt knows only the commands in [[term_commands|Terminal Commands]]. Type help to list them.
+
+= "usage:" followed by a command
+The command needs more: for example telnet needs a host, finger needs name@host, and nc needs a host and a port.
+
+= "nc: invalid port"
+Ports run from 1 to 65535.
+
+= "Error: Host not found"
+The host name could not be found. Check its spelling.
+
+= "Error: Connection refused" or "Error: Connection timed out"
+The service did not accept a connection on that port within 20 seconds.
+
+= "No active connection."
+exit and quit close a connection; there is none open.
+
+= The shortcut buttons stay dimmed
+They are dimmed during a session. If you pressed a key during the second after clicking a button, the command was not run: press ENTER to run it, or BACKSPACE it away and run another command; the buttons return when that session ends.
+
+= I cannot leave a Telnet session
+Use the remote service's own logout or quit command. The Terminal has no Disconnect button.
+
+@topic gwb_overview | GW-BASIC | GW-BASIC;BASIC;Microsoft BASIC;programming;overview | gwb
+= About GW-BASIC
+GW-BASIC is the BASIC that Microsoft supplied with the IBM PC compatibles of the 1980s, from 1983. For a generation of home and office computer users it was the first programming language, and magazines printed program listings in it for readers to type in. Microsoft published its source code in 2020, under the MIT licence.
+
+= GW-BASIC in Navigator
+The GW-BASIC service runs Microsoft GW-BASIC on a PC built into Navigator: an 8088 processor at 4.77 MHz with a {{gl_cga|CGA}} display and a PC speaker. Write and run programs as on a real PC. Programs are saved in a folder of your Documents, where two programs are waiting to start with: RETRO649.BAS and DIALUP.BAS.
+
+- [[gwb_connect|Starting GW-BASIC]]
+- [[gwb_settings|GW-BASIC Files and Settings]]
+- [[gwb_usage|Using GW-BASIC]]
+- [[gwb_trouble|GW-BASIC Troubleshooting]]
+
+@topic gwb_connect | Starting GW-BASIC | GW-BASIC;starting;Restart;SYSTEM | gwb
+GW-BASIC has nothing to connect to. It starts when you choose its button, and shows its Ok prompt.
+
+- **Restart** starts GW-BASIC again. The program in memory is lost; saved files are not touched.
+- The SYSTEM command ends GW-BASIC. Press any key in the screen to start it again.
+
+When you choose another service, GW-BASIC is paused, with its sound; when you return it carries on, with your program still in memory.
+
+GW-BASIC does not warn you about a program you have not saved. SAVE it before you close Navigator.
+
+@topic gwb_settings | GW-BASIC Files and Settings | GW-BASIC;files;SAVE;LOAD;Teletext BASIC folder;Open BASIC folder | gwb
+GW-BASIC has no settings.
+
+= Where files are kept
+To GW-BASIC, drive C: is the folder **Teletext BASIC** in your Documents. The line under the buttons shows where it is. LOAD, SAVE, FILES, KILL, NAME, OPEN, MKDIR, CHDIR and RMDIR work in that folder, and nothing outside it can be reached; drive letters are ignored.
+
+Names follow the DOS rules: up to eight characters, a period and three more. They are stored in capitals, and longer names are cut. Files with long Windows names are not seen.
+
+Choose **Open BASIC folder** to see the folder in Windows.
+
+@topic gwb_usage | Using GW-BASIC | GW-BASIC;keyboard;function keys;pasting a program;sound;screen modes | gwb
+= Keyboard
+Click the screen to give it the keyboard. Keys are typed as on a US keyboard, whatever layout Windows uses.
+
+- F1 to F10 are GW-BASIC's function keys, with SHIFT, CTRL and ALT. (In GW-BASIC, F1 is LIST.)
+- ALT with a letter types a BASIC keyword.
+- The arrow keys, HOME, END, PAGE UP, PAGE DOWN, INS and DEL edit as on the PC.
+- CTRL+BREAK stops a running program. CTRL+SCROLL LOCK and CTRL+PAUSE do the same.
+
+ALT+F4 still closes Navigator.
+
+= Pasting a program
+Copy a listing from another program, then choose **Paste** or press CTRL+V or SHIFT+INS. Navigator types it into GW-BASIC, line by line. Curly quotation marks and dashes become their plain ASCII forms; other characters outside ASCII are left out.
+
+= Screen and sound
+GW-BASIC's text screens and its CGA graphics screens are shown at 4:3. BEEP, SOUND and PLAY play as on a PC speaker.
+
+Clicking the screen only gives it the keyboard; programs cannot read the mouse. Text cannot be copied out of the screen.
+
+@topic gwb_trouble | GW-BASIC Troubleshooting | GW-BASIC;troubleshooting;errors;SHELL;printer | gwb
+= "GW-BASIC could not start"
+The reason follows. "the BASIC folder does not exist" or "could not create Documents\Teletext BASIC" means Navigator could not make the folder in your Documents; check that Documents can be written to.
+
+= A file is not found
+Only the Teletext BASIC folder can be reached, and names must follow the DOS 8.3 rules.
+
+= GW-BASIC's own error messages
+Messages such as Syntax error are GW-BASIC's. See a GW-BASIC manual.
+
+= SHELL, the printer and the serial ports
+This PC cannot run other programs with SHELL, and it has no printer and no serial ports. Programs that need them will not work as written.
+
+= The screen shows only text when a program draws
+Only the CGA screen modes are shown. Programs written for EGA or VGA screens fall back to text.
+
+= F1 does not open Help
+In GW-BASIC, F1 belongs to the BASIC screen. Choose Contents from the Help menu instead.

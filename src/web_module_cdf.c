@@ -668,7 +668,7 @@ static LRESULT CALLBACK CdfDlgProc(HWND hwnd, UINT msg,
         HWND h;
         int  i;
 
-        /* Navigator 1.1: MS Sans Serif 8, the Windows 3.1 dialog face,
+        /* Navigator 1.5: MS Sans Serif 8, the Windows 3.1 dialog face,
          * rather than the system message font. g_w31_font is shared and
          * owned by suite_w31.c, so it is borrowed, never deleted here. */
         if (!g_cdf_font) g_cdf_font = g_w31_font;

@@ -150,10 +150,14 @@ static void title_box(HDC dc, const RECT *tb, int left, RECT *out)
 void cmac_window(HDC dc, const RECT *rc, const char *title, int active,
                  int has_close, COLORREF interior_bg, RECT *client, RECT *closebox)
 {
-    RECT tb, cb, zb, sb, tr;
+    RECT tb, cb, tr;
     int y, tw, tx0, tx1;
     SIZE sz;
     HFONT of;
+    /* The title is black for the front window and for a LIT one; only the
+     * front window gets stripes and boxes. */
+    int dark_title = (active & (CMAC_WIN_ACTIVE | CMAC_WIN_LIT)) != 0;
+    active &= CMAC_WIN_ACTIVE;
 
     /* drop shadow, then the frame */
     fill(dc, rc->left + 1, rc->bottom, rc->right + 1, rc->bottom + 1, CMAC_BLACK);
@@ -175,22 +179,10 @@ void cmac_window(HDC dc, const RECT *rc, const char *title, int active,
          rc->top + CMAC_TITLE_H, CMAC_BLACK);
 
     memset(&cb, 0, sizeof(cb));
-    if (active) {
-        if (has_close) title_box(dc, &tb, tb.left + 7, &cb);
-        /* collapse box (two bars) at the right edge and the zoom box (a
-         * small square in the corner of a larger one) beside it, as on
-         * ref5; decorative */
-        title_box(dc, &tb, tb.right - 7 - 11, &sb);
-        fill(dc, sb.left + 3, sb.top + 4, sb.right - 3, sb.top + 5, CMAC_BLACK);
-        fill(dc, sb.left + 3, sb.top + 6, sb.right - 3, sb.top + 7, CMAC_BLACK);
-        title_box(dc, &tb, tb.right - 7 - 11 - 4 - 11, &zb);
-        {
-            RECT in;
-            in.left = zb.left; in.top = zb.top;
-            in.right = zb.left + 6; in.bottom = zb.top + 6;
-            frame(dc, &in, CMAC_BLACK);
-        }
-    }
+    /* No zoom or collapse box (2026-11-13, Navigator 1.6, operator): they
+     * did nothing, so the front window's stripes run the full width, a
+     * plain System 7 title bar. Only a close box, where asked for. */
+    if (active && has_close) title_box(dc, &tb, tb.left + 7, &cb);
     if (closebox) *closebox = cb;
 
     /* title, centred, stripes cleared 6px either side */
@@ -200,14 +192,14 @@ void cmac_window(HDC dc, const RECT *rc, const char *title, int active,
         SelectObject(dc, of);
         tw = sz.cx;
         /* leave room for the boxes only where they are drawn */
-        if (tw > (tb.right - tb.left) - (active ? 76 : 20))
-            tw = (tb.right - tb.left) - (active ? 76 : 20);
+        if (tw > (tb.right - tb.left) - ((active && has_close) ? 48 : 20))
+            tw = (tb.right - tb.left) - ((active && has_close) ? 48 : 20);
         tx0 = (tb.left + tb.right - tw) / 2 - 6;
         tx1 = tx0 + tw + 12;
         fill(dc, tx0, tb.top + 1, tx1, tb.bottom - 1, CMAC_LTGRAY);
         tr.left = tx0 + 6; tr.right = tx1 - 6;
         tr.top = tb.top; tr.bottom = tb.bottom;
-        cmac_text_rc(dc, &tr, title, cmac_font_title(), active ? CMAC_BLACK : CMAC_GRAY,
+        cmac_text_rc(dc, &tr, title, cmac_font_title(), dark_title ? CMAC_BLACK : CMAC_GRAY,
                      DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     }
 

@@ -287,6 +287,9 @@ typedef struct WebDoc {
     int              flash_object_depth;  /* OBJECT nesting inside it */
     int              in_noembed;
     struct WebFlash *flash_fallback_cur;  /* tag for blocks made now */
+    /* 1: the document is one movie opened by its own .swf address,
+     * laid over the whole render view (blocks[0] is its box). */
+    int              flash_full;
 #endif
 } WebDoc;
 

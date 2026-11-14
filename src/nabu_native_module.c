@@ -1157,7 +1157,7 @@ static void nn_screen_paint(HWND hwnd, HDC hdc)
      * rectangle around the picture. The border colour is still tracked in
      * g_border, it is simply no longer painted here.
      *
-     * Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the surround
+     * Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the surround
      * is now the gray Windows 3.1 face and this window sits in a sunken
      * frame, so the bars are no longer the surround. They stay black:
      * the framed screen reads as one dark canvas (a television) inside

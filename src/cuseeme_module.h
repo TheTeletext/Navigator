@@ -1,9 +1,10 @@
 /* cuseeme_module.h - F7 "CU-SeeMe Live TV" Retro-mode tab.
  *
- * Receive-only CU-SeeMe client: connects to the live reflector on tab
- * activation, renders native 160x120 16-gray video centered in the tab,
- * plays DELTAMOD (format 26) audio via waveOut, and tears the UDP socket
- * down on deactivation. Mirrors the other module entry points in
+ * Receive-only CU-SeeMe client: connects to the reflector when Connect is
+ * pressed (not on activation), shows the 160x120 16-gray video in a System 7
+ * style desktop, plays the audio with the codec chosen in the Audio Codec
+ * list (Intel DVI by default, Delta-Mod) via waveOut, and disconnects when
+ * the tab is left. Mirrors the other module entry points in
  * suite_shell.h (telnet/gopher/wais).
  *
  * Part of Teletext Navigator.

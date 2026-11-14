@@ -1,0 +1,185 @@
+%map nabu_overview 300
+%map nabu_connect 301
+%map nabu_settings 302
+%map nabu_usage 303
+%map nabu_trouble 304
+%map vtx_overview 400
+%map vtx_connect 401
+%map vtx_settings 402
+%map vtx_usage 403
+%map vtx_trouble 404
+
+@topic nabu_overview | NABU | NABU;NABU Network;emulator;overview | nabu
+= About the NABU Network
+The NABU Network (Natural Access to Bi-directional Utilities) was a Canadian home computer and information service delivered by cable television. Developed in the Ottawa region and launched in 1983, it brought software, news, weather, sports, stock quotations and classified advertising to a computer connected to the household's cable. It has often been called "the Internet before the Internet".
+
+NABU reached about 1,500 subscribers in Ottawa and 700 in Alexandria, Virginia, before the network closed in 1986. A revival began after thousands of unused NABU computers came back on the market in 2022. Only a small number of public NABU services are documented today; The Teletext's NABU edition returns this Canadian invention to active service.
+
+A NABU program was not a page to display: it was sent to the NABU Personal Computer, a Z80 machine, and run there. The honest way to show one is to run one.
+
+= NABU in Navigator
+So the NABU service runs a NABU computer: an emulated Z80 machine with its video and sound chips, which starts from its own firmware, MGT IPL, and loads its program from a NABU channel over the network. If you own a real NABU Personal Computer, the service can relay the channel to it through a serial port instead.
+
+The Teletext's NABU channel is channel 1 at nabu.teletext.ca: current news and information as 40-column text and colour graphics.
+
+- [[nabu_connect|Starting the NABU]]
+- [[nabu_settings|NABU Settings]]
+- [[nabu_usage|Using the NABU]]
+- [[nabu_trouble|NABU Troubleshooting]]
+
+@topic nabu_connect | Starting the NABU | NABU;connecting;Connect button;channel;starting the NABU | nabu
+= In the emulator
+1. In the **Mode** list, choose **Emulator** (the usual choice).
+2. Check **Host** (nabu.teletext.ca), **Port** (5816) and **Channel** (1).
+3. Choose **Connect**.
+
+The screen shows "Connecting to the Teletext channel", then the NABU starts and loads the channel's program. The status bar shows the host, the channel and the state: Connecting, Booting, then Ready when the program is running.
+
+= On a real NABU Personal Computer
+1. Cable the NABU to a serial port of your computer.
+2. In the **Mode** list, choose **Real NABU PC (serial)**.
+3. Choose the port in the **Serial port** list.
+4. Check Host, Port and Channel, and choose **Connect**.
+5. Turn on the NABU if it is not already running.
+
+Navigator relays the channel between the network and the NABU at the NABU's speed of 111,860 bits per second. The screen shows a log of the connection under a coloured banner: BRIDGING in green while the relay runs, CONNECTING or RECONNECTING in amber, DISCONNECTED in red. If the network or the serial port drops, Navigator reconnects by itself.
+
+= Stopping
+Choose **Disconnect**, or choose another service: leaving the NABU service stops the machine or the relay.
+
+@topic nabu_settings | NABU Settings | NABU;settings;Mode;serial port;channel | nabu
+- **Mode**: Emulator, or Real NABU PC (serial).
+- **Host**, **Port** and **Channel**: where the NABU channel is. The Teletext's is nabu.teletext.ca, port 5816, channel 1. Channels are numbered from 1 to 256.
+- **Serial port**: the port the real NABU is cabled to. It can be chosen only in serial mode.
+
+These settings are locked while the NABU is running. Disconnect puts Host, Port and Channel back to The Teletext's channel.
+
+Navigator remembers only the serial port you chose. Mode, host, port and channel start at The Teletext's channel each time.
+
+@topic nabu_usage | Using the NABU | NABU;keyboard;sound;NABU keys | nabu
+Click the NABU's screen to give it the keyboard. Keys reach the machine only while it is running.
+
+Letters, digits and punctuation are typed as on a US keyboard, whatever keyboard layout Windows uses. SHIFT, CAPS LOCK and CTRL work as on the NABU. The NABU's special keys are on these keys:
+
+- The arrow keys: the NABU's arrow keys.
+- PAGE DOWN and PAGE UP: the NABU's right and left keys (the two double-arrow keys).
+- DEL: NO. INS: YES.
+- ALT: SYM. PAUSE: the NABU's PAUSE key.
+- BACKSPACE: the rubout key.
+
+The NABU's TV/NABU key has no key on the PC.
+
+The NABU's sound plays through your computer's speakers. The picture is shown at 4:3, as large as the window allows. The machine always runs at the speed of a real NABU.
+
+@topic nabu_trouble | NABU Troubleshooting | NABU;troubleshooting;errors;No channel connection;firmware;serial port | nabu
+= "No host given.", "Port must be between 1 and 65535." or "Channel must be between 1 and 256."
+Correct the box named, then choose Connect.
+
+= "Could not connect" or "No channel connection"
+The NABU could not reach the channel server, or lost it. Check Host and Port, and your network connection.
+
+= "No NABU firmware found."
+The NABU's start-up firmware is missing from Navigator's folder. Install Navigator again.
+
+= "No serial port chosen."
+In serial mode, choose a port in the Serial port list first.
+
+= The real NABU does not start the program
+Check the cable and the port, and that the banner reads BRIDGING. Some serial adapters cannot run at the NABU's speed of 111,860 bits per second; the log says so if the driver refuses it.
+
+= Keys do nothing
+Click the NABU's screen first. The machine must be running.
+
+@topic vtx_overview | Videotex | Videotex;Minitel;NAPLPS;Telidon;overview | vtx
+= About videotex
+Videotex was one of the first attempts to make the telephone line and a television-style screen into an electronic publishing medium. Long before the World Wide Web, a reader could call a service, choose numbered pages from a menu, and read news, weather, sports results, financial information, directories and public information from a central computer. News no longer had to wait for the next printed edition.
+
+In France, newspapers had an early role in the {{gl_minitel|Minitel}} services; Libération used the Minitel to give results of the 1984 Los Angeles Olympic Games through the French night.
+
+Videotex also has a strong Canadian and Montreal history. Canada's Telidon research produced the graphics technology that became {{gl_naplps|NAPLPS}}, which sends text, shapes, colours and fills as compact drawing instructions that the terminal draws itself. It reached the public through Bell Canada's ALEX service, whose commercial trial began in the Montreal area on December 5, 1988. Its Alextel terminal, designed for Bell by Norpak and made by Northern Telecom, reached its services over Bell's DATAPAC network. A Minitel service had entered the Quebec market in the spring of 1988, so the two systems competed in the same city.
+
+= Videotex in Navigator
+The Videotex service is a terminal for both kinds of service: the Minitel (40 columns by 25 rows, with its own function keys), which it starts with, and NAPLPS.
+
+The Teletext publishes both editions at videotex.teletext.ca: daily news, markets and numbers, traffic, weather, maps and public alerts. Pages are sent at about 1200 bits per second, some 120 characters a second, so screens build as they did on a period terminal.
+
+- [[vtx_connect|Connecting to a Videotex Service]]
+- [[vtx_settings|Videotex Settings]]
+- [[vtx_usage|Using Minitel and NAPLPS]]
+- [[vtx_trouble|Videotex Troubleshooting]]
+
+@topic vtx_connect | Connecting to a Videotex Service | Videotex;Minitel;NAPLPS;connecting;CONNEXION/FIN;Connect button | vtx
+= Minitel
+1. In the **Format** list, choose **Minitel**. The Port box changes to 516.
+2. Check the **Host** box (videotex.teletext.ca).
+3. Press **CONNEXION/FIN** on the screen keyboard, or F9.
+
+The status line under the screen shows "Connected to" and the host, and a C appears in the top right corner of the Minitel screen (F when it is not connected). To disconnect, press CONNEXION/FIN twice: the first press is sent to the service, the second hangs up.
+
+= NAPLPS
+1. In the **Format** list, choose **NAPLPS**. The Port box changes to 1983.
+2. Check the **Host** box (videotex.teletext.ca).
+3. Choose **Connect**.
+
+To disconnect, choose **Disconnect** or press F10.
+
+= After disconnecting
+The screen shows "Disconnected from" and the host, then, five seconds later, the format's opening screen. The format can be changed only while you are disconnected. The session and the screen are kept if you choose another service.
+
+@topic vtx_settings | Videotex Settings | Videotex;settings;Monochrome;Scanlines;CAPITALS only;capital letters | vtx
+- **Format**: Minitel or NAPLPS. Changing it sets the usual port: 516 for Minitel, 1983 for NAPLPS.
+- **Host** and **Port**: where the service is. They are locked while connected.
+- **Monochrome**: shows the screen in grey levels, as on a monochrome terminal (for Minitel, the grey levels of the Minitel 1B tube). Clear it for colour.
+- **Scanlines** (Minitel only): draws the dark lines between the rows of a television tube.
+- **CAPITALS only (Ctrl+C, M)** (Minitel only): see below.
+
+= Capital letters on the Minitel
+Usually a letter is sent as you type it: SHIFT or CAPS LOCK gives a capital, as on a PC. Some Minitel services expect capitals, as the Minitel keyboard did. In **CAPITALS only** mode every letter is sent as a capital, and SHIFT gives a lower-case letter, as on the Minitel; CAPS LOCK then does nothing. To switch, check the box, or press CTRL+C and then M, the Minitel's own Fnct C, M command.
+
+None of these settings is remembered after Navigator closes.
+
+@topic vtx_usage | Using Minitel and NAPLPS | Videotex;Minitel keys;ENVOI;SOMMAIRE;NAPLPS keys;keyboard | vtx
+= Minitel keys
+Click a key on the screen keyboard, or use the PC key:
+
+- ENVOI (send): ENTER or RIGHT ARROW.
+- SOMMAIRE (contents): END.
+- RETOUR (back): HOME or UP ARROW.
+- SUITE (next): TAB or DOWN ARROW.
+- ANNULATION (cancel): ESC or LEFT ARROW.
+- CORRECTION: BACKSPACE.
+- GUIDE: F1. REPETITION: F2. CONNEXION/FIN: F9.
+
+What you type is shown when the service sends it back; the Minitel does not show it by itself. On the Minitel screen CTRL+C is the Fnct C command, not Copy; the Videotex service has no Copy.
+
+= NAPLPS keys
+- F1 Help, F2 Refresh, F3 Cancel, F4 Top, F5 Previous, F6 Menu, F7 Next, F8 Send.
+- F9 Exit (a key of the PP3 software, not of the ALEXtel terminal).
+- F10 disconnects.
+
+Letters, digits, ENTER, BACKSPACE, TAB, ESC and DEL are sent as typed.
+
+= The screen
+Both formats are drawn at a whole-number scale: 320 by 250 for the Minitel, 256 by 200 for NAPLPS. The status line counts what has been received and drawn.
+
+@topic vtx_trouble | Videotex Troubleshooting | Videotex;troubleshooting;errors;Minitel;NAPLPS | vtx
+= "Enter a host name" or "Enter a port from 1 to 65535"
+Correct the Host or Port box.
+
+= "Connection failed: Host not found"
+The host name could not be found. Check its spelling.
+
+= "Connection failed: Connection refused" or "Connection timed out"
+Check the port: 516 for The Teletext's Minitel service, 1983 for NAPLPS.
+
+= "Host closed the connection"
+The service ended the session. Connect again.
+
+= Nothing appears after connecting
+A videotex service speaks first; the screen fills as its page arrives, at about 120 characters a second. Check that the Format matches the service: a Minitel service shown as NAPLPS, or the other way round, does not draw.
+
+= Letters appear in the wrong case
+See CAPITALS only in [[vtx_settings|Videotex Settings]].
+
+= Some parts of a NAPLPS picture are missing
+Navigator's NAPLPS decoder does not draw macros, redefinable characters, mosaics, unprotected fields or blinking. The status line counts what was skipped.

@@ -1,5 +1,5 @@
 /*
- * suite_w31.h - Windows 3.1 look and feel for Teletext Navigator 1.1.
+ * suite_w31.h - Windows 3.1 look and feel for Teletext Navigator 1.5.
  *
  * Part of Teletext Navigator.
  * Copyright (C) 2026 Dimitri Papadopoulos and The Teletext
@@ -120,6 +120,15 @@ void w31_toggle_busy(HWND btn);
  * standard behaviour stays with DefWindowProc. The main window calls it;
  * the hook gives it to every top-level dialog with a caption, at birth. */
 void w31_caption_attach(HWND h);
+
+/* A right-click (context) menu in the Windows 3.1 look (2026-11-13): the
+ * owner-drawn popup Help and the system menu use, as a shared service.
+ * Same arguments and results as TrackPopupMenu(menu, flags, x, y, 0, owner,
+ * NULL): with TPM_RETURNCMD it returns the chosen id (0 for none);
+ * without, the choice is POSTED to owner as WM_COMMAND, as TrackPopupMenu
+ * does, and it returns nonzero if something was chosen. The items, their
+ * states and order are the caller's; only the drawing changes. */
+int w31_track_popup(HMENU menu, UINT flags, int x, int y, HWND owner);
 
 /* Load one of the embedded 16-colour icon bitmaps (IDB_W31_*), cached. */
 HBITMAP w31_icon(int resource_id);

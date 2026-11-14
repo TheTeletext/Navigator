@@ -294,7 +294,7 @@ static AudioFormat audio_format_detect(const unsigned char *buf, size_t len)
  * decoded frame fixes the sample rate and channel count for the run; if
  * a later frame disagrees minimp3 may emit fewer samples but the wave
  * format header we hand to waveOut stays bound to the first frame's
- * values (acceptable for v0.1.0-mvp: typical Gopher-served MP3s do not
+ * values (acceptable: typical Gopher-served MP3s do not
  * change rate mid-stream). */
 static int decode_mp3_to_pcm(const unsigned char *buf, size_t len,
                              short **out_pcm, size_t *out_samples,

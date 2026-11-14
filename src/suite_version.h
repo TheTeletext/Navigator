@@ -61,7 +61,7 @@
 /* ---- edit these, and only these ---------------------------------- */
 
 #define SUITE_VERSION_MAJOR   1
-#define SUITE_VERSION_MINOR   5
+#define SUITE_VERSION_MINOR   6
 #define SUITE_VERSION_PATCH   0
 
 /* Pre-release suffix, including its leading hyphen. Set to "" for a

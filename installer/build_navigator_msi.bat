@@ -141,6 +141,19 @@ copy /y "%ROOT%\THIRD-PARTY-NOTICES.md"    "%PAYLOAD%\NOTICES.TXT" >nul || exit 
 copy /y "%ROOT%\licenses\*.txt"            "%PAYLOAD%\LICENSES\"   >nul || exit /b 1
 if "%NAV_FLASH%"=="1" copy /y "%ROOT%\nav_ruffle.dll" "%PAYLOAD%\" >nul || exit /b 1
 
+@REM Help (Navigator 1.6, docs/2026-11-13_WinHelp_Revival_Phase2b.md): The
+@REM Teletext WinHelp viewer (LGPL 2.1+, its own repository beside this one,
+@REM github.com/TheTeletext/WinHelp), its licence text BESIDE it (LGPL
+@REM obligation), its How to Use Help, and TELETEXT.HLP (compiled, kept in
+@REM help\). The viewer must be built from a pushed, tagged commit.
+if not defined WINHELP_DIR set "WINHELP_DIR=%ROOT%\..\mgt-winhelp"
+copy /y "%WINHELP_DIR%\build\TTWINHLP.EXE" "%PAYLOAD%\TTWINHLP.EXE" >nul || exit /b 1
+copy /y "%WINHELP_DIR%\COPYING.LIB"        "%PAYLOAD%\COPYING.LIB"  >nul || exit /b 1
+copy /y "%WINHELP_DIR%\help\TTWINHLP.HLP"  "%PAYLOAD%\TTWINHLP.HLP" >nul || exit /b 1
+copy /y "%ROOT%\help\TELETEXT.HLP"         "%PAYLOAD%\TELETEXT.HLP" >nul || exit /b 1
+@REM The printed manual (manual\build_manual.ps1; kept in the repository).
+copy /y "%ROOT%\manual\Teletext Navigator Manual.pdf" "%PAYLOAD%\Teletext Navigator Manual.pdf" >nul || exit /b 1
+
 @REM ------------------------------------------------------------------
 @REM The NABU folder: boot firmware ONLY. The NABU tab runs the Marduk
 @REM core inside the program and reads nothing in NABU\ but the two

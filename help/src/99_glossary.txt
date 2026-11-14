@@ -1,0 +1,97 @@
+;; Glossary popups. Short, factual, one idea each.
+
+@popup gl_anonftp | anonymous FTP
+A way of offering files by FTP to anyone. You log in with the user name "anonymous" and need no account of your own. Navigator's FTP and Archie services always log in this way.
+
+@popup gl_archie | Archie
+The first Internet search engine, created at McGill University in Montreal in 1989. An Archie server keeps an index of the files on anonymous FTP sites and tells you which host and directory hold a file.
+
+@popup gl_ardp | ARDP
+The Asynchronous Reliable Delivery Protocol of the Prospero system. Archie clients use it to send a request to the server over UDP, and to receive the answer in numbered packets.
+
+@popup gl_ascii | ASCII mode
+An FTP transfer mode for text files. The server sends lines of text, and line endings are adjusted for the receiving computer. Use binary mode for everything else.
+
+@popup gl_binary | binary mode
+An FTP transfer mode in which every byte of the file is sent unchanged. Programs, archives, pictures, sound and PDF files must be sent in binary mode.
+
+@popup gl_cga | CGA
+The Color Graphics Adapter, IBM's first colour display for the PC (1981): 80 by 25 or 40 by 25 text, and graphics up to 640 by 200 pixels.
+
+@popup gl_codec | codec
+Short for coder-decoder: the method used to turn sound into data and back. CU-SeeMe used several; the Teletext TV reflector sends Intel DVI.
+
+@popup gl_cuseeme | CU-SeeMe
+A program written at Cornell University in 1992 to send live video and sound over the Internet. A reflector passes one sender's picture and sound on to many viewers.
+
+@popup gl_dns | DNS name
+The name of a computer on the Internet, such as news.teletext.ca. The Domain Name System turns the name into the computer's numeric address.
+
+@popup gl_ega | EGA
+The Enhanced Graphics Adapter (IBM, 1984): 640 by 350 pixels in 16 colours. RIPscrip screens are drawn at this size.
+
+@popup gl_finger | Finger
+One of the earliest Internet services. You ask a Finger server about a name, as in news@finger.teletext.ca, and it answers with text, then closes the connection. Finger uses port 79.
+
+@popup gl_ftp | FTP
+The File Transfer Protocol, one of the oldest Internet services, used to list the files on a server and copy them to your computer. FTP servers usually listen on port 21.
+
+@popup gl_ftpmail | FTP-Mail
+Electronic mail sent with the MAIL command of the File Transfer Protocol, as on the ARPANET before mail had a protocol of its own (RFC 765).
+
+@popup gl_gopher | Gopher
+A menu-based way of publishing documents on the Internet, created at the University of Minnesota in 1991 (RFC 1436). Each menu item leads to another menu, a document, a search or a file.
+
+@popup gl_host | host
+A computer on the network that offers a service. In Navigator you type the host's DNS name, such as wais.teletext.ca.
+
+@popup gl_irc | IRC
+Internet Relay Chat, created in 1988: text conversations in channels whose names begin with #. Servers usually listen on port 6667.
+
+@popup gl_minitel | Minitel
+The French videotex terminal of the Teletel service, introduced in 1982: 40 columns by 25 rows, with its own keyboard of function keys such as ENVOI and SOMMAIRE.
+
+@popup gl_nabu | NABU
+The NABU Network, a Canadian home computer service delivered by cable television from 1983. Programs were sent down the cable to the NABU Personal Computer, a Z80 machine, which ran them.
+
+@popup gl_naplps | NAPLPS
+The North American Presentation Level Protocol Syntax, the graphics standard that grew out of Canada's Telidon videotex. Pictures are sent as drawing commands, not as pixels.
+
+@popup gl_netnews | Netnews
+The worldwide system of newsgroups, in which articles are copied from server to server. Newsreaders fetch articles from a news server with NNTP.
+
+@popup gl_nntp | NNTP
+The Network News Transfer Protocol (RFC 977, 1986; now RFC 3977), used by newsreaders to list newsgroups and read their articles. News servers usually listen on port 119.
+
+@popup gl_passive | passive mode
+An FTP setting in which your computer opens the data connection to the server, instead of the server opening it to your computer. Passive mode works through most firewalls and home routers.
+
+@popup gl_port | port
+A number from 1 to 65535 that, with the host name, says which service on the host to connect to. Each service has a usual port: 21 for FTP, 23 for Telnet, 70 for Gopher, 119 for NNTP, 210 for WAIS.
+
+@popup gl_qotd | QOTD
+The Quote of the Day service (RFC 865, 1983). A connection to port 17 returns one short message and closes. The Teletext sends a news bulletin of the day.
+
+@popup gl_reflector | reflector
+A CU-SeeMe server that receives a sender's video and sound and passes them on to every connected viewer.
+
+@popup gl_ripscrip | RIPscrip
+The Remote Imaging Protocol, developed by TeleGrafix Communications in the early 1990s. A RIPscrip bulletin board sends short text commands that the terminal draws as lines, shapes, text and buttons, so graphical screens could travel over a modem.
+
+@popup gl_selector | selector
+In Gopher, the string that names one item on a server. Navigator shows the full address of an item, as gopher://host/selector, in its Selector box.
+
+@popup gl_telnet | Telnet
+The original Internet protocol for using a remote computer from a terminal (RFC 854). Telnet servers usually listen on port 23.
+
+@popup gl_vt220 | VT220
+A text terminal made by Digital Equipment Corporation in 1983. Its control sequences, which move the cursor and erase the screen, became a standard that most terminal programs understand.
+
+@popup gl_wais | WAIS
+Wide Area Information Servers, developed from 1989 by Thinking Machines, Apple Computer and Dow Jones. You send words to a WAIS server and it returns the documents of a database ranked by how well they match.
+
+@popup gl_z3950 | Z39.50-1988
+The American national standard for information retrieval, which WAIS used to carry its searches. Navigator speaks Z39.50-1988 (Version 1), the version of the original WAIS servers.
+
+@popup gl_zmodem | Zmodem
+A file transfer protocol written by Chuck Forsberg in 1986 and widely used by bulletin boards. The board sends the file in checked blocks, and the terminal saves it.

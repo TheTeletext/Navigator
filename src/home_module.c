@@ -1,5 +1,5 @@
 /*
- * home_module.c - The Home launcher (Navigator 1.1).
+ * home_module.c - The Home launcher (Navigator 1.5).
  *
  * Part of Teletext Navigator.
  * Copyright (C) 2026 Dimitri Papadopoulos and The Teletext

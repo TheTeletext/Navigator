@@ -1,0 +1,95 @@
+%map home_overview 100
+%map rip_overview 200
+%map rip_connect 201
+%map rip_settings 202
+%map rip_usage 203
+%map rip_trouble 204
+
+@topic home_overview | Home | Home;starting Navigator;choosing a service | home
+Home is the service Navigator shows when it starts. It has one large button for each of the other services, in the order of the ribbon, with a line saying what the service is.
+
+To open a service, click its button. Each Home button does the same as the service's button on the [[nav_ribbon|ribbon]].
+
+Home has nothing to connect to and no settings.
+
+@topic rip_overview | RIPscrip | RIPscrip;bulletin board;BBS;graphical terminal;Telnet;overview | rip
+= About RIPscrip
+RIPscrip, the Remote Imaging Protocol Script, was developed by TeleGrafix Communications in the early 1990s as a graphical presentation system for information services reached by modem. A text terminal could show letters and ANSI character graphics, but no point-and-click screens, and sending whole pictures over a telephone line was too slow.
+
+RIPscrip solved this by sending short text commands that describe lines, boxes, circles, colours, text, icons and buttons. The terminal draws the screen itself, commonly in the 640 by 350, 16-colour {{gl_ega|EGA}} format of RIPterm 1.54. Newspapers and public services used it to put wire copy, local news, weather, notices and downloadable documents behind a graphical, mouse-driven screen. Sun.ONE, launched in March 1995 by The Gainesville Sun and the University of Florida College of Journalism and Communications, carried local, national and international news this way. Its time was short: web browsers soon reached everyone. Today active public RIPscrip services are exceptionally rare, and there is no registry from which they can be counted.
+
+The Teletext's RIPscrip service implements the RIPscrip 1.54 command set, reconstructed from TeleGrafix's published specification. Its pictures are drawn at about the speed of a 14,400 bits per second modem; file downloads are not slowed.
+
+= RIPscrip in Navigator
+The RIPscrip service is a graphical terminal for {{gl_ripscrip|RIPscrip}} 1.54 bulletin boards, connected by {{gl_telnet|Telnet}}. You choose the board's buttons with the mouse or with their keys, and receive its files by {{gl_zmodem|Zmodem}}. It is set up for The Teletext's board, ripscrip.teletext.ca: news, markets and numbers, weather, traffic, public alerts and the print replica edition.
+
+- [[rip_connect|Connecting to a RIPscrip Board]]
+- [[rip_settings|RIPscrip Settings]]
+- [[rip_usage|Using a RIPscrip Board]]
+- [[rip_trouble|RIPscrip Troubleshooting]]
+
+@topic rip_connect | Connecting to a RIPscrip Board | RIPscrip;connecting;Connect button;Disconnect;host;port;Telnet | rip
+To connect:
+
+1. Check the **Host** box. It starts with ripscrip.teletext.ca.
+2. Check the **Port** box. It starts with 23, the {{gl_telnet|Telnet}} port.
+3. Choose **Connect**.
+
+The status bar shows "Connecting to" and the host. While the connection is being made the button reads Disconnect and is dimmed; it cannot be stopped, but it gives up after 20 seconds. When the board answers, the status bar shows "Connected to" and the host, the Host and Port boxes are locked, and the screen waits for the board's first picture.
+
+Navigator answers the board's request for its RIPscrip version automatically, as a RIPscrip 1.54 terminal.
+
+To disconnect, choose **Disconnect**. The status bar shows "Disconnected from" and the host, and the screen is cleared. If the board ends the session, the same thing happens. Navigator does not reconnect by itself; choose Connect again.
+
+If you leave the RIPscrip service for another, the session stays open and the screen is kept.
+
+@topic rip_settings | RIPscrip Settings | RIPscrip;settings;host;port | rip
+The only settings are the **Host** and **Port** boxes, which can be changed while you are disconnected.
+
+The RIPscrip service has no other options, and remembers nothing between sessions: the next time Navigator starts, Host and Port show ripscrip.teletext.ca and 23 again.
+
+@topic rip_usage | Using a RIPscrip Board | RIPscrip;buttons;hotkeys;mouse;downloading files;Zmodem;Downloads folder | rip
+= The screen
+The board's 640 by 350 picture is shown at the proportions of a 4:3 monitor, as large as the window allows, with black bars at the sides or the top if needed. While a screen is being drawn the status bar shows how much has been read, and "Page: Done" when it is complete.
+
+= Choosing a button
+Click a button on the board's screen. It is shown pressed while you hold the mouse button, and its command is sent when you release it over the same button. To change your mind, move off the button before releasing it.
+
+Many buttons also have a key, usually a letter or a digit shown on the button. Press the key and the button flashes, then its command is sent. Upper and lower case are the same.
+
+When a screen has no buttons, what you type is sent to the board: letters, digits, SPACEBAR, ENTER, BACKSPACE and the hyphen. When a screen has buttons, only their keys work.
+
+= Downloading a file
+When you choose a download on the board, or the board starts sending a file, Navigator receives it by {{gl_zmodem|Zmodem}}. No dialog box appears:
+
+- The file is saved in your **Downloads** folder.
+- A file of the same name is never replaced: the new one is saved as name (1), name (2) and so on.
+- The status bar shows the progress, with the progress bar when the size is known.
+- Press ESC to cancel. A file that does not arrive completely is deleted.
+
+While a file is being received, other keys and clicks are ignored. When it is done, the screen shows "Saved", the name and the size, and the status bar shows "Transfer: Done".
+
+@topic rip_trouble | RIPscrip Troubleshooting | RIPscrip;troubleshooting;errors;Host not found;Connection refused;Connection timed out | rip
+= "Enter a host name first."
+The Host box is empty. Type a host name and choose Connect.
+
+= "Connection error: Host not found"
+The name in the Host box could not be found. Check its spelling; use the host's {{gl_dns|DNS name}}.
+
+= "Connection error: Connection refused" or "Connection timed out"
+The host did not accept a connection on that port. Check the Port box (23 for The Teletext's board), and that your network allows Telnet connections.
+
+= The screen stays black after connecting
+The status bar says the session is waiting for the RIPscrip scene. Some hosts send plain text to a terminal that is not RIPscrip; Navigator draws only RIPscrip screens. The Teletext's board at ripscrip.teletext.ca sends RIPscrip.
+
+= Typing does nothing
+On a screen with buttons, only the buttons' keys are sent. Click a button instead.
+
+= "This screen has more than 128 clickable regions."
+RIPscrip 1.54 allows 128 buttons on one screen. The board sent more; the extra ones do not respond.
+
+= A download stopped
+The status bar gives the reason, such as "The connection dropped during the transfer." or "The sender stopped responding." The partial file has been deleted; start the download again from the board.
+
+= "Download held back"
+The receiver could not start. Choose the download again; if it keeps happening, disconnect and connect again.

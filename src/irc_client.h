@@ -22,7 +22,7 @@
  *
  * The service knows nothing about GDI. Host, port, channel, and the
  * nick pattern are all caller-supplied (the viewer module holds the
- * greektimes.ca defaults).
+ * teletext.ca defaults).
  *
  * Threading: all sends (CAP/NICK/USER/JOIN/PONG) are reactive and
  * happen on the worker thread inside its own read loop, so there is no
@@ -94,7 +94,7 @@ typedef struct IrcClient IrcClient;
 
 /* Open a receive-only IRC session on a worker thread.
  *
- *   host, port      TCP endpoint (e.g. irc.greektimes.ca, 6667).
+ *   host, port      TCP endpoint (e.g. irc.teletext.ca, 6667).
  *   channel         channel to JOIN and mirror (e.g. "#retro").
  *   nick_pattern    registration-nick template; every 'X' is replaced
  *                   with a random digit (if the pattern has no 'X', four

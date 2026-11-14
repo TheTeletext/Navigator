@@ -26,7 +26,7 @@
 #include <stddef.h>
 
 /*
- * Defaults. The host is the umbrella name videotex.greektimes.ca, as for
+ * Defaults. The host is the umbrella name videotex.teletext.ca, as for
  * NAPLPS; the port is 516, the IANA "videotex" port, which the Unicorn
  * service listens on publicly since 2026-09-27 (Phase 3 go-live).
  */

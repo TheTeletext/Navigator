@@ -37,4 +37,15 @@ int   suite_clipboard_has_text(void);
  * Newsgroups article pane). Returns 1 on success, 0 on failure. */
 int   suite_clipboard_put_wtext(HWND owner, const wchar_t *text);
 
+/* The read-only right-click menu of a text view (2026-11-13, Navigator
+ * 1.6): "Copy  Ctrl+C" and "Select All  Ctrl+A", each grayed when it has
+ * nothing to act on, shown at the screen point (x, y) and tracked
+ * modally. Returns which was chosen, or 0 for none. The caller does the
+ * work with its own selection model (selection stays per module; only the
+ * menu and the clipboard are shared). Web and Newsgroups use it. */
+#define SUITE_CTX_COPY        1
+#define SUITE_CTX_SELECT_ALL  2
+int   suite_clipboard_context_menu(HWND owner, int x, int y,
+                                   int can_copy, int can_select_all);
+
 #endif /* SUITE_CLIPBOARD_H */

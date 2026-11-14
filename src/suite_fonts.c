@@ -66,7 +66,7 @@ void suite_fonts_init(void)
     g_ubuntu_mono_reg_handle  = load_embedded_font(hInst, IDR_UBUNTU_MONO_REGULAR);
     g_ubuntu_mono_bold_handle = load_embedded_font(hInst, IDR_UBUNTU_MONO_BOLD);
 
-    /* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the chrome
+    /* Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the chrome
      * font is MS Sans Serif 8, the Windows 3.1 system face, for every
      * button, label and field. It was Consolas 16 through 1.0. Protocol
      * output keeps its own fixed-pitch fonts (g_hFontOutput, Gopher's

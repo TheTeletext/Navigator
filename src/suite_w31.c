@@ -1,5 +1,5 @@
 /*
- * suite_w31.c - Windows 3.1 look and feel for Teletext Navigator 1.1.
+ * suite_w31.c - Windows 3.1 look and feel for Teletext Navigator 1.5.
  *
  * Part of Teletext Navigator.
  * Copyright (C) 2026 Dimitri Papadopoulos and The Teletext
@@ -730,7 +730,19 @@ static BOOL cap_rects(HWND h, RECT *bar, RECT *sys, RECT *mn, RECT *mx)
         WINDOWINFO wi;
         ZeroMemory(&wi, sizeof wi);
         wi.cbSize = sizeof wi;
-        if (GetWindowInfo(h, &wi)) bar->left = (int)wi.cxWindowBorders;
+        if (GetWindowInfo(h, &wi)) {
+            int bx = (int)wi.cxWindowBorders, by = (int)wi.cyWindowBorders;
+            bar->left = bx;
+            /* 2026-11-13 (Navigator 1.6, refshots/ref21): where the frame
+             * is painted Windows 3.1 style (cap_frame), the bar's black
+             * outline IS the frame's inner black line, so the bar takes
+             * that line on its left, top and right. */
+            if (bx >= 3 && by >= 3) {
+                bar->left  = bx - 1;
+                bar->top   = by - 1;
+                bar->right = (wr.right - wr.left) - bx + 1;
+            }
+        }
     }
     hh = bar->bottom - bar->top;
     {
@@ -810,6 +822,58 @@ static void cap_menubar_edges(HWND h, HDC dc, const RECT *bar)
     }
 }
 
+/* The window frame, Windows 3.1 style (2026-11-13, Navigator 1.6, measured
+ * against refshots/ref21_win311_progman_border_target.png): a black line
+ * at the outer edge, the frame band in the face gray, and a black line
+ * where the frame meets the inside of the window; that inner line is also
+ * the caption's and the menu bar's outline (cap_rects), so the rules under
+ * the title bar and the menu bar run into it. A RESIZABLE window
+ * (WS_THICKFRAME) also gets the corner ticks: a black line across the band
+ * at the caption's height from each corner, in line with the system box's
+ * right rule and the caption's bottom rule, marking the corner drag zones.
+ * A fixed-size window (a dialog) has none, as in Windows 3.1. Windows'
+ * own frame metrics are kept, so dragging and the corner zones are
+ * unchanged. Drawn after Windows' frame, under the caption. */
+static void cap_frame(HWND h, HDC dc, const RECT *bar, const RECT *sys)
+{
+    WINDOWINFO wi;
+    RECT o, in;
+    HRGN ring, hole;
+    int bx, by, W, H;
+    ZeroMemory(&wi, sizeof wi);
+    wi.cbSize = sizeof wi;
+    if (!GetWindowInfo(h, &wi)) return;
+    bx = (int)wi.cxWindowBorders;
+    by = (int)wi.cyWindowBorders;
+    if (bx < 3 || by < 3) return;
+    W = wi.rcWindow.right - wi.rcWindow.left;
+    H = wi.rcWindow.bottom - wi.rcWindow.top;
+    SetRect(&o, 0, 0, W, H);
+    SetRect(&in, bx, by, W - bx, H - by);
+    ring = CreateRectRgnIndirect(&o);
+    hole = CreateRectRgnIndirect(&in);
+    CombineRgn(ring, ring, hole, RGN_DIFF);
+    FillRgn(dc, ring, g_w31_br_face);
+    DeleteObject(hole);
+    DeleteObject(ring);
+    FrameRect(dc, &o, (HBRUSH)GetStockObject(BLACK_BRUSH));
+    InflateRect(&in, 1, 1);
+    FrameRect(dc, &in, (HBRUSH)GetStockObject(BLACK_BRUSH));
+    if (GetWindowLongA(h, GWL_STYLE) & WS_THICKFRAME) {
+        int tx = sys->right - 1;                 /* from the left and right ends */
+        int ty = bar->bottom - 1;                /* from the top and bottom ends */
+        if (sys->right <= sys->left) tx = bar->left + (bar->bottom - bar->top) - 1;
+        vline(dc, tx,         0,      by, W31_FRAME);   /* top edge */
+        vline(dc, W - 1 - tx, 0,      by, W31_FRAME);
+        vline(dc, tx,         H - by, H,  W31_FRAME);   /* bottom edge */
+        vline(dc, W - 1 - tx, H - by, H,  W31_FRAME);
+        hline(dc, 0,      bx, ty,         W31_FRAME);   /* left edge */
+        hline(dc, 0,      bx, H - 1 - ty, W31_FRAME);
+        hline(dc, W - bx, W,  ty,         W31_FRAME);   /* right edge */
+        hline(dc, W - bx, W,  H - 1 - ty, W31_FRAME);
+    }
+}
+
 static void cap_paint(HWND h, int active)
 {
     RECT bar, sys, mn, mx, t;
@@ -824,6 +888,7 @@ static void cap_paint(HWND h, int active)
     }
     dc = GetWindowDC(h);
     if (!dc) return;
+    cap_frame(h, dc, &bar, &sys);
 
     /* the bar */
     br = CreateSolidBrush(active ? W31_NAVY : W31_WINDOW);
@@ -1212,6 +1277,97 @@ static void menuwnd_ncpaint(HWND h)
     DeleteObject(clip);
     FrameRect(dc, &wr, (HBRUSH)GetStockObject(BLACK_BRUSH));
     ReleaseDC(h, dc);
+}
+
+/* Right-click menus, Windows 3.1 style (2026-11-13, Navigator 1.6 part 2,
+ * docs/2026-11-13_Navigator_1.6_Polish_Part2.md). The same owner-drawn popup
+ * as Help and the system menu, as a shared service: for one TrackPopupMenu
+ * the menu's items are converted (md_convert) and the popup registered as
+ * ours, so its window gets the square black frame (menuwnd_style) and its
+ * items the bold System face, navy selection and stippled gray. Owner-drawn
+ * items are measured and drawn by their owner window, which here is a
+ * private hidden window answering WM_MEASUREITEM, WM_DRAWITEM and
+ * WM_MENUCHAR with the painters the menu bar uses; the caller's view needs
+ * no code for it. Afterwards the entries are released, so the item table
+ * does not grow with every right-click. */
+#define W31_MENUOWNER_CLASS "NavW31MenuOwner"
+
+static LRESULT CALLBACK menuowner_proc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    switch (m) {
+    case WM_MEASUREITEM: {
+        MEASUREITEMSTRUCT *mi = (MEASUREITEMSTRUCT *)l;
+        if (mi && mi->CtlType == ODT_MENU && md_of(mi->itemData)) {
+            cap_menubar_measure(h, mi);
+            return TRUE;
+        }
+        break;
+    }
+    case WM_DRAWITEM: {
+        const DRAWITEMSTRUCT *di = (const DRAWITEMSTRUCT *)l;
+        if (di && di->CtlType == ODT_MENU && md_of(di->itemData)) {
+            cap_menubar_draw(di);
+            return TRUE;
+        }
+        break;
+    }
+    case WM_MENUCHAR: {
+        LRESULT r = md_menuchar(w, l);
+        if (r != -1) return r;
+        break;
+    }
+    }
+    return DefWindowProcA(h, m, w, l);
+}
+
+static HWND menuowner_window(void)
+{
+    static HWND hw = NULL;
+    static BOOL registered = FALSE;
+    if (hw && IsWindow(hw)) return hw;
+    if (!registered) {
+        WNDCLASSA wc;
+        ZeroMemory(&wc, sizeof wc);
+        wc.lpfnWndProc   = menuowner_proc;
+        wc.hInstance     = GetModuleHandleA(NULL);
+        wc.lpszClassName = W31_MENUOWNER_CLASS;
+        registered = RegisterClassA(&wc) != 0;
+    }
+    /* Hidden and never shown; a popup (not message-only) window, since a
+     * menu needs an ordinary window as its owner. */
+    hw = CreateWindowExA(WS_EX_TOOLWINDOW, W31_MENUOWNER_CLASS, "", WS_POPUP,
+                         0, 0, 0, 0, NULL, NULL, GetModuleHandleA(NULL), NULL);
+    return hw;
+}
+
+int w31_track_popup(HMENU menu, UINT flags, int x, int y, HWND owner)
+{
+    int n0 = g_md_n, np0 = g_md_npops, i, cmd;
+    HWND mo;
+    if (!menu) return 0;
+    mo = menuowner_window();
+    if (!mo) {                                   /* never expected: the stock look */
+        return (int)TrackPopupMenu(menu, flags, x, y, 0, owner, NULL);
+    }
+    md_convert(menu, MD_POP);
+    cmd = (int)TrackPopupMenu(menu, flags | TPM_RETURNCMD, x, y, 0, mo, NULL);
+    /* Release what this call added (entries are only ever appended, and a
+     * popup is modal, so they are the last ones). */
+    for (i = n0; i < g_md_n; i++) {
+        free(g_md[i].text);
+        g_md[i].text = NULL;
+        g_md[i].kind = 0;
+        g_md[i].menu = NULL;
+    }
+    g_md_n = n0;
+    g_md_npops = np0;
+    /* Without TPM_RETURNCMD TrackPopupMenu would have POSTED the command to
+     * the owner; do exactly that, so callers keep their WM_COMMAND path. */
+    if (!(flags & TPM_RETURNCMD)) {
+        if (cmd && owner) PostMessageA(owner, WM_COMMAND, MAKEWPARAM(cmd, 0), 0);
+        return cmd != 0;
+    }
+    return cmd;
 }
 
 /* Track a press on minimize or maximize the way the stock buttons do:

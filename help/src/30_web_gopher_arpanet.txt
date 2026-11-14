@@ -1,0 +1,231 @@
+%map web_overview 500
+%map web_connect 501
+%map web_settings 502
+%map web_usage 503
+%map web_trouble 504
+%map gopher_overview 600
+%map gopher_connect 601
+%map gopher_settings 602
+%map gopher_usage 603
+%map gopher_trouble 604
+%map arpa_overview 700
+%map arpa_connect 701
+%map arpa_settings 702
+%map arpa_usage 703
+%map arpa_trouble 704
+
+@topic web_overview | Web | Web;World Wide Web;browser;HTML;Flash;overview | web
+= About the World Wide Web of the 1990s
+The World Wide Web joined documents on servers all over the Internet with links. Its early pages were written in simple HTML, for browsers such as NCSA Mosaic and Netscape Navigator: headings, paragraphs, lists, tables and pictures, without scripts or style sheets.
+
+In the late 1990s, Internet Explorer 4.0 added Active Channels, a "push" model in which a site's Channel Definition Format (CDF) file listed its contents for the browser to collect, an early ancestor of RSS feeds. To our knowledge, only three Internet Explorer Active Channels remain in operation in the world, The Teletext's among them.
+
+The Teletext also broadcasts Teletext Radio as a RealAudio 3.0 live stream, over the original PNA protocol of mid-1990s Internet radio. To our knowledge, it is the only RealAudio live server using the original PNA protocol in public operation in the world today.
+
+The Teletext's web site, http://www.teletext.ca/, is written for those early browsers: current news, weather, traffic, markets and numbers, Teletext Radio and public alerts, in a classic layout.
+
+= The Web in Navigator
+The Web service is a browser of that period. It is built on libwww, the W3C's reference library, and draws pages with its own HTML 3.2 renderer: headings, paragraphs, lists, tables, fonts and colours, and GIF, JPEG and PNG pictures, animated GIFs included. Flash movies (.swf) play through the Ruffle player.
+
+- [[web_connect|Opening a Web Page]]
+- [[web_settings|Web Settings]]
+- [[web_usage|Browsing the Web]]
+- [[web_trouble|Web Troubleshooting]]
+
+@topic web_connect | Opening a Web Page | Web;URL;opening a page;Go;Home;connecting | web
+The Web service has no connection to open: each page is fetched when you ask for it.
+
+To open a page:
+
+1. Type its address in the **URL** box, for example http://www.teletext.ca/.
+2. Press ENTER or choose **Go**.
+
+The status bar shows "Connecting to" and the host, then how much of the page has arrived, then "Document: Done".
+
+- **Home** opens http://www.teletext.ca/.
+- **Refresh** fetches the current page again.
+- **Back** and **Forward** move through the pages you have seen.
+
+While a page is being fetched, the buttons and the URL box are dimmed except Stop. **Stop** discards the page when it arrives and shows "Stopped."; the transfer itself runs to its end.
+
+Addresses beginning gopher:// open in the [[gopher_overview|Gopher]] service, and addresses beginning ftp:// in the [[ftp_overview|FTP]] service.
+
+@topic web_settings | Web Settings | Web;settings;history | web
+The Web service has no settings. It remembers the last 64 pages for Back and Forward while Navigator runs, and nothing after it closes.
+
+@topic web_usage | Browsing the Web | Web;links;copying text;scrolling;sound;Flash;Active Channel | web
+= Links
+Point to a link and the pointer becomes a hand, and the status bar shows its address. Click to follow it.
+
+= Scrolling
+Use the scroll bar, the mouse wheel, or UP ARROW, DOWN ARROW, PAGE UP, PAGE DOWN, HOME and END.
+
+= Copying text
+Drag across text to select it, then press CTRL+C, or click with the right mouse button and choose Copy. CTRL+A selects the whole page; ESC clears the selection.
+
+= Sound
+- A link to an .au file plays it.
+- A link to a .tsp file plays its TrueSpeech sound.
+- A link to a .ram file is passed to the program Windows uses for RealAudio files, if one is installed.
+
+= Flash movies
+A movie in a page plays in its place; an address ending in .swf fills the window. Click a movie to give it the mouse and keyboard. When you leave the Web service the movie stops; it starts again from its first frame when you return.
+
+= Active Channels
+An address of a .cdf Active Channel file is read, and the status bar reports how many items it has. The channel itself is not displayed.
+
+The Web service cannot save pages or files to disk.
+
+@topic web_trouble | Web Troubleshooting | Web;troubleshooting;errors;forms;HTTPS;Flash | web
+= "Could not load" and the address
+The page could not be fetched. Check the address, and that the server is reachable.
+
+= A page looks wrong or empty
+Like the browsers of its time, the Web service does not run JavaScript, apply style sheets, use cookies or show frames, and it cannot fill in forms. Pages written for modern browsers may not work. The Teletext's site at http://www.teletext.ca/ is written for it.
+
+= Secure (https://) pages do not open
+The Web service fetches pages by plain HTTP, as browsers did before secure pages were common. It cannot open https:// addresses.
+
+= A picture shows as [image: ...]
+The picture could not be loaded or read.
+
+= "Flash movie cannot play"
+The status bar gives the reason, such as "not a Flash movie", "the movie is larger than 32 MB" or "the movie could not be downloaded".
+
+@topic gopher_overview | Gopher | Gopher;Gopherspace;menus;overview | gopher
+= About Gopher
+{{gl_gopher|Gopher}} is a predecessor of the World Wide Web, created at the University of Minnesota in 1991. It shows menus: each item leads to another menu, a document, a search or a file. There are no scripts, no advertising and nothing for the reader's computer to run.
+
+Before the Web took over, Gopher was one of the Internet's first public news racks. Readers browsed online magazines, political commentary, institutional bulletins, government documents and newspaper-like services through simple menus. In public debates such as the one over the North American Free Trade Agreement (NAFTA), Gopher led readers to current commentary and the related documents, while online news publishing was still an experiment. Universities, media services, libraries and public institutions ran Gopher servers as a searchable newsstand and document shelf.
+
+The Teletext uses Gopher in the same tradition, as a menu-based news rack. Today roughly 200 Gopher servers are estimated to remain active in the world, and The Teletext operates one of them as part of a live publishing system.
+
+= Gopher in Navigator
+The Gopher service is a Gopher client (RFC 1436). It opens menus and text documents, shows pictures, runs Gopher searches, plays sounds and saves files. It is set up for The Teletext's Gopher server, gopher.teletext.ca: daily news, weather, traffic, markets and numbers, public alerts, articles, archives and the print replica edition in PDF.
+
+- [[gopher_connect|Opening a Gopher Menu]]
+- [[gopher_settings|Gopher Settings]]
+- [[gopher_usage|Using Gopher Menus]]
+- [[gopher_trouble|Gopher Troubleshooting]]
+
+@topic gopher_connect | Opening a Gopher Menu | Gopher;Selector;opening a menu;Go;Home;connecting | gopher
+Gopher has no connection to keep open: each menu or document is fetched when you ask for it.
+
+To open a menu:
+
+1. Type its address in the **Selector** box, for example gopher://gopher.teletext.ca/. You may leave out gopher://, and add a port after the host, as in gopher.teletext.ca:70.
+2. Press ENTER or choose **Go**.
+
+The status bar shows "Connecting...", then how many bytes have arrived, then "Menu: Done" or "Document: Done".
+
+- **Home** opens gopher://gopher.teletext.ca/.
+- **Refresh** fetches the current menu or document again.
+- **Back** and **Forward** move through what you have seen.
+
+Nothing is fetched until you choose Go or Home.
+
+@topic gopher_settings | Gopher Settings | Gopher;settings;history | gopher
+The Gopher service has no settings. It remembers the last 64 menus and documents for Back and Forward while Navigator runs, and nothing after it closes. The usual Gopher {{gl_port|port}}, 70, is used unless the address names another.
+
+@topic gopher_usage | Using Gopher Menus | Gopher;menu items;searching;pictures;sound;saving files;copying text | gopher
+Each menu item has an icon for its kind. Items you can open are shown in blue; point to one and the pointer becomes a hand. Click to open it:
+
+- **Menus** and **text documents** open in the window.
+- **Pictures** (GIF and other images) open in a window of their own. Close it with its Control-menu box.
+- **Searches** open the Gopher Search dialog box. Type the words to find and choose OK; the results are shown as a menu.
+- **Sounds** play through your speakers.
+- **Files** open a Save As dialog box, so you can choose where to save them. Files whose names end in .mp3 or .au are played instead.
+
+Telnet, video and archive items are shown with their icons, but cannot be opened.
+
+= Copying text
+Drag across text to select it (a click without dragging opens the item under the pointer). Press CTRL+C to copy, CTRL+A to select everything, or click with the right mouse button for the same commands.
+
+= Scrolling
+Use the scroll bar, the mouse wheel, or the arrow keys, PAGE UP, PAGE DOWN, HOME and END.
+
+Gopher links followed in the [[web_overview|Web]] service open here.
+
+@topic gopher_trouble | Gopher Troubleshooting | Gopher;troubleshooting;errors;Stop | gopher
+= Stop does not stop at once
+Stop asks the transfer to end; the Gopher service waits until the server stops sending, at most 15 seconds.
+
+= "a fetch is already in flight; press Stop first."
+Only one menu or document is fetched at a time. Wait for it, or choose Stop.
+
+= "malformed URL."
+The address in the Selector box is not a Gopher address. It should look like gopher://host/ or gopher://host/1/path.
+
+= An item does nothing when clicked
+Some kinds of item (Telnet sessions, video, archives and Web links) cannot be opened by the Gopher service.
+
+= "image decode failed."
+The picture could not be read.
+
+= "Audio service busy (Stop first)."
+A sound is already playing.
+
+@topic arpa_overview | ARPANET | ARPANET;FTP-Mail;mail;sending a message;overview | arpa
+= About the ARPANET and FTP-Mail
+Before today's Internet, there was the ARPANET, a network created in the United States to connect universities, research centres, government agencies and laboratories. On January 1, 1983, it moved from its older Network Control Protocol (NCP) to TCP/IP, which laid the foundation of the Internet we know.
+
+At first, electronic mail could not travel from one computer to another. In 1971 Ray Tomlinson made it possible on the ARPANET for a message to move between connected computers. That idea became part of the history of {{gl_ftpmail|FTP-Mail}}, in which mail was sent with commands of the File Transfer Protocol.
+
+The Teletext has recreated FTP-Mail as a working service, with the command flow of the old Internet specifications. Messages sent to it are received by The Teletext's mail system and may be read by the operator or the editors.
+
+= ARPANET in Navigator
+The ARPANET service sends a short message by FTP-Mail, with the MAIL command of RFC 765. No account or password is needed. It is set up for The Teletext's server, arpanet.teletext.ca, port 2121, and its mailbox INFO@TELETEXT.
+
+- [[arpa_connect|Connecting to an FTP-Mail Server]]
+- [[arpa_settings|ARPANET Settings]]
+- [[arpa_usage|Writing and Sending a Message]]
+- [[arpa_trouble|ARPANET Troubleshooting]]
+
+@topic arpa_connect | Connecting to an FTP-Mail Server | ARPANET;FTP-Mail;connecting;Connect button;server;port | arpa
+1. Check the **Server** box (arpanet.teletext.ca) and the **Port** box (2121).
+2. Choose **Connect**.
+
+Navigator opens a connection, waits for the server's greeting and closes the connection again. The status bar shows each line the server sends. When the greeting arrives, the To and Message boxes and the Send and Clear buttons become available, and Server and Port are locked.
+
+FTP-Mail keeps no connection open between messages: each Send opens its own, and so does Disconnect.
+
+To disconnect, choose **Disconnect**. Navigator says goodbye to the server, clears the message and puts the To box back to INFO@TELETEXT.
+
+@topic arpa_settings | ARPANET Settings | ARPANET;settings;To;mailbox | arpa
+- **Server** and **Port**: the FTP-Mail server. The Teletext's is arpanet.teletext.ca, port 2121.
+- **To**: the mailbox. It starts as INFO@TELETEXT. A mailbox may be written as NAME@HOST or NAME AT HOST.
+
+The ARPANET service remembers nothing after Navigator closes.
+
+@topic arpa_usage | Writing and Sending a Message | ARPANET;writing a message;Send;Clear;message size | arpa
+1. Connect, as described in [[arpa_connect|Connecting to an FTP-Mail Server]].
+2. Check the **To** box, and press ENTER to move to the message.
+3. Type the message in the **Message** box. ENTER starts a new line.
+4. Choose **Send**, or press CTRL+ENTER.
+
+Under the message, **Bytes used** counts its size against the server's limit of 2048 bytes, and says "over cap" when it is too long.
+
+Navigator sends the message with the MAIL command and shows the server's replies in the status bar. When the server accepts it, the message is locked and Send is dimmed, so it is not sent twice. Choose **Clear** to empty the message and write another; the To box is kept.
+
+Before sending, line endings are made standard, and control characters (except TAB) and terminal escape sequences are removed.
+
+A line holding only a period ends a message in FTP-Mail. Pressing ENTER at the end of such a line sends the message, and a line of only a period cannot be part of a message: everything after it is not sent.
+
+@topic arpa_trouble | ARPANET Troubleshooting | ARPANET;troubleshooting;errors;FTP-Mail | arpa
+= "Server and Port are required." or "Port must be 1-65535."
+Correct the box, then choose Connect.
+
+= "Cannot resolve" and the server name
+The server's name could not be found. Check its spelling.
+
+= "Cannot connect to" the server
+The server did not answer on that port. The Teletext's FTP-Mail server uses port 2121.
+
+= "No FTP-Mail banner from" the server
+The server answered but did not greet as an FTP-Mail server. Check the port.
+
+= The server's reply begins with 550
+The mailbox in the To box is not known to the server.
+
+= The server's reply begins with 552
+The message is longer than the server accepts. Shorten it to 2048 bytes or less.

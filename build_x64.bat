@@ -85,7 +85,8 @@ set CFLAGS_GWB=-O2 -fstack-protector-strong -D_WIN32 -Isrc ^
 @REM the system browser. No vendored crypto.
 set LDFLAGS=-s -Wl,--no-insert-timestamp -lbcrypt -lws2_32 -lcomctl32 -lcomdlg32 -lgdi32 -lgdiplus -lmsimg32 -lole32 -loleaut32 -luuid -lwinmm -lwinhttp -lusp10 -lshell32 -static -mwindows -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va -lssp
 
-set TARGET=TeletextNavigator.exe
+@REM TARGET may be preset (e.g. while an operator copy holds the exe open).
+if not defined TARGET set TARGET=TeletextNavigator.exe
 
 echo Compiling WAIS protocol files (CNIDR preserved, x64 / GCC 15 / UCRT64)...
 for %%f in (zutil zprot wprot wutil wmessage transprt docid list ztype1 irfileio cutil panic ustubs ui_win) do (
@@ -132,7 +133,7 @@ for %%f in (sockets_win win_stubs) do (
 )
 
 echo Compiling Navigator shell and modules...
-for %%f in (suite_shell suite_w31 home_module suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service) do (
+for %%f in (suite_shell suite_w31 home_module suite_help suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service) do (
     echo   %%f.c
     %CC% %CFLAGS_SUITE% -c -o src\%%f.o src\%%f.c
     if errorlevel 1 exit /b 1
@@ -234,7 +235,7 @@ echo Linking %TARGET%...
     src\wais\ustubs.o src\wais\ui_win.o ^
     %LWWW_OBJS% ^
     src\sockets_win.o src\win_stubs.o ^
-    src\suite_shell.o src\suite_w31.o src\home_module.o src\suite_fonts.o src\suite_branding.o ^
+    src\suite_shell.o src\suite_w31.o src\home_module.o src\suite_help.o src\suite_fonts.o src\suite_branding.o ^
     src\suite_clipboard.o src\suite_logo.o ^
     src\http_fetch.o src\suite_sha256.o src\suite_update.o ^
     src\wais_module.o src\arpamail_module.o src\web_module.o ^

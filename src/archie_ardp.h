@@ -73,7 +73,7 @@ typedef enum {
  * the server did not send that attribute). */
 typedef struct {
     char name[256];     /* LINK <name> field as sent                    */
-    char host[256];     /* FTP host (e.g. ftp.greektimes.ca)            */
+    char host[256];     /* FTP host (e.g. ftp.teletext.ca)             */
     char hsoname[512];  /* full path on host (e.g. /pub/HELLO.txt)      */
     char dir[512];      /* dirname(hsoname)                             */
     char filename[256]; /* basename(hsoname)                            */

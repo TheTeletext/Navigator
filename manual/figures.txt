@@ -1,0 +1,28 @@
+;; Screenshots (manual\shots\<name>.png, made by capture_shots.ps1) and where
+;; they go: topic context | shot | caption. A figure follows its topic's text.
+nav_window | home | The Teletext Navigator window, at the Home service.
+nav_menus | menu_file | The File menu.
+nav_menus | menu_help | The Help menu.
+nav_menus | about | The About box.
+rip_usage | ripscrip | The RIPscrip service, connected to The Teletext's board at ripscrip.teletext.ca.
+nabu_usage | nabu | The NABU service: the emulated NABU Personal Computer running the program of The Teletext's channel.
+vtx_usage | minitel | The Videotex service in Minitel format, connected to videotex.teletext.ca.
+web_usage | web | The Web service at http://www.teletext.ca/.
+web_usage | web_flash | The Teletext's Flash animation, a Flash version 4 movie, playing in a page of the Web service (http://www.teletext.ca/flash/demo.htm).
+web_usage | web_radio | The Radio page of The Teletext's web site, with its RealAudio link.
+web_usage | realaudio | Teletext Radio playing in RealPlayer, opened from the RealAudio link (its channel sidebar closed).
+gopher_usage | gopher | The Gopher service at gopher.teletext.ca.
+arpa_usage | arpanet | A message written in the ARPANET service, ready to send (this one was not sent).
+wais_usage | wais | A WAIS search of The Teletext's database for the word "montreal".
+wais_usage | wais_doc | A document read from the WAIS server.
+archie_usage | archie | The Archie service: the hosts, directories and files found for "pdf".
+ftp_usage | ftp | The FTP service connected to ftp.teletext.ca.
+news_usage | newsgroups | The Newsgroups service reading an article of The Teletext's news server.
+irc_usage | irc | The IRC service following #retro on irc.teletext.ca.
+cusm_usage | cuseeme | CU-SeeMe receiving Teletext TV from cu-seeme.teletext.ca.
+term_connect | terminal_finger | The Terminal after the Finger News button.
+term_usage | terminal_telnet | A Telnet session with telnet.teletext.ca.
+gwb_usage | gwbasic | GW-BASIC running RETRO649.BAS.
+intro_look | help_contents | Teletext Navigator Help at its Contents: a real WinHelp file in The Teletext WinHelp.
+helpuse_intro | help_f1_ftp | The Help topic opened by F1 in the FTP service.
+howto_search | help_search | The Search dialog box: the topics with the keyword "connecting".

@@ -94,6 +94,15 @@
         RebootPrompt="no"
         PromptToContinue="yes"
         Timeout="15" />
+    <!-- Help (Navigator 1.6): the help viewer may be open too. -->
+    <util:CloseApplication
+        Id="CloseHelpViewer"
+        Target="TTWINHLP.EXE"
+        Description="Teletext Navigator Help is open and must be closed before Teletext Navigator can be updated."
+        CloseMessage="yes"
+        RebootPrompt="no"
+        PromptToContinue="yes"
+        Timeout="15" />
 
     <Launch
         Condition="Installed OR (VersionNT &gt;= 603)"
@@ -108,6 +117,7 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentGroupRef Id="NabuFiles" />
       <ComponentGroupRef Id="DocFiles" />
+      <ComponentGroupRef Id="HelpFiles" />
 <?if $(NavFlash) = "1" ?>
       <ComponentGroupRef Id="FlashFiles" />
 <?endif?>
@@ -181,6 +191,43 @@
       </Component>
     </ComponentGroup>
 <?endif?>
+
+    <!--
+      Help (Navigator 1.6, docs/2026-11-13_WinHelp_Revival_Phase2b.md):
+      Help > Contents and F1 start TTWINHLP.EXE on TELETEXT.HLP
+      (src/suite_help.c). TTWINHLP.EXE is The Teletext WinHelp, a separate
+      program under the LGPL 2.1 or later (source:
+      github.com/TheTeletext/WinHelp); its licence text, COPYING.LIB, is
+      installed beside it, with its How to Use Help (TTWINHLP.HLP). Two NEW
+      components with their own GUIDs; no existing component was touched.
+    -->
+    <ComponentGroup Id="HelpFiles" Directory="INSTALLFOLDER">
+      <Component Id="HelpViewer" Guid="65ACD032-EDF7-4A75-A4F5-082632250EC0">
+        <File Id="HelpViewerExe"     Name="TTWINHLP.EXE" Source="$(PayloadDir)\TTWINHLP.EXE" KeyPath="yes" />
+        <File Id="HelpViewerLicence" Name="COPYING.LIB"  Source="$(PayloadDir)\COPYING.LIB" />
+        <File Id="HelpViewerHowTo"   Name="TTWINHLP.HLP" Source="$(PayloadDir)\TTWINHLP.HLP" />
+      </Component>
+      <Component Id="HelpContent" Guid="11BC1011-41F5-410D-AF07-26DDAE3E0DD2">
+        <File Id="NavigatorHelp" Name="TELETEXT.HLP" Source="$(PayloadDir)\TELETEXT.HLP" KeyPath="yes" />
+      </Component>
+      <!-- The printed manual (manual\, built by manual\build_manual.ps1) and its
+           Start Menu shortcut beside the launch shortcut. NEW components. -->
+      <Component Id="ManualFile" Guid="0738481F-AFB2-4926-9066-461F13566C33">
+        <File Id="NavigatorManual" Name="Teletext Navigator Manual.pdf"
+              Source="$(PayloadDir)\Teletext Navigator Manual.pdf" KeyPath="yes" />
+      </Component>
+      <Component Id="ManualShortcut" Directory="ProgramMenuFolder"
+                 Guid="D729F35B-6943-45CD-9B5D-B5645368B905">
+        <Shortcut Id="ManualStartMenuLink"
+                  Name="Teletext Navigator Manual"
+                  Description="The Teletext Navigator User's Guide (PDF)"
+                  Target="[INSTALLFOLDER]Teletext Navigator Manual.pdf"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM"
+                       Key="SOFTWARE\The Teletext\Teletext Navigator"
+                       Name="ManualShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
 
     <ComponentGroup Id="NabuFiles" Directory="NABUFOLDER">
       <Files Include="$(PayloadDir)\NABU\**" />

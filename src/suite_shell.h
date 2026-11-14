@@ -69,7 +69,7 @@ typedef struct suite_module {
 #define SUITE_ID_BTN_GWBASIC  (SUITE_ID_BTN_BASE + 13)  /* 2026-10-20 */
 #define SUITE_ID_BTN_FTP      (SUITE_ID_BTN_BASE + 14)  /* 2026-11-12, docs/2026-11-12_FTP_TAB.md */
 #define SUITE_ID_BTN_NEWSGROUPS (SUITE_ID_BTN_BASE + 15) /* 2026-11-13, docs/2026-11-13_NETNEWS_TAB.md */
-/* Navigator 1.1: the Home launcher, the first ribbon button and the
+/* Navigator 1.5: the Home launcher, the first ribbon button and the
  * launch default. Kept apart from the tab block so no old id moves. */
 #define SUITE_ID_HOME         150
 
@@ -175,9 +175,8 @@ void activedesktop_module_resize(HWND content, int w, int h);
 BOOL activedesktop_module_on_command(HWND content, WPARAM wParam, LPARAM lParam);
 BOOL activedesktop_module_has_unsaved(void);
 
-/* Phase 6a: Gopher and Telnet placeholder tabs. Real engines are
- * out of scope for v0.1.0-mvp; each is a future phase with its
- * own blueprint. */
+/* Gopher and Terminal (Telnet) tabs (placeholders in Phase 6a; real
+ * engines since). */
 void gopher_module_activate(HWND content);
 void gopher_module_deactivate(HWND content);
 void gopher_module_resize(HWND content, int w, int h);

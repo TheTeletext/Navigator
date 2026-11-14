@@ -1,0 +1,17 @@
+;; The Help chapter (printed manual only): its opening; the viewer's own How
+;; to Use Help topics (mgt-winhelp help\src\ttwinhlp.txt) follow it.
+@topic helpuse_intro | Using Help | Help;Help viewer;The Teletext WinHelp;TTWINHLP | helpuse:000
+Teletext Navigator's Help is a Windows Help file, TELETEXT.HLP, shown by **The Teletext WinHelp** (TTWINHLP.EXE). It holds the same information as this manual, ready on the screen while you work.
+
+To open Help:
+
+- Choose **Contents** from the Help menu to start at the Contents.
+- Choose **Search for Help on** to find a topic by keyword.
+- Press F1 for the topic of the service you are using. In GW-BASIC and Videotex, F1 belongs to the screen of the service; see [[nav_help|Getting Help]].
+- Choose **How to Use Help** to learn about the Help window itself.
+
+One Help window serves every request: when you press F1 in another service, the same window moves to that service's topic. When you close Navigator, Help closes with it.
+
+The Teletext WinHelp is the WinHelp viewer of the Wine project, made into a native Windows program by The Teletext, with the look of WinHelp 3.1. It is free software under the GNU Lesser General Public License, version 2.1 or later; its source code is at https://github.com/TheTeletext/WinHelp. It also opens the Help files of Windows 3.0 and Windows 3.1 programs.
+
+The rest of this chapter is the viewer's own How to Use Help.

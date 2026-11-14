@@ -18,8 +18,14 @@
  * and NOEMBED are ignored at parse time, exactly as libwww ignored them
  * before, so the page's own NOEMBED text shows as it always did. When the
  * player is installed but a movie cannot start (download failed, not a
- * SWF, no graphics device), the movie's box collapses and that movie's
- * NOEMBED / OBJECT fallback content is shown in its place.
+ * SWF, no graphics device, or the player stopped with an error), its box
+ * keeps its place in the page and shows a placeholder, as a 1990s browser
+ * with the plug-in installed did; NOEMBED / OBJECT fallback content is
+ * never shown while a player is installed (2026-11-13, operator brief;
+ * docs/2026-11-13_Navigator_Flash_Ruffle.md D4).
+ *
+ * Full view (D3): a .swf address opened directly fills the whole render
+ * view, scaled to fit (Netscape's full-page plug-in mode).
  */
 
 #ifndef WEB_FLASH_H
@@ -66,8 +72,16 @@ void web_flash_take_bytes(WebFlash *f, const char *abs_url,
                           const unsigned char *bytes, size_t len,
                           const char *fail_reason);
 
-/* Box size for layout: markup size, else the stage size, else 0. */
+/* Box size for layout: markup size, else the stage size, else 0; a movie
+ * that cannot play and has no size at all reserves the placeholder size
+ * (WEB_FLASH_PH_W x WEB_FLASH_PH_H, or 4:3 of the one size given). */
 void web_flash_box(const WebFlash *f, int *w, int *h);
+#define WEB_FLASH_PH_W 160
+#define WEB_FLASH_PH_H 120
+
+/* Does this address name a movie by its file name (path ends ".swf",
+ * query and fragment ignored)? */
+int  web_flash_url_is_swf(const char *url);
 
 /* Largest SWF accepted, in bytes. */
 #define WEB_FLASH_MAX_SWF (32u * 1024u * 1024u)
@@ -84,6 +98,11 @@ int  web_flash_cannot_play(const WebFlash *f);
 void web_flash_paint_begin(HWND render_view);
 void web_flash_place(WebFlash *f, int x, int y, int w, int h);
 void web_flash_paint_end(void);
+
+/* What the page paint calls for every movie box it draws: a movie that
+ * cannot play gets the placeholder painted into hdc at the box; any
+ * other movie is placed (web_flash_place). */
+void web_flash_show(WebFlash *f, HDC hdc, int x, int y, int w, int h);
 
 /* Start a downloaded movie as a child window of render_view (nothing
  * happens while the view is hidden or if it already plays), or stop a

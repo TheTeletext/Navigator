@@ -47,7 +47,7 @@
 /* Output buffer the dialog proc fills on OK. Lives at module scope so
  * the dialog can reach it without a custom lParam payload chain. The
  * dialog is modal and the function is documented non-reentrant, so a
- * single static slot is sufficient for v0.1.0-mvp. */
+ * single static slot is sufficient. */
 static char       *g_gsd_out_query   = NULL;
 static const char *g_gsd_in_display  = NULL;
 static const char *g_gsd_in_selector = NULL;

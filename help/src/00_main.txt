@@ -1,0 +1,197 @@
+;; TELETEXT.HLP source: Teletext Navigator Help. Edit these files, then run
+;; help\build_help.ps1 (hlpsrc.py -> RTF + HPJ -> Help Compiler 3.10.505).
+;; Facts come from Navigator's own code (branch navigator-1.6, 2026-11-13).
+;; Rules: no feature the program does not have; DNS names only; "Netnews"
+;; or "NNTP", never the other word; WAIS is Z39.50-1988 (Version 1); no em
+;; dashes.
+%title Teletext Navigator Help
+%contents contents
+%helpon TTWINHLP.HLP
+%copyright Copyright (c) 2026 The Teletext
+%config BrowseButtons()
+;; Pictures (help\make_bitmaps.ps1): the launcher logo, and each service's
+;; ribbon icon, shown in the title of every topic of that service.
+%bitmap TTLOGO.BMP HOME.BMP RIPSCRIP.BMP NABU.BMP VIDEOTEX.BMP WEB.BMP GOPHER.BMP
+%bitmap ARPANET.BMP WAIS.BMP ARCHIE.BMP FTP.BMP NEWSGRPS.BMP IRC.BMP CUSEEME.BMP
+%bitmap TERMINAL.BMP GWBASIC.BMP
+%seqicon general TTLOGO.BMP
+%seqicon home HOME.BMP
+%seqicon rip RIPSCRIP.BMP
+%seqicon nabu NABU.BMP
+%seqicon vtx VIDEOTEX.BMP
+%seqicon web WEB.BMP
+%seqicon gopher GOPHER.BMP
+%seqicon arpa ARPANET.BMP
+%seqicon wais WAIS.BMP
+%seqicon archie ARCHIE.BMP
+%seqicon ftp FTP.BMP
+%seqicon news NEWSGRPS.BMP
+%seqicon irc IRC.BMP
+%seqicon cusm CUSEEME.BMP
+%seqicon term TERMINAL.BMP
+%seqicon gwb GWBASIC.BMP
+%map contents 1
+%map nav_window 10
+%map nav_ribbon 11
+%map nav_menus 12
+%map nav_status 13
+%map nav_updates 14
+%map nav_help 15
+
+@topic contents | Teletext Navigator Help Contents | contents;help contents;index;Teletext Navigator | | TTLOGO.BMP
+Teletext Navigator connects your computer to the information services of The Teletext the way the networks of the 1980s and 1990s reached them: by bulletin board, videotex, Gopher, WAIS, Archie, FTP, Netnews, IRC and more. Each service has its own tab on the ribbon.
+
+To learn how to use Help, press F1 in this window, or choose How to Use Help from the Help menu.
+
+= Using Navigator
+- [[nav_window|The Navigator Window]]
+- [[nav_ribbon|Choosing a Service: the Ribbon]]
+- [[nav_status|The Status Bar]]
+- [[nav_menus|Menu Commands]]
+- [[nav_updates|Checking for Updates]]
+- [[nav_help|Getting Help]]
+
+= The Services
+{bmc HOME.BMP} [[home_overview|Home]]
+
+{bmc RIPSCRIP.BMP} [[rip_overview|RIPscrip]]
+
+{bmc NABU.BMP} [[nabu_overview|NABU]]
+
+{bmc VIDEOTEX.BMP} [[vtx_overview|Videotex]]
+
+{bmc WEB.BMP} [[web_overview|Web]]
+
+{bmc GOPHER.BMP} [[gopher_overview|Gopher]]
+
+{bmc ARPANET.BMP} [[arpa_overview|ARPANET]]
+
+{bmc WAIS.BMP} [[wais_overview|WAIS]]
+
+{bmc ARCHIE.BMP} [[archie_overview|Archie]]
+
+{bmc FTP.BMP} [[ftp_overview|FTP]]
+
+{bmc NEWSGRPS.BMP} [[news_overview|Newsgroups]]
+
+{bmc IRC.BMP} [[irc_overview|IRC]]
+
+{bmc CUSEEME.BMP} [[cusm_overview|CU-SeeMe]]
+
+{bmc TERMINAL.BMP} [[term_overview|Terminal]]
+
+{bmc GWBASIC.BMP} [[gwb_overview|GW-BASIC]]
+
+= Reference
+- [[glossary|Glossary]]
+
+@topic nav_window | The Navigator Window | window;Navigator window;title bar;resizing the window | general
+The Navigator window has five parts, from top to bottom:
+
+- The **title bar**, with the Control-menu box at the left and the Minimize and Maximize buttons at the right.
+- The **menu bar**, with the File and Help menus.
+- The **ribbon**, a row of buttons, one for each service. See [[nav_ribbon|Choosing a Service: the Ribbon]].
+- The **work area**, where the chosen service is shown.
+- The **status bar**, which reports what the service is doing. See [[nav_status|The Status Bar]].
+
+The window can be sized by dragging its border. It cannot be made smaller than 1024 by 768 pixels, or smaller than your screen if your screen is smaller than that. Navigator opens at that size each time it starts; it does not remember a size or position.
+
+@topic nav_ribbon | Choosing a Service: the Ribbon | ribbon;tabs;choosing a service;switching services | general
+Each button on the ribbon opens one service. The button of the service you are using stays pressed in. Point to a button to see the service's full name.
+
+The ribbon is used with the mouse. No key is assigned to a ribbon button.
+
+When you choose another service, the one you leave keeps its place: its screen, its text and, in most services, its connection are still there when you come back. Three services behave differently:
+
+- {{gl_cuseeme|CU-SeeMe}} disconnects when you leave it, so its sound does not play behind another service. Choose Connect again when you return.
+- {{gl_nabu|NABU}} stops its machine or its serial bridge when you leave it.
+- GW-BASIC pauses its machine and its sound, and resumes them when you return, with your program still in memory.
+
+The [[home_overview|Home]] service, shown when Navigator starts, has one large button for every other service.
+
+@topic nav_menus | Menu Commands | menus;File menu;Help menu;Exit;About | general
+= File menu
+- **Exit** closes Navigator. Any connection that is open is closed.
+
+= Help menu
+- **Contents** opens this Help at its Contents.
+- **Search for Help on** opens Help's Search dialog box, where you can find a topic by keyword.
+- **How to Use Help** explains how to use the Help window.
+- **Check for Updates** asks The Teletext whether a newer version of Navigator has been published. See [[nav_updates|Checking for Updates]].
+- **About** shows the version of Navigator, its licence and the credits for the software it contains.
+
+The menus can be opened with the mouse, or with the ALT key and the underlined letter.
+
+@topic nav_status | The Status Bar | status bar;status line;progress;messages | general
+The status bar at the bottom of the window shows one line of text from the service you are using: what it is connecting to, what it has received, and any error. It shows "Ready" when you change services.
+
+While a service receives something whose size it knows, a small progress bar at the right end of the status bar shows how much has arrived. The Archie, FTP, Newsgroups, RIPscrip, WAIS and Web services use it.
+
+Some services show messages in their own windows instead: the Terminal prints them in the terminal, Videotex has its own status line under the screen, and CU-SeeMe has a status line under its picture.
+
+@topic nav_updates | Checking for Updates | updates;Check for Updates;new version;installing an update | general
+Navigator can check whether a newer version has been published.
+
+= Automatic check
+About four seconds after Navigator starts, it checks for an update, at most once a day. If the check fails, nothing is shown. To stop the automatic check, clear **Check for updates on startup** in the update dialog box.
+
+= Checking yourself
+Choose **Check for Updates** from the Help menu. Navigator reports either that it is up to date, or that a new version is available.
+
+= Installing an update
+When a new version is available, a dialog box shows the version and its release notes. Choose:
+
+- **Update Now** to download it. Navigator checks the download against its published SHA-256 checksum, then closes and starts the installer. Open Navigator again when the installer has finished.
+- **Remind Me Later** to be asked again at a later start.
+- **Skip This Version** not to be offered that version again by the automatic check.
+
+Navigator downloads updates only from apps.teletext.ca. A download that does not match its checksum is deleted and is never run.
+
+@topic nav_help | Getting Help | help;F1;Help key;context help | general
+To open Help:
+
+- Choose **Contents** from the Help menu to start at the Contents.
+- Press **F1** to open the Help topic for the service you are using.
+
+In three places F1 belongs to the service instead of to Help, because the program or terminal shown there uses F1 itself:
+
+- In [[gwb_overview|GW-BASIC]], F1 is the first function key of the BASIC screen.
+- In [[vtx_overview|Videotex]], F1 is the GUIDE key of the Minitel, and the Help key of a NAPLPS service.
+
+In those services, choose Contents from the Help menu. In Videotex you can also click the Host box first, then press F1.
+
+@topic glossary | Glossary | glossary;terms;definitions
+Choose a term to see its definition.
+
+- {{gl_anonftp|anonymous FTP}}
+- {{gl_archie|Archie}}
+- {{gl_ardp|ARDP}}
+- {{gl_ascii|ASCII mode}}
+- {{gl_binary|binary mode}}
+- {{gl_cga|CGA}}
+- {{gl_codec|codec}}
+- {{gl_cuseeme|CU-SeeMe}}
+- {{gl_dns|DNS name}}
+- {{gl_ega|EGA}}
+- {{gl_finger|Finger}}
+- {{gl_ftp|FTP}}
+- {{gl_ftpmail|FTP-Mail}}
+- {{gl_gopher|Gopher}}
+- {{gl_host|host}}
+- {{gl_irc|IRC}}
+- {{gl_minitel|Minitel}}
+- {{gl_nabu|NABU}}
+- {{gl_naplps|NAPLPS}}
+- {{gl_netnews|Netnews}}
+- {{gl_nntp|NNTP}}
+- {{gl_passive|passive mode}}
+- {{gl_port|port}}
+- {{gl_qotd|QOTD}}
+- {{gl_reflector|reflector}}
+- {{gl_ripscrip|RIPscrip}}
+- {{gl_selector|selector}}
+- {{gl_telnet|Telnet}}
+- {{gl_vt220|VT220}}
+- {{gl_wais|WAIS}}
+- {{gl_z3950|Z39.50-1988}}
+- {{gl_zmodem|Zmodem}}

@@ -74,7 +74,7 @@ extern int  WINAPI GdipGetImageHeight(void *image, UINT *height);
 #define GOPHER_DEFAULT_PORT_  70
 #define GOPHER_HOME_URL       "gopher://gopher.teletext.ca/"
 
-/* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): a Windows 3.1
+/* Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): a Windows 3.1
  * document window, black on white, menu items in VGA navy so a
  * selector reads as something to press, info lines black, selection in
  * the Windows highlight (navy, white text). Through 1.0 this was white
@@ -1106,7 +1106,7 @@ static void gopher_navigate(const char *raw_url, int push_history,
     case 's': kind = GOPHER_KIND_BINARY; break;
     default:
         /* Unknown / out-of-scope types: graceful degrade. */
-        gopher_set_status("Gopher: item type not supported in v0.1.0-mvp.");
+        gopher_set_status("Gopher: this kind of item cannot be opened.");
         free(url); free(host); free(selector);
         return;
     }
@@ -1194,11 +1194,15 @@ static void gopher_on_fetch_done(int ok, GopherFetchResult *r)
                 const char *slash = suggest;
                 const char *p;
                 for (p = suggest; *p; p++) if (*p == '/') slash = p + 1;
-                if (gopher_save_binary_dialog(GetParent(g_hContent),
-                                              slash, r->bytes, r->size) == 0)
-                    gopher_set_status("Saved");
-                else
-                    gopher_set_status("Save cancelled");
+                /* 1.6: each outcome its own message; a failed write was
+                 * reported as "Save cancelled" (WinHelp phase 2b s3.4) */
+                switch (gopher_save_binary_dialog(GetParent(g_hContent),
+                                                  slash, r->bytes, r->size)) {
+                case 0:  gopher_set_status("Saved"); break;
+                case 1:  gopher_set_status("Save cancelled"); break;
+                case 2:  gopher_set_status("Gopher: the file could not be created there."); break;
+                default: gopher_set_status("Gopher: writing the file failed; nothing kept."); break;
+                }
             }
             break;
         }
@@ -1238,7 +1242,7 @@ static void gopher_dispatch_item(int idx)
     if (!gopher_type_is_clickable(it->type)) return;
     if (it->type == 'h') {
         /* TODO: cross-module dispatch hook for 'h' type (URL: prefix
-         * to web_module). Out of scope for v0.1.0-mvp. */
+         * to web_module). Not implemented yet (a post-1.6 item). */
         gopher_set_status("Gopher: 'h' URL items are not yet supported.");
         return;
     }
@@ -1505,7 +1509,10 @@ static int gopher_save_binary_dialog(HWND owner, const char *suggested,
     if (h == INVALID_HANDLE_VALUE) return 2;
     ok = WriteFile(h, bytes, (DWORD)n, &written, NULL);
     CloseHandle(h);
-    if (!ok || written != (DWORD)n) return 3;
+    if (!ok || written != (DWORD)n) {
+        DeleteFileA(path);            /* 1.6: no partial file left behind */
+        return 3;
+    }
     return 0;
 }
 
@@ -1698,8 +1705,10 @@ static LRESULT CALLBACK GopherRenderProc(HWND hwnd, UINT m, WPARAM w, LPARAM l)
         pt.y = GET_Y_LPARAM(l);
         ClientToScreen(hwnd, &pt);
         SetFocus(hwnd);
-        TrackPopupMenu(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON,
-                       pt.x, pt.y, 0, hwnd, NULL);
+        /* the Windows 3.1 popup since 2026-11-13 (w31_track_popup, suite_w31.c); the items and
+         * the WM_COMMAND path below are unchanged */
+        w31_track_popup(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+                        pt.x, pt.y, hwnd);
         DestroyMenu(hm);
         return 0;
     }
@@ -2133,7 +2142,7 @@ BOOL gopher_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
         break;
     case IDC_GOPH_STOP_BTN:
         if (notif == BN_CLICKED) {
-            /* Worker has no cancel hook in v0.1.0-mvp; the recv loop
+            /* The worker has no cancel hook; the recv loop
              * has a 15s timeout. Surface intent through the status
              * line and let the timeout fire. */
             gopher_set_status("Gopher: stop requested (waiting on recv timeout)...");

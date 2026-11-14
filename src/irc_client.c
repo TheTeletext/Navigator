@@ -5,7 +5,7 @@
  * Copyright (c) 2026 Dimitri Papadopoulos and The Teletext.
  * AGPLv3 -- see /COPYING.
  *
- * Wire behaviour (verified live against irc.greektimes.ca, UnrealIRCd
+ * Wire behaviour (verified live against The Teletext's IRC server, UnrealIRCd
  * 6.2.4, 2026-07-17):
  *   1. TCP connect, plaintext 6667.
  *   2. CAP LS 302 -> CAP REQ :server-time batch message-tags -> CAP END.

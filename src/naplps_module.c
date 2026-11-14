@@ -37,7 +37,7 @@
  * TWO FORMATS, ONE TAB (operator decision, 2026-09-27). The tab is
  * labelled "Videotex" and carries a Format dropdown, NAPLPS or Minitel,
  * which can only be changed while disconnected. Both formats use the same
- * host (videotex.greektimes.ca), the same single telnet_proto session and
+ * host (videotex.teletext.ca), the same single telnet_proto session and
  * the same status line; the port follows the format (1983 NAPLPS, 516
  * Minitel). Minitel mode is a complete terminal, screen and keyboard,
  * built by minitel_view.[ch] over the clean-room minitel_decode.[ch] and
@@ -849,7 +849,7 @@ static LRESULT CALLBACK NapPanelProc(HWND hwnd, UINT msg,
         FillRect(hdc, &rc, g_w31_br_face);
         return 1;
     }
-    /* Navigator 1.1: Windows 3.1 chrome round the videotex screen, which
+    /* Navigator 1.5: Windows 3.1 chrome round the videotex screen, which
      * itself stays black, as a videotex terminal is, in a sunken frame. */
     case WM_CTLCOLORSTATIC:
     case WM_CTLCOLORBTN:

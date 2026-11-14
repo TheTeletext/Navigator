@@ -22,6 +22,7 @@
 #include "nabu_native_module.h"
 #include "gwbasic_module.h"
 #include "home_module.h"
+#include "suite_help.h"
 #include "suite_w31.h"
 #include "suite_res.h"
 #include <winsock2.h>
@@ -38,7 +39,7 @@
  * centered lines, so the bar grew from
  * 50 to 68 px and BTN_HEIGHT from 36 to 54 px to give the second line
  * room above the existing 4 px row padding. */
-/* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the tab bar is a
+/* Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md): the tab bar is a
  * WinCIM-style ribbon of chiseled buttons, each a 32x32 16-colour icon
  * over an MS Sans Serif label, left-aligned at a fixed width that only
  * shrinks when the window is too narrow for all of them. */
@@ -47,7 +48,9 @@
 #define BTN_PAD     6
 #define BTN_GAP     2
 #define BTN_HEIGHT  58
-#define BTN_MAX_W   72
+/* 76 since 2026-11-13 (Navigator 1.6): "Newsgroups" is 69 px in bold MS Sans
+ * Serif 8 and needs 75 (76 latched) whole; 72 clipped it 1 px a side. */
+#define BTN_MAX_W   76
 
 /* Min window size: 800x600 per dispatch decision 11 until 2026-11-12;
  * since then 1024x768 (operator decision, docs/2026-11-13_NETNEWS_TAB.md
@@ -93,6 +96,10 @@
 
 #define ID_HELP_ABOUT   200   /* Help > About (mouse / Alt+H mnemonic) */
 #define ID_HELP_UPDATE  201   /* Help > Check for Updates              */
+#define ID_FILE_EXIT    202   /* File > Exit (2026-11-13, Navigator 1.6) */
+#define ID_HELP_CONTENTS 203  /* Help > Contents (TELETEXT.HLP, Navigator 1.6) */
+#define ID_HELP_SEARCH   204  /* Help > Search for Help on... */
+#define ID_HELP_HOWTO    205  /* Help > How to Use Help */
 
 /* The automatic update check does not run at WM_CREATE. It runs a few
  * seconds after the window is up, on a one-shot timer, so it is not
@@ -240,6 +247,21 @@ static BOOL g_in_user_resize = FALSE;
 
 BOOL suite_shell_in_user_resize(void) { return g_in_user_resize; }
 
+/* TRUE when F1 belongs to the window with the keyboard: the screens of
+ * GW-BASIC, the Minitel and NAPLPS, whose F1 keys are the machine's. */
+static BOOL help_f1_is_the_tabs(HWND focus)
+{
+    static const char *const own_f1[] = {
+        "MGTGwBasicScreen", "MGTMinitelCanvasV1", "MGTNapCanvasV1"
+    };
+    char cls[64];
+    int i;
+    if (!focus || !GetClassNameA(focus, cls, sizeof cls)) return FALSE;
+    for (i = 0; i < (int)(sizeof own_f1 / sizeof own_f1[0]); i++)
+        if (lstrcmpA(cls, own_f1[i]) == 0) return TRUE;
+    return FALSE;
+}
+
 /* Forward declarations. */
 static void layout_children(HWND hwnd);
 static void switch_to_module(int idx);
@@ -291,7 +313,7 @@ void suite_set_active_module(int command_id)
 
 /* ------------------------------------------------------------------ */
 /* Content panel: custom child window class.                           */
-/* Navigator 1.1: paints the Windows 3.1 button face and answers        */
+/* Navigator 1.5: paints the Windows 3.1 button face and answers        */
 /* WM_CTLCOLOR* with black on gray for labels and black on white for    */
 /* fields and lists (it was white on black through 1.0).                */
 /* ------------------------------------------------------------------ */
@@ -429,7 +451,7 @@ static void register_content_class(HINSTANCE hInst)
 }
 
 /* ------------------------------------------------------------------ */
-/* The ribbon button painter (Navigator 1.1).                          */
+/* The ribbon button painter (Navigator 1.5).                          */
 /* A Windows 3.1 push button holding the tab's 16-colour icon over its  */
 /* label. The active tab stays LATCHED DOWN (inverted bevel, contents   */
 /* shifted), the period way of showing which of a row of tool buttons   */
@@ -518,20 +540,30 @@ static void switch_to_module(int idx)
 }
 
 /* ------------------------------------------------------------------ */
-/* Menu bar: Help > About.                                             */
+/* Menu bar: File > Exit, Help > About.                                */
 /* ------------------------------------------------------------------ */
 
 static HMENU build_menu(void)
 {
     HMENU root = CreateMenu();
+    HMENU file = CreatePopupMenu();
     HMENU help = CreatePopupMenu();
+    /* File, the first item, as in every Windows 3.1 application
+     * (2026-11-13, Navigator 1.6, operator). Exit sends WM_CLOSE, the same
+     * path as Alt+F4, the system menu's Close and the taskbar. */
+    AppendMenuA(file, MF_STRING, ID_FILE_EXIT, "E&xit");
+    AppendMenuA(root, MF_POPUP, (UINT_PTR)file, "&File");
+    /* The Windows 3.1 Help menu (2026-11-13, Navigator 1.6): Contents,
+     * Search for Help on, How to Use Help, as every 3.1 application had
+     * them, opening TELETEXT.HLP in The Teletext WinHelp (suite_help.c). */
+    AppendMenuA(help, MF_STRING, ID_HELP_CONTENTS, "&Contents");
+    AppendMenuA(help, MF_STRING, ID_HELP_SEARCH, "&Search for Help on...");
+    AppendMenuA(help, MF_STRING, ID_HELP_HOWTO, "&How to Use Help");
+    AppendMenuA(help, MF_SEPARATOR, 0, NULL);
     AppendMenuA(help, MF_STRING, ID_HELP_UPDATE, "Check for &Updates...");
     AppendMenuA(help, MF_SEPARATOR, 0, NULL);
     AppendMenuA(help, MF_STRING, ID_HELP_ABOUT, "&About");
-    /* MF_RIGHTJUSTIFY: pushes the Help menu to the right edge of the menu bar.
-     * No \tF12 hint on the top-level item because Windows does not render
-     * tab-aligned shortcut text in the menu bar (it mashes together as
-     * "HelpF12"). The F12 accelerator is still active. */
+    /* MF_RIGHTJUSTIFY: pushes the Help menu to the right edge of the menu bar. */
     AppendMenuA(root, MF_POPUP | MF_RIGHTJUSTIFY, (UINT_PTR)help, "&Help");
     return root;
 }
@@ -820,11 +852,23 @@ static LRESULT CALLBACK SuiteWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
             if (idx >= 0) switch_to_module(idx);
             return 0;
         }
+        case ID_FILE_EXIT:
+            PostMessageA(hwnd, WM_CLOSE, 0, 0);
+            return 0;
         case ID_HELP_ABOUT:
             suite_about_show(hwnd);
             return 0;
         case ID_HELP_UPDATE:
             suite_update_check(hwnd);
+            return 0;
+        case ID_HELP_CONTENTS:
+            suite_help_contents(hwnd);
+            return 0;
+        case ID_HELP_SEARCH:
+            suite_help_search(hwnd);
+            return 0;
+        case ID_HELP_HOWTO:
+            suite_help_on_help(hwnd);
             return 0;
         }
         break;
@@ -928,7 +972,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
     icc.dwICC  = ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES;
     InitCommonControlsEx(&icc);
 
-    /* Navigator 1.1: the Windows 3.1 palette and font, and the CTL3D-
+    /* Navigator 1.5: the Windows 3.1 palette and font, and the CTL3D-
      * style hook that restyles every push button, sunken field and
      * dialog this thread creates from here on (suite_w31.h). */
     w31_init();
@@ -1033,6 +1077,18 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
          * the v1 intent for any nesting depth and is identical to the old
          * check for the other tabs' direct-child controls. */
         focused = GetFocus();
+        /* F1: Help for the tab in view (Navigator 1.6), except where F1
+         * belongs to what the tab shows: GW-BASIC's function key, the
+         * Minitel's GUIDE key and a NAPLPS service's Help key, while their
+         * screen has the keyboard. */
+        if (msg.message == WM_KEYDOWN && msg.wParam == VK_F1 &&
+            !(GetKeyState(VK_SHIFT) & 0x8000) && !(GetKeyState(VK_CONTROL) & 0x8000) &&
+            !help_f1_is_the_tabs(focused)) {
+            suite_help_context(g_hwndMain, g_active_module >= 0
+                               ? (DWORD)NAV_HELP_TAB_ID(g_active_module)
+                               : (DWORD)NAV_HELP_CONTENTS_ID);
+            continue;
+        }
         focus_in_content = (focused != NULL) &&
                            (focused == g_hwndContent ||
                             IsChild(g_hwndContent, focused));
@@ -1045,6 +1101,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
         DispatchMessageA(&msg);
     }
 
+    suite_help_quit(NULL);   /* as 3.1 applications did: WinHelp(HELP_QUIT) */
     suite_update_shutdown();
     ripscrip_module_shutdown();
     naplps_module_shutdown();

@@ -1,0 +1,306 @@
+%map wais_overview 800
+%map wais_connect 801
+%map wais_settings 802
+%map wais_usage 803
+%map wais_trouble 804
+%map archie_overview 900
+%map archie_connect 901
+%map archie_settings 902
+%map archie_usage 903
+%map archie_trouble 904
+%map ftp_overview 1000
+%map ftp_connect 1001
+%map ftp_settings 1002
+%map ftp_usage 1003
+%map ftp_trouble 1004
+
+@topic wais_overview | WAIS | WAIS;full-text search;Z39.50;searching;overview | wais
+= About WAIS
+{{gl_wais|WAIS}}, the Wide Area Information Server, was one of the first distributed search systems on the Internet. Instead of browsing menus, you asked a question: you send words to a WAIS server, and it returns the documents of a database ranked by how well they match. It came out of early Internet research into information discovery.
+
+WAIS carried its searches in {{gl_z3950|Z39.50-1988}}, the American national standard for information retrieval of its day.
+
+The Teletext runs a live WAIS server with the original WAIS protocol. To our knowledge, it is the only publicly accessible production WAIS server using the original WAIS protocol, derived from Z39.50-1988, in operation in the world today. It is not a preserved relic but a working search service attached to a news operation: a ranked full-text search of The Teletext's articles.
+
+= WAIS in Navigator
+The WAIS service is a native WAIS client. It speaks Z39.50-1988 (Version 1), the protocol of the original WAIS servers, with client code from freeWAIS-sf 2.2.14. It is set up for The Teletext's server, wais.teletext.ca, port 210, database teletext.
+
+- [[wais_connect|Connecting to a WAIS Server]]
+- [[wais_settings|WAIS Settings]]
+- [[wais_usage|Searching and Reading Documents]]
+- [[wais_trouble|WAIS Troubleshooting]]
+
+@topic wais_connect | Connecting to a WAIS Server | WAIS;connecting;Connect button;server;port;database | wais
+1. Check the **Server** box (wais.teletext.ca), the **Port** box (210) and the **Database** box (teletext).
+2. Choose **Connect**.
+
+Navigator checks that the server can be searched:
+
+- It opens a connection to the server, within 3 seconds.
+- It sends the Z39.50-1988 initialization, and waits 3 seconds for the answer.
+- It runs a test search in the database you named.
+
+While it checks, the status bar shows "Connecting..." and the button reads Disconnect but is dimmed; the check cannot be stopped. When the test search succeeds, the status bar shows "Connected to" and the server and database. The Search box, the Doc # box and their buttons become available, and Server, Port and Database are locked.
+
+WAIS keeps no connection open: each search and each document you read opens a connection of its own. "Connected" means that the server and database answered the check.
+
+To disconnect, choose **Disconnect**. Nothing is sent to the server; Navigator stops any search in progress and clears the Search box, the Doc # box and the results.
+
+@topic wais_settings | WAIS Settings | WAIS;settings;server;port;database | wais
+- **Server**: the WAIS server's name. The Teletext's is wais.teletext.ca.
+- **Port**: 210, the usual WAIS port.
+- **Database**: the database to search on that server. The Teletext's is teletext.
+
+These can be changed only while you are disconnected. They are kept when you choose another service, but not after Navigator closes.
+
+The line **Protocol: Z39.50-1988** names the protocol; it cannot be changed.
+
+@topic wais_usage | Searching and Reading Documents | WAIS;searching;search words;score;reading a document;Doc #;View | wais
+= Searching
+1. Type one or more words in the **Search** box.
+2. Press ENTER or choose **Search**.
+
+The status bar shows "Searching...", then "Search: Done" and the number of documents. The server returns at most 40.
+
+The results begin with "Search Response:" and the number of records returned. Each document then has one line: its number, a bar of up to nine solid blocks showing its score (the server's own measure of how well it matches; a longer bar is a better match), and its headline, or "(no title)" if it has none.
+
+= Reading a document
+1. Type the document's number in the **Doc #** box.
+2. Press ENTER or choose **View**.
+
+The status bar shows how much of the document has arrived, then "Document: Done". The document replaces the results in the window. A document is read up to its full length, at most one megabyte.
+
+Choose **<** to go back from the document to the results, and **>** to go forward to the last document again.
+
+= Moving and copying
+- UP ARROW, DOWN ARROW, PAGE UP and PAGE DOWN scroll the window even while you are typing in a box.
+- ESC stops a search or a document that is arriving.
+- To copy, select text in the window and press CTRL+C, or click with the right mouse button and choose Copy. CTRL+A selects everything.
+
+Only one search or document can be in progress at a time.
+
+@topic wais_trouble | WAIS Troubleshooting | WAIS;troubleshooting;errors;database not found | wais
+= "Server, port, and database are required." or "Port must be 1-65535."
+Fill in the box, then choose Connect.
+
+= "Cannot connect to" the server
+The server did not accept a connection on that port within 3 seconds. Check the name and the port (210).
+
+= "does not speak WAIS Z39.50-1988."
+Something answered on that port, but not a WAIS server.
+
+= "Database" ... "not found"
+The server does not have a database of that name. The Teletext's database is teletext, in lower case.
+
+= "Run a search first." or "Enter a Doc # from 1 to" a number
+Search before reading, and use a number from the results.
+
+= "WAIS is busy: press Esc to cancel."
+A search or a document is still arriving. Wait, or press ESC.
+
+= A search or document never finishes
+Press ESC to stop it, then try again. Navigator waits as long as the server takes.
+
+= "No response from server." or "Z39.50-1988 Init failed."
+The server closed the connection or did not answer the search. Try again; if it continues, disconnect and connect again.
+
+@topic archie_overview | Archie | Archie;searching for files;FTP archives;overview | archie
+= About Archie
+{{gl_archie|Archie}} was the Internet's first search engine, created at McGill University in Montreal in 1989 by Alan Emtage, with Peter Deutsch and Bill Heelan. Before the World Wide Web, public anonymous FTP servers held a large and growing collection of software, documents, reports, data, pictures, sound and public records. Finding them was the problem. Archie solved it by collecting the file listings of FTP servers into one searchable index of file names, directories and hosts.
+
+Reporters, librarians and researchers used Archie to find source documents, public records and files connected with the news. During the debate over the North American Free Trade Agreement, the NAFTA text and related documents were distributed through university and legal FTP archives, and library guidance of the time records using Archie to find a copy. Archie was the early Internet's finding desk: it told you which server held a file and where.
+
+Archie was invented here in Montreal, and its return has a special meaning for us. The Teletext runs a Bunyip Archie 3.5 server connected to its own anonymous FTP archive, reached through Archie's original protocol, Prospero's {{gl_ardp|ARDP}}. To our knowledge, it is the only publicly accessible Archie server in operation in the world today. Welcome home, Archie!
+
+Archie's creators were Alan Emtage, Bill Heelan and Peter Deutsch (McGill University, 1989). The Archie 3.5 release came from Bunyip Information Systems, Inc. (1996). Its last surviving copy was preserved by ICM, University of Warsaw, and found and set free by The Serial Port (2024).
+
+= Archie in Navigator
+The Archie service asks an Archie server which anonymous FTP sites hold a file, shows the hosts, directories and files it finds, and downloads the one you choose. It speaks ARDP over UDP, as the original clients did. It is set up for The Teletext's server, archie.teletext.ca, which indexes the files of ftp.teletext.ca.
+
+- [[archie_connect|Searching an Archie Server]]
+- [[archie_settings|Archie Settings]]
+- [[archie_usage|Choosing and Downloading a File]]
+- [[archie_trouble|Archie Troubleshooting]]
+
+@topic archie_connect | Searching an Archie Server | Archie;searching;Search button;Archie server;connecting | archie
+Archie has no Connect button: each search is one exchange with the server.
+
+1. Type part or all of a file name in the **Search** box, for example pdf.
+2. Check the **Archie Server** box (archie.teletext.ca) and the **Port** box (1525).
+3. Choose a **Search Type**.
+4. Press ENTER or choose **Search**.
+
+The status bar shows "Searching Archie...", and, when the answer comes in several packets, which packet has arrived. When it is complete it shows "Search: Done" and the number of hits. A server returns at most 100 hits.
+
+Navigator tries four times, waiting four seconds each time, before it reports that the server does not answer. A search cannot be stopped once it has started.
+
+@topic archie_settings | Archie Settings | Archie;settings;search type;Exact first;substring;regular expression | archie
+= Search Type
+- **Substring**: finds names that contain the text, in upper or lower case.
+- **Substring (case sensitive)**: the same, with upper and lower case kept apart.
+- **Exact**: finds only names that are exactly the text.
+- **Regular Expression**: the text is a pattern, as in the UNIX ed editor.
+
+**Exact first**: look for an exact match before the substring or pattern search. It is dimmed when Exact is chosen.
+
+= Server
+**Archie Server** and **Port** name the server. The Teletext's is archie.teletext.ca, port 1525. You may also type the port after the name, as archie.teletext.ca:1525. Archie uses UDP; the Protocol line says so and cannot be changed.
+
+These settings are kept when you choose another service, but not after Navigator closes.
+
+@topic archie_usage | Choosing and Downloading a File | Archie;Hosts;Directories;Files;downloading files;Save As | archie
+The hits are shown in three lists:
+
+- **Hosts**: the FTP sites that hold a match.
+- **Directories**: the directories on the chosen host.
+- **Files**: the files in the chosen directory.
+
+After a search, the first host and its first directory are chosen for you. Click a host or a directory to fill the next list.
+
+Click a file to see its details under **Selected file**: its name, its size in kilobytes, its UNIX permissions (Mode), its date, and the address of its host.
+
+= Downloading the file
+1. Choose a file in the Files list.
+2. Choose **Download**.
+3. In the Download file dialog box, choose where to save it, and choose Save.
+
+Navigator downloads the file from its host by {{gl_anonftp|anonymous FTP}}, in {{gl_binary|binary mode}} and {{gl_passive|passive mode}}, on port 21. The status bar counts the bytes, and shows "Saved" when the file is complete. While it downloads, the Download button reads **Cancel**; choose it to stop. A file that does not arrive completely is deleted.
+
+To browse the host's other files, use the [[ftp_overview|FTP]] service.
+
+@topic archie_trouble | Archie Troubleshooting | Archie;troubleshooting;errors;no response | archie
+= "Enter a search term and press Search."
+The Search box is empty.
+
+= "Cannot resolve" the server
+The Archie server's name could not be found. Check its spelling.
+
+= "No response from" the server
+The server did not answer after four tries. Archie uses UDP port 1525; some networks block UDP.
+
+= "Search: Done (0 hits)"
+No file name matched. Try Substring instead of Exact, or a shorter part of the name.
+
+= The server's own message, beginning ERROR or FAILURE
+The server refused the search; its message says why. A Regular Expression search with a mistake in the pattern is a common cause.
+
+= "Anonymous login failed" or "Cannot connect to" a host
+The FTP site that holds the file refused the download, or is no longer there. Archie's index may be older than the site.
+
+= "Server refused passive mode."
+The host does not allow passive transfers. Archie downloads always use passive mode; try the FTP service with Passive cleared.
+
+@topic ftp_overview | FTP | FTP;anonymous FTP;file transfer;downloading files;overview | ftp
+= About FTP
+{{gl_ftp|FTP}}, the File Transfer Protocol, is one of the foundation services of the early Internet, and still one of the simplest ways to offer files to every kind of computer. In the news business, {{gl_anonftp|anonymous FTP}} became the Internet's first file counter: the place to fetch the documents, reports, data, pictures, sound, software and public records behind the day's news.
+
+During the NAFTA debate of the early 1990s, anonymous FTP let readers fetch the treaty's text, chapters and appendixes straight from Internet archives. During the war in Bosnia in the mid-1990s, FTP sites gathered and distributed news, documents, pictures and reports about the conflict. FTP was not the headline ticker: it was the document room behind the newsroom.
+
+The Teletext uses FTP in the same way, as the file depot of its system.
+
+= FTP in Navigator
+The FTP service lists the files on an anonymous FTP server and copies them to your computer. It is laid out like the FTP programs of the 1990s: your computer's folders on the left, the server's directories on the right, and below them a log of everything said between Navigator and the server.
+
+It downloads only. It logs in as anonymous, and cannot upload, delete, rename or create anything on a server. It is set up for The Teletext's server, ftp.teletext.ca: print replica editions in PDF, audio and video podcasts, software and other files.
+
+- [[ftp_connect|Connecting to an FTP Server]]
+- [[ftp_settings|FTP Settings]]
+- [[ftp_usage|Browsing and Downloading Files]]
+- [[ftp_trouble|FTP Troubleshooting]]
+
+@topic ftp_connect | Connecting to an FTP Server | FTP;connecting;Connect button;host;port;anonymous;login;ftp:// addresses | ftp
+1. Check the **Host** box (ftp.teletext.ca) and the **Port** box (21).
+2. Choose **Connect**, or press ENTER in the Host box.
+
+The status bar shows "Connecting to" and the host. Navigator then:
+
+- opens the connection, within 20 seconds;
+- waits for the server's greeting;
+- logs in as anonymous, giving navigator@teletext.ca as the password if the server asks for one;
+- asks for the current directory and lists it.
+
+The remote list fills, and the status bar shows "Connected to" the host, the directory and the number of entries. Every command and reply appears in the log.
+
+The **Username** box always shows Anonymous; it cannot be changed. A server that does not accept anonymous logins cannot be used.
+
+To stop a connection that is being made, choose the button again; it reads Disconnect while connecting. To disconnect, choose **Disconnect**: Navigator sends QUIT and shows the server's goodbye.
+
+= FTP addresses
+An ftp:// address followed in the [[web_overview|Web]] service opens here: Navigator connects to the host, goes to the directory, and selects the file if the address names one. A user name in the address is ignored.
+
+= Idle sessions
+Navigator does not keep an idle session alive. Many servers end a session that has been idle for some minutes; the status bar then says so, and you connect again.
+
+@topic ftp_settings | FTP Settings | FTP;settings;Passive;transfer mode;ASCII;Binary;Auto | ftp
+= Passive
+When **Passive** is checked (as it is at first), your computer opens the data connection for each listing and file. This is {{gl_passive|passive mode}}, and it works through most firewalls and home routers. Clear it only if a server needs the older active mode, in which the server connects to your computer.
+
+= Transfer
+- **ASCII**: every file is sent in {{gl_ascii|ASCII mode}}, as text.
+- **Binary**: every file is sent in {{gl_binary|binary mode}}, unchanged.
+- **Auto** (chosen at first): text files are sent in ASCII mode and everything else in binary mode. Auto treats as text the names ending .txt, .asc, .me, .1st, .diz, .nfo, .htm, .html, .md, .ini, .bat, .c, .h, .sha256, .md5, .sfv, .csv, .log, .xml, .json, .cfg, .bas and .lst, and names without an extension that begin README, INDEX or LICENSE, or are 00INDEX.
+
+= Host and Port
+Change them while you are disconnected. The usual FTP port is 21.
+
+None of these settings is remembered after Navigator closes.
+
+@topic ftp_usage | Browsing and Downloading Files | FTP;directories;downloading files;View;local folder;Downloads folder;cancelling a transfer | ftp
+= The server's files (right)
+Directories and links are listed first, then files, each in alphabetical order. Each line shows the name, the size in bytes and the date. ".." goes up one level.
+
+- Double-click a directory, or select it and press ENTER, to open it.
+- Double-click a file, or select it and press ENTER, to download it.
+- A link that leads to a directory opens it; otherwise the link is downloaded.
+
+= Your folders (left)
+The local side starts in your Downloads folder. Double-click a folder, a drive or ".." to move. Downloads are saved in the folder shown on the left.
+
+= Downloading
+Select a file on the right and choose **<--**, or double-click it. No dialog box appears:
+
+- The file is saved in the local folder on the left.
+- A file of the same name is never replaced: the new one is saved as name (2), name (3) and so on.
+- Characters that Windows does not allow in names are replaced with _.
+- The status bar shows the progress, with the progress bar when the server gives the size.
+
+When the file is complete, the status bar shows "Transfer: Done", the log shows its size and time, and the local list is refreshed.
+
+To cancel a download, press ESC in either list or in the log. The session stays open. A file that does not arrive completely is deleted.
+
+= Viewing a file
+Select a file and choose **View** to open it in the program Windows uses for that kind of file. View opens only text files (.txt, .sha256, .asc, .log, .nfo, and files named 00INDEX, INDEX, README or CHANGES) and PDF files; it never opens a program or a script. A file on the server is first copied to a temporary folder, which is removed when you disconnect.
+
+= The log
+Lines from the server are shown in black, the commands Navigator sends in blue, and Navigator's own notes in grey. The last 3000 lines are kept.
+
+@topic ftp_trouble | FTP Troubleshooting | FTP;troubleshooting;errors;anonymous login refused;passive mode;idle session | ftp
+= "Enter a host name." or "Port must be 1 to 65535."
+Correct the Host or Port box.
+
+= "Cannot connect: host" ... "not found."
+The host name could not be found. Check its spelling.
+
+= "Cannot connect to" the host ... "timed out" or "connection refused or unreachable"
+The server did not accept a connection on that port. Check the port (21 for most servers).
+
+= "Anonymous login refused"
+The server does not allow anonymous logins. The FTP service can log in only as anonymous.
+
+= "Cannot open the data connection" or "Listing failed"
+Listings and files travel on a second connection. If Passive is cleared, check it and try again; if it is checked, try clearing it.
+
+= "Transfer failed" ... "nothing kept."
+The download did not complete, and the partial file was deleted. Start it again.
+
+= "The server ended the idle session" or "The server closed the idle connection. Disconnected."
+The server ends sessions that are idle. Connect again.
+
+= "Not opened:" ... "is not a type View opens."
+View opens only text and PDF files. Download the file instead.
+
+= "Could not open" ... "no viewer is set up"
+Windows has no program for that kind of file.
+
+= "Refused to send" in the log
+The FTP service sends only the commands needed to list and download. Commands that would change a server are never sent.

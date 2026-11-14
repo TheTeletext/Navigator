@@ -6,7 +6,7 @@
  * AGPLv3 -- see /COPYING.
  *
  * Receive-only broadcast viewer for the #retro channel on
- * irc.greektimes.ca. Mirrors telnet_module's lifecycle: init/shutdown
+ * irc.teletext.ca. Mirrors telnet_module's lifecycle: init/shutdown
  * bracket the per-process allocations; activate/deactivate/resize/
  * on_command/has_unsaved are the suite_module_t callbacks (declared in
  * suite_shell.h). Reuses the vt_term core + suite_clipboard for an

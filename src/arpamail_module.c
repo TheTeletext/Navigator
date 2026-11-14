@@ -877,7 +877,7 @@ void arpamail_module_activate(HWND content)
     if (g_hFontOutput)
         SendMessageA(g_a_body_edit, WM_SETFONT, (WPARAM)g_hFontOutput, TRUE);
 
-    /* Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md), operator
+    /* Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md), operator
      * decision 2026-11-10: the tab keeps its terminal look. The To: line
      * and the message are white on black in fixed pitch, as in 1.0;
      * labels, buttons and the strip are the Windows 3.1 chrome. */

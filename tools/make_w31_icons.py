@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# make_w31_icons.py - the Navigator 1.1 icon set, 32x32, 16 colours,
+# make_w31_icons.py - the Navigator 1.5 icon set, 32x32, 16 colours,
 # and (2026-11-11) the 16x16 Gopher item-type icons.
 #
 # Part of Teletext Navigator.

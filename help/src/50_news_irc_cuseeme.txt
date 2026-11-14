@@ -1,0 +1,224 @@
+%map news_overview 1100
+%map news_connect 1101
+%map news_settings 1102
+%map news_usage 1103
+%map news_trouble 1104
+%map irc_overview 1200
+%map irc_connect 1201
+%map irc_settings 1202
+%map irc_usage 1203
+%map irc_trouble 1204
+%map cusm_overview 1300
+%map cusm_connect 1301
+%map cusm_settings 1302
+%map cusm_usage 1303
+%map cusm_trouble 1304
+
+@topic news_overview | Newsgroups | Newsgroups;Netnews;NNTP;newsreader;reading articles;overview | news
+= About Netnews and NNTP
+{{gl_nntp|NNTP}}, the Network News Transfer Protocol, was one of the defining technologies of online news before the Web. For years, {{gl_netnews|Netnews}} newsgroups and newsreader programs were a main way to read, follow and keep the information published on the network.
+
+The Teletext runs its own news server, which carries its current news, weather bulletins and official alerts into this historic medium, in its own newsgroups:
+
+- teletext.montreal.news: the Montreal and Canadian daily news.
+- teletext.montreal.weather: Montreal conditions, the forecast and the weather briefing.
+- teletext.montreal.alerts: official public alerts.
+- teletext.montreal.traffic: Montreal road-work notices.
+- teletext.montreal.numbers: markets and numbers (lottery results, gas prices, rates and currencies).
+
+Anyone may read every group without logging in. Publicly reachable independent news servers of this kind appear to number only in the tens in the world.
+
+= Newsgroups in Navigator
+The Newsgroups service is a newsreader. It lists the groups of a news server, the articles of a group and the text of an article. It only reads: it cannot post an article, and it does not log in. It is set up for news.teletext.ca, port 119.
+
+- [[news_connect|Connecting to a News Server]]
+- [[news_settings|Newsgroups Settings]]
+- [[news_usage|Reading Newsgroups]]
+- [[news_trouble|Newsgroups Troubleshooting]]
+
+@topic news_connect | Connecting to a News Server | Newsgroups;NNTP;connecting;Connect button;server;port | news
+1. Check the **Server** box (news.teletext.ca) and the **Port** box (119).
+2. Choose **Connect**.
+
+The status bar shows "Connecting to" the server, then "Reading group list...", then "Groups: Done" and the number of groups. The Newsgroups list fills, sorted by name, with each group's description under its name.
+
+Choosing Connect clears all three panes. The server must answer within 20 seconds, and each reply within 30.
+
+To disconnect, choose **Disconnect**. If nothing is being read, Navigator sends QUIT and shows the server's goodbye. If a list or an article is still arriving, it stops at once. What is on the screen stays there until you connect again.
+
+@topic news_settings | Newsgroups Settings | Newsgroups;settings;server;port | news
+The only settings are the **Server** and **Port** boxes, which can be changed while you are disconnected. The usual NNTP port is 119.
+
+The Newsgroups service connects without encryption and without a login, and remembers nothing after Navigator closes. It does not keep track of which articles you have read.
+
+@topic news_usage | Reading Newsgroups | Newsgroups;reading articles;articles list;attachments;copying text | news
+The window has three panes:
+
+- **Newsgroups**: the groups on the server. The number of articles appears once the group has been opened.
+- **Articles**: the articles of the chosen group, newest first, with Subject, From, Date and Lines. Articles are listed one by one, not grouped into threads.
+- **Article**: the text of the chosen article, with its From, Newsgroups, Subject and Date lines first.
+
+= Choosing
+- Click a group or an article to open it.
+- Or move with the arrow keys, PAGE UP, PAGE DOWN, HOME and END; the row opens when you stop for a moment. ENTER opens it at once.
+- TAB and SHIFT+TAB move between the three panes.
+
+When a group opens, the status bar shows "Reading the overview of" the group, with the progress bar, then "Overview: Done" and the number of articles. Articles that are no longer on the server are left out.
+
+= Reading
+In the Article pane, use the arrow keys, PAGE UP, PAGE DOWN, HOME, END, the scroll bars or the mouse wheel. The text is shown in a fixed-pitch font, as the author wrote it.
+
+Parts of an article that are not text, such as attachments, are named in brackets but not opened. An article longer than 8 megabytes is cut, and the status bar says so.
+
+= Copying
+Drag across the article's text to select it, then press CTRL+C, or click with the right mouse button and choose Copy. CTRL+A selects the whole article. The Newsgroups service cannot save an article.
+
+@topic news_trouble | Newsgroups Troubleshooting | Newsgroups;troubleshooting;errors;NNTP | news
+= "Enter a server name." or "Port must be 1 to 65535."
+Correct the box, then choose Connect.
+
+= "Cannot connect: host" ... "not found."
+The server's name could not be found. Check its spelling.
+
+= "Cannot connect to" the server ... "timed out" or "connection refused or unreachable"
+The server did not answer on that port. The usual port is 119.
+
+= "The server turned the connection away"
+The server refused this connection; its message says why.
+
+= "Reading" a group "is not permitted"
+The server does not let anonymous readers open that group.
+
+= "This article is no longer on the server"
+It has expired or been removed since the list was read. It is taken off the list.
+
+= "The server ended the idle session" or "The server closed the idle connection. Disconnected."
+Connect again.
+
+@topic irc_overview | IRC | IRC;Internet Relay Chat;#retro;channel;overview | irc
+= About IRC
+{{gl_irc|IRC}}, Internet Relay Chat, appeared in 1988 as a system for live text conversation over the network, and it soon carried live news during world events. IRC reporting was widely used during the Gulf War of 1991, the Soviet coup attempt of 1991, the Moscow crisis of 1993 and the Northridge earthquake of 1994.
+
+The Teletext uses IRC in that tradition, as a live, read-only news channel: #retro carries news, alerts and weather updates in plain text, for old and new clients alike. The broadcast program is the only one allowed to speak in it.
+
+= IRC in Navigator
+The IRC service shows the messages of one channel as they arrive. It only receives: there is no box to type in, and it sends the server nothing but what IRC requires to stay connected. It is set up for irc.teletext.ca, port 6667, channel #retro.
+
+- [[irc_connect|Connecting to an IRC Channel]]
+- [[irc_settings|IRC Settings]]
+- [[irc_usage|Reading the Channel]]
+- [[irc_trouble|IRC Troubleshooting]]
+
+@topic irc_connect | Connecting to an IRC Channel | IRC;connecting;Connect button;server;port;channel;nickname | irc
+1. Check the **Server** box (irc.teletext.ca), the **Port** box (6667) and the **Channel** box (retro; the # is already there).
+2. Choose **Connect**.
+
+The status bar shows "Connecting to" the server and channel, then "Connected to" the server, "joining" the channel, then "Connected to" the server and channel. The window shows the server's welcome, and then the channel's messages.
+
+Navigator joins under a name of its own, mgtview- followed by four digits, chosen anew at each connection.
+
+If the connection drops after you have joined, Navigator connects again by itself, waiting a little longer each time, up to 30 seconds. The session stays open when you choose another service.
+
+To disconnect, choose **Disconnect**. The text stays in the window.
+
+@topic irc_settings | IRC Settings | IRC;settings;server;port;channel | irc
+- **Server** and **Port**: the IRC server. The Teletext's is irc.teletext.ca, port 6667.
+- **Channel**: the channel to join, without its #. The Teletext's is retro.
+
+These can be changed while you are disconnected. The IRC service connects without encryption and remembers nothing after Navigator closes.
+
+@topic irc_usage | Reading the Channel | IRC;reading messages;copying text;scrolling | irc
+Each message is shown on a line of its own, with the time it was sent (in your time zone) in brackets. Every other message has a light green background, so long messages are easy to tell apart. The sender's name is not shown.
+
+Only the messages and notices sent to the channel are shown. People joining or leaving, name changes and topic changes are not.
+
+The last 2000 lines are kept. The window follows new messages while you are at the bottom; scroll up to read earlier ones, and new messages will not move the text away from you. Use the scroll bar, the mouse wheel, UP ARROW, DOWN ARROW, PAGE UP, PAGE DOWN, HOME (the oldest line) and END (the newest).
+
+To copy, drag across the text and press CTRL+C, or click with the right mouse button and choose Copy. CTRL+A selects everything.
+
+Letters outside the plain ASCII set, such as accented or Greek letters, are shown as blanks, and IRC colour codes are not shown in colour.
+
+@topic irc_trouble | IRC Troubleshooting | IRC;troubleshooting;errors | irc
+= "Server, port, and channel are required." or "Port must be 1-65535."
+Fill in the box, then choose Connect.
+
+= "Connection failed: Could not resolve host"
+The server's name could not be found. Check its spelling.
+
+= "Connection failed: Connection refused" or "Connection timed out"
+The server did not accept a connection on that port. The Teletext's server uses 6667.
+
+= A message from the server in the window, beginning with *
+The server refused to let Navigator join the channel; its message says why. Check the channel's name.
+
+= Nothing appears after joining
+The channel is quiet. On #retro, news and weather are sent at intervals.
+
+@topic cusm_overview | CU-SeeMe | CU-SeeMe;Live TV;video;Teletext TV;reflector;overview | cusm
+= About CU-SeeMe
+In 1992 Cornell University built one of the Internet's first video systems: {{gl_cuseeme|CU-SeeMe}}. When few people had ever seen live video travel over a network, it let computers around the world share grainy black-and-white pictures and sound in real time.
+
+With a program called a {{gl_reflector|reflector}}, one live feed could be sent to many viewers at once, and CU-SeeMe became something close to television. NASA used it to show space shuttle launches to the world, years before online video was ordinary. When the Oklahoma City bombing happened in 1995, the coverage of KOCO Channel 5 was carried by CU-SeeMe, one of the first times breaking news reached the world this way. Later that year ABC carried a live news program over the Internet with CU-SeeMe.
+
+Teletext TV carries on that tradition: one live feed for anyone who wants to watch, with no chat room and nothing to send back. Its reflector runs the original Cornell software of 1995. To our knowledge, it is the only round-the-clock live television CU-SeeMe reflector running the original Cornell server still broadcasting anywhere in the world.
+
+= CU-SeeMe in Navigator
+The CU-SeeMe service shows the live picture and plays the sound, laid out like CU-SeeMe on a Macintosh of the time: a video window, a participant list, an audio window and two windows of statistics. It only watches and listens; it never sends. It is set up for cu-seeme.teletext.ca, which carries Teletext TV: 160 by 120 grey-scale video at about one frame a second, with sound in the Intel DVI format.
+
+- [[cusm_connect|Connecting to a Reflector]]
+- [[cusm_settings|CU-SeeMe Settings]]
+- [[cusm_usage|Watching CU-SeeMe]]
+- [[cusm_trouble|CU-SeeMe Troubleshooting]]
+
+@topic cusm_connect | Connecting to a Reflector | CU-SeeMe;connecting;Connect button;reflector;port | cusm
+1. Check the **Reflector** box (cu-seeme.teletext.ca) and the **Port** box (7648).
+2. Check the **Audio Codec** list. Teletext TV uses Intel DVI.
+3. Choose **Connect**.
+
+The status line under the picture shows "Connecting...", then "Handshaking...", then "Receiving" with the frame rate, the sound rate and the codec. The picture replaces the test pattern, and Navigator appears among the Lurkers in the Participant List (a lurker watches without sending).
+
+If nothing arrives for 8 seconds, the status line shows "Connection lost" and Navigator tries again by itself, waiting a little longer each time.
+
+To disconnect, choose **Disconnect**; choosing it while connecting stops the attempt. Choosing another service also disconnects, so the sound does not play behind it. Choose Connect again when you return.
+
+@topic cusm_settings | CU-SeeMe Settings | CU-SeeMe;settings;audio codec;Intel DVI;Delta-Mod;volume | cusm
+- **Reflector** and **Port**: the reflector to watch. The Teletext's is cu-seeme.teletext.ca, port 7648.
+- **Audio Codec**: how to decode the sound. **Intel DVI** (chosen at first) is what Teletext TV sends; **Delta-Mod** was used by other reflectors. Choose the one the reflector sends, or the sound will be noise.
+
+These can be changed while you are disconnected. The volume and the mute button are in the Audio window. Nothing is remembered after Navigator closes.
+
+@topic cusm_usage | Watching CU-SeeMe | CU-SeeMe;video window;sound;mute;statistics;participant list | cusm
+= The video window
+Its title is the sender's name. The picture is shown four times its size when the window allows, or three or two times. The line under the picture shows the frame rate and the data rate, or DISCONNECTED, WAITING, TIMED OUT or PAUSED.
+
+The buttons under the picture:
+
+- The **eye** shows the test pattern instead of the picture (PAUSED). The sound keeps playing. Click it again to see the picture.
+- The **speaker** mutes or restores the sound.
+- The **two icons** at the right open and close the Transmission Statistics and Version and IP windows.
+
+The microphone is dimmed: CU-SeeMe here never sends sound.
+
+= The other windows
+- **Participant List**: the people connected to the reflector, as Visible Users, Hidden Users and Lurkers.
+- **Audio**: a speaker button (mute), the sound level and a volume slider.
+- **Transmission Statistics**: how long you have been connected, frames and packets received, frame rate, data rate and the sound codec.
+- **Version and IP**: the reflector's name and address, your address as the reflector sees it, and the sender's details.
+
+The sound plays through your computer's speakers. The CU-SeeMe service is used with the mouse; no keys do anything in the picture area.
+
+@topic cusm_trouble | CU-SeeMe Troubleshooting | CU-SeeMe;troubleshooting;errors;no picture;no sound | cusm
+= "Reflector and port are required." or "Port must be 1-65535."
+Fill in the box, then choose Connect.
+
+= "Connection lost - retrying"
+Nothing has arrived for 8 seconds. Navigator keeps trying. If it never connects, check the reflector's name (a name that cannot be found gives the same message) and that your network allows UDP on port 7648.
+
+= The sound is noise
+Choose the other Audio Codec. Teletext TV sends Intel DVI.
+
+= No sound at all
+Check the speaker buttons and the volume slider, and your computer's sound. If Windows has no working sound device, CU-SeeMe plays no sound and gives no message.
+
+= The picture stays on the test pattern
+Check the line under the picture. PAUSED means the eye button is off; WAITING means no picture has arrived yet.

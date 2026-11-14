@@ -1045,6 +1045,15 @@ static wchar_t *body_selection(void)
     return out;
 }
 
+/* Select the whole article (Ctrl+A and the context menu). */
+static void body_select_all(HWND h)
+{
+    if (g_nlines <= 0) return;
+    g_sel_al = 0; g_sel_ac = 0; g_sel_cl = g_nlines - 1;
+    g_sel_cc = (int)wcslen(g_lines[g_nlines - 1]);
+    InvalidateRect(h, NULL, FALSE);
+}
+
 /* WM_GETTEXT for the gates: the pane's text as UTF-8. */
 static char *view_text_utf8(int k)
 {
@@ -1162,6 +1171,25 @@ static LRESULT CALLBACK NewsViewProc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_LBUTTONUP:
         if (g_selecting) { g_selecting = 0; ReleaseCapture(); }
         return 0;
+    case WM_RBUTTONUP:
+        /* The article's right-click menu (2026-11-13, Navigator 1.6): Copy
+         * and Select All, the shared menu the Web tab uses, acting on this
+         * pane's own selection exactly as Ctrl+C and Ctrl+A do. The lists
+         * have no text selection, so no menu there. */
+        if (k == V_BODY) {
+            POINT pt;
+            wchar_t *t;
+            int cmd;
+            pt.x = (short)LOWORD(l); pt.y = (short)HIWORD(l);
+            ClientToScreen(h, &pt);
+            SetFocus(h);
+            t = body_selection();
+            cmd = suite_clipboard_context_menu(h, pt.x, pt.y, t && t[0], g_nlines > 0);
+            if (cmd == SUITE_CTX_COPY && t && t[0]) suite_clipboard_put_wtext(h, t);
+            else if (cmd == SUITE_CTX_SELECT_ALL) body_select_all(h);
+            free(t);
+        }
+        return 0;
     case WM_MOUSEWHEEL: {
         int notches = GET_WHEEL_DELTA_WPARAM(w) / WHEEL_DELTA;
         if (notches == 0) notches = GET_WHEEL_DELTA_WPARAM(w) > 0 ? 1 : -1;
@@ -1196,14 +1224,7 @@ static LRESULT CALLBACK NewsViewProc(HWND h, UINT m, WPARAM w, LPARAM l)
         int ctrl = GetKeyState(VK_CONTROL) < 0, shift = GetKeyState(VK_SHIFT) < 0;
         if (w == VK_TAB) { focus_next(h, shift); return 0; }
         if (k == V_BODY) {
-            if (ctrl && w == 'A') {
-                if (g_nlines > 0) {
-                    g_sel_al = 0; g_sel_ac = 0; g_sel_cl = g_nlines - 1;
-                    g_sel_cc = (int)wcslen(g_lines[g_nlines - 1]);
-                    InvalidateRect(h, NULL, FALSE);
-                }
-                return 0;
-            }
+            if (ctrl && w == 'A') { body_select_all(h); return 0; }
             if (ctrl && (w == 'C' || w == VK_INSERT)) {
                 wchar_t *t = body_selection();
                 if (t && t[0]) suite_clipboard_put_wtext(h, t);

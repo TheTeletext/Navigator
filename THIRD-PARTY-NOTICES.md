@@ -616,3 +616,46 @@ implied.
   fallbacks and output; none of them is redistributed.
 - Without the DLL (or with `NAV_FLASH=0` at build time) the tab behaves
   exactly as it did before Flash: pages show their own NOEMBED text.
+
+## The Teletext WinHelp (TTWINHLP.EXE, the Help viewer)
+
+- What it is: the program that shows Navigator's Help (`TELETEXT.HLP`)
+  when Help > Contents, Search for Help on, How to Use Help or F1 is
+  chosen. It is the Wine project's WinHelp viewer (`programs/winhlp32`)
+  ported to native Windows by The Teletext. It is a **separate program**,
+  installed beside `TeletextNavigator.exe`; Navigator only starts it and
+  sends it WinHelp's `WM_COPYDATA` commands (`src/suite_help.c`). It is
+  not linked into Navigator.
+- Licence: **GNU Lesser General Public License, version 2.1 or later**.
+  Copyright the Wine project authors (Ulrich Schmid, Eric Pouech,
+  Sylvain Petreolle, Ken Belleau, Kirill K. Smirnov and others) and, for
+  the port, The Teletext. The licence text ships beside the program as
+  `COPYING.LIB`.
+- Source: the complete source of the program, with the unmodified Wine
+  and ReactOS sources it started from, is published at
+  https://github.com/TheTeletext/WinHelp. Every change made for the port
+  is marked `TELETEXT PORT` in the source. The window chrome in it
+  (`src/w31.c`) comes from Navigator's `src/suite_w31.c`, relicensed for
+  that program under the LGPL 2.1 or later by its author.
+- Also installed with it: `TTWINHLP.HLP`, its How to Use Help, written
+  for it by The Teletext (same licence).
+- Navigator's Help itself (`TELETEXT.HLP`, source in `help/src/`) is
+  Navigator's own documentation, under Navigator's licence. It was
+  compiled with the Microsoft Help Compiler 3.10.505, a build-time tool
+  that is not distributed.
+
+## Liberation fonts (the typefaces of the manual)
+
+- What it is: the Liberation Sans, Serif and Mono typefaces, in which the
+  Teletext Navigator User's Guide (`Teletext Navigator Manual.pdf`) is
+  set. Subsets of them are embedded in that PDF, as the licence allows.
+  They are not used by the program.
+- Licence: **SIL Open Font License 1.1**. Digitized data copyright (c)
+  2010 Google Corporation, with Reserved Font Arimo, Tinos and Cousine;
+  copyright (c) 2012 Red Hat, Inc., with Reserved Font Name Liberation
+  (as `OFL.txt` states them). The fonts are kept at
+  `manual/fonts/` with the licence text, `manual/fonts/OFL.txt`.
+- The manual itself is Navigator's own work, under the GNU Affero General
+  Public License v3.0 or later like the program; it is built from
+  `manual/` and `help/src/` with Typst (Apache-2.0), a build-time tool
+  that is not distributed.

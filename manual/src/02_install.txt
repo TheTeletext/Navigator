@@ -1,0 +1,39 @@
+;; Chapter 2: Installing (printed manual only). Facts: installer\TeletextNavigator.wxs
+;; (WixUI_FeatureTree, features Main and DesktopShortcut, Program Files\Teletext
+;; Navigator, CloseApplication for the exe and the help viewer, HelpFiles,
+;; the manual and its Start Menu shortcut).
+@topic install_setup | Installing Teletext Navigator | installing;setup;installer;MSI | install:000
+Teletext Navigator is installed with a Windows Installer package, a file whose name ends in .msi.
+
+1. Open the installer file.
+2. Read the licence agreement. Teletext Navigator is free software under the GNU Affero General Public License, version 3 or later. To continue, accept the agreement and choose **Next**.
+3. In **Custom Setup**, choose what to install:
+  **Teletext Navigator**: the program, its Help, this manual and the Start Menu shortcuts. It is always installed.
+  **Desktop shortcut**: a shortcut to Teletext Navigator on the desktop.
+  To install somewhere other than the Program Files\Teletext Navigator folder, choose **Browse**.
+4. Choose **Install**. Windows asks your permission to install a program for all users of the computer.
+5. Choose **Finish**.
+
+If Teletext Navigator or its Help is open, the installer asks you to close it first.
+
+@topic install_files | What Is Installed | installed files;Start Menu;shortcuts;manual | install:010
+In the program's folder:
+
+- **TeletextNavigator.exe**, the program.
+- **TTWINHLP.EXE**, The Teletext WinHelp, the Help viewer, with its licence (COPYING.LIB) and its own Help file, TTWINHLP.HLP.
+- **TELETEXT.HLP**, Teletext Navigator's Help.
+- **Teletext Navigator Manual.pdf**, this manual.
+- README.TXT, LICENSE.TXT, NOTICES.TXT and CREDITS.TXT, and the LICENSES folder with the licences of the software Navigator contains.
+- The NABU folder, with the start-up firmware of the NABU service.
+
+On the Start Menu: **Teletext Navigator**, and **Teletext Navigator Manual**, which opens this manual.
+
+@topic install_start | Starting and Updating | starting Navigator;updating;new version | install:020
+To start Teletext Navigator, choose **Teletext Navigator** on the Start Menu, or its desktop shortcut.
+
+Navigator checks for a new version by itself, at most once a day, and you can check at any time with **Check for Updates** on the Help menu. An update downloads the new installer, checks it, and installs it over the old version: your settings are kept. See [[nav_updates|Checking for Updates]].
+
+@topic install_remove | Removing Teletext Navigator | uninstalling;removing | install:030
+Open **Settings** in Windows and choose **Apps**, then **Installed apps** (on Windows 10, **Apps and features**). Choose Teletext Navigator, then **Uninstall**.
+
+Files that you made with Navigator are yours and are not removed: the files you downloaded (in your Downloads folder or wherever you saved them) and your GW-BASIC programs (in the Teletext BASIC folder of your Documents).

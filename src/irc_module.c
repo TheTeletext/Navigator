@@ -1,7 +1,8 @@
 /*
- * irc_module.c - F8 Retro IRC viewer. Receive-only broadcast view of the
- *                #retro channel on irc.greektimes.ca, rendered amber-on-
- *                black in the same Retro Terminal look as F6 Telnet.
+ * irc_module.c - the IRC tab. Receive-only broadcast view of the #retro
+ *                channel on irc.teletext.ca, black on white with zebra
+ *                rows (the Windows 3.1 look; the tab has no keyboard
+ *                shortcut since the F-key accelerators were retired).
  *
  * Part of Teletext Navigator.
  * Copyright (c) 2026 Dimitri Papadopoulos and The Teletext.
@@ -47,7 +48,7 @@
 #include <string.h>
 
 /* ---------- config defaults (no Navigator-wide config store exists; every
- * module keeps its greektimes.ca endpoint as named #defines) ---------- */
+ * module keeps its teletext.ca endpoint as named #defines) ---------- */
 #define IRC_DEFAULT_HOST         "irc.teletext.ca"
 #define IRC_DEFAULT_PORT         6667
 #define IRC_DEFAULT_PORT_STR     "6667"     /* connect-bar field default */
@@ -55,7 +56,7 @@
 #define IRC_DEFAULT_CHANNEL_NAME "retro"    /* bare name for the field (# in label) */
 #define IRC_DEFAULT_NICK_PATTERN "mgtview-XXXX"
 
-/* ---------- palette. Navigator 1.1 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md):
+/* ---------- palette. Navigator 1.5 (docs/2026-11-10_NAVIGATOR_WIN31_UX.md):
  * a Windows 3.1 document window, black on white, selection in the
  * Windows highlight (navy, white text). Through 1.0 this was amber on
  * near-black; IRC is plain text on the wire, so the amber was app
@@ -642,7 +643,8 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         pt.y = GET_Y_LPARAM(lParam);
         ClientToScreen(hwnd, &pt);
         SetFocus(hwnd);
-        TrackPopupMenu(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+        /* the Windows 3.1 popup since 2026-11-13 (w31_track_popup, suite_w31.c) */
+        w31_track_popup(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, hwnd);
         DestroyMenu(hm);
         return 0;
     }

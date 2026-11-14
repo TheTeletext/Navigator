@@ -244,9 +244,10 @@ static LRESULT CALLBACK OutputSub(HWND h, UINT m, WPARAM w, LPARAM l)
             pt.x = rc.left + 40;
             pt.y = rc.top + 40;
         }
-        cmd = TrackPopupMenu(menu,
-                             TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_TOPALIGN | TPM_LEFTALIGN,
-                             pt.x, pt.y, 0, h, NULL);
+        /* the Windows 3.1 popup since 2026-11-13 (w31_track_popup, suite_w31.c) */
+        cmd = w31_track_popup(menu,
+                              TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_TOPALIGN | TPM_LEFTALIGN,
+                              pt.x, pt.y, h);
         DestroyMenu(menu);
 
         if (cmd == 1) SendMessageA(h, WM_COPY, 0, 0);
