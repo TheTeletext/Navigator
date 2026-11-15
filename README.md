@@ -4,7 +4,12 @@ The retro internet client of [The Teletext](http://www.teletext.ca): one
 Windows app with a client for each live retro service of The Teletext, each
 speaking the real protocol to a real server rather than imitating it.
 
+[![download](https://img.shields.io/badge/download-Teletext__Navigator__1.6.0.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
+[![release](https://img.shields.io/github/v/release/TheTeletext/Navigator?label=release&color=blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](COPYING)
+
+Download: [Teletext_Navigator_1.6.0.msi](https://github.com/TheTeletext/Navigator/releases/latest)
+(SHA-256 published beside it).
 
 ---
 
