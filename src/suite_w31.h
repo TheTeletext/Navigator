@@ -137,6 +137,12 @@ HBITMAP w31_icon(int resource_id);
 void w31_draw_icon(HDC hdc, HBITMAP bmp, int x, int y);
 void w31_untheme(HWND h);
 
+/* Set (SetPropA, any non-NULL value) on a dialog field that must show a
+ * script MS Sans Serif's Western bitmap cut lacks (Navigator 1.7, the
+ * Downloads directory in Settings > Configuration): the hook then leaves
+ * the font it is sent, instead of putting the period face back. */
+#define W31_PROP_KEEPFONT "NavW31.KeepFont"
+
 /* Windows 3.1 scrollbars (2026-11-11, docs/2026-11-11_W31_SCROLLBARS.md).
  * A window of one of Navigator's own classes born with WS_VSCROLL or
  * WS_HSCROLL is adopted by the hook: the style comes off, so Windows draws

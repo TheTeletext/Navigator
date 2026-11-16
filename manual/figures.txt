@@ -2,9 +2,13 @@
 ;; they go: topic context | shot | caption. A figure follows its topic's text.
 nav_window | home | The Teletext Navigator window, at the Home service.
 nav_menus | menu_file | The File menu.
+nav_menus | menu_settings | The Settings menu.
 nav_menus | menu_help | The Help menu.
 nav_menus | about | The About box.
+nav_config | config | The Configuration dialog box, with the Downloads directory.
 rip_usage | ripscrip | The RIPscrip service, connected to The Teletext's board at ripscrip.teletext.ca.
+bbs_usage | bbs | The BBS service at the main menu of The Teletext BBS, bbs.teletext.ca.
+bbs_download | bbs_download | The print replica edition arriving by Zmodem from The Teletext BBS.
 nabu_usage | nabu | The NABU service: the emulated NABU Personal Computer running the program of The Teletext's channel.
 vtx_usage | minitel | The Videotex service in Minitel format, connected to videotex.teletext.ca.
 web_usage | web | The Web service at http://www.teletext.ca/.

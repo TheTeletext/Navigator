@@ -54,6 +54,7 @@
 #define FTP_ASSOCSTR_PROGID 20 /* ASSOCSTR_PROGID (Windows 8+), hidden by this SDK's version guard */
 
 #include "suite_shell.h"
+#include "suite_config.h"
 #include "suite_res.h"
 #include "suite_w31.h"
 #include "ftp_ctrl.h"
@@ -1533,10 +1534,21 @@ void ftp_module_resize(HWND content, int w, int h)
     MoveWindow(g_log, margin, log_top, w - 2 * margin, log_h, TRUE);
 }
 
+/* The local pane starts in the Settings > Configuration Downloads directory
+ * (Navigator 1.7), created if need be. A path the ANSI code page cannot
+ * spell (this tab's file calls are ANSI) falls back to the old default,
+ * the profile's Downloads. */
 static void default_local_dir(void)
 {
     char prof[MAX_PATH];
-    DWORD n = GetEnvironmentVariableA("USERPROFILE", prof, sizeof prof);
+    DWORD n;
+    if (suite_config_downloads_dir_ansi(g_local_dir, sizeof g_local_dir)) {
+        wchar_t w[MAX_PATH];
+        if (MultiByteToWideChar(CP_ACP, 0, g_local_dir, -1, w, MAX_PATH) &&
+            suite_config_ensure_dir_w(w))
+            return;
+    }
+    n = GetEnvironmentVariableA("USERPROFILE", prof, sizeof prof);
     g_local_dir[0] = '\0';
     if (n > 0 && n < sizeof prof) {
         _snprintf(g_local_dir, sizeof g_local_dir, "%s\\Downloads", prof);

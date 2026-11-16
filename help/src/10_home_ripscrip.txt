@@ -48,7 +48,7 @@ The only settings are the **Host** and **Port** boxes, which can be changed whil
 
 The RIPscrip service has no other options, and remembers nothing between sessions: the next time Navigator starts, Host and Port show ripscrip.teletext.ca and 23 again.
 
-@topic rip_usage | Using a RIPscrip Board | RIPscrip;buttons;hotkeys;mouse;downloading files;Zmodem;Downloads folder | rip
+@topic rip_usage | Using a RIPscrip Board | RIPscrip;buttons;hotkeys;mouse;downloading files;Zmodem;Downloads directory | rip
 = The screen
 The board's 640 by 350 picture is shown at the proportions of a 4:3 monitor, as large as the window allows, with black bars at the sides or the top if needed. While a screen is being drawn the status bar shows how much has been read, and "Page: Done" when it is complete.
 
@@ -62,7 +62,7 @@ When a screen has no buttons, what you type is sent to the board: letters, digit
 = Downloading a file
 When you choose a download on the board, or the board starts sending a file, Navigator receives it by {{gl_zmodem|Zmodem}}. No dialog box appears:
 
-- The file is saved in your **Downloads** folder.
+- The file is saved in the Downloads directory set in Settings, Configuration. See [[nav_config|Configuration]].
 - A file of the same name is never replaced: the new one is saved as name (1), name (2) and so on.
 - The status bar shows the progress, with the progress bar when the size is known.
 - Press ESC to cancel. A file that does not arrive completely is deleted.

@@ -71,6 +71,7 @@
 #define IDB_W31_GWBASIC            512
 #define IDB_W31_FTP                513   /* 2026-11-12 */
 #define IDB_W31_NEWSGROUPS         514   /* 2026-11-13 */
+#define IDB_W31_BBS                515   /* 2026-11-15, Navigator 1.7 */
 
 /* CU-SeeMe idle test pattern (RCA Indian Head), 1024x768 4 bpp gray,
  * from tools/make_cusm_icons.py (assets/cusmicons/testpattern.bmp). */

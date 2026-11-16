@@ -22,6 +22,20 @@
  *   DONT <opt>       -> reply WONT <opt>
  *   SB ... IAC SE    -> parse; reply only to TTYPE SEND
  *   IAC IAC          -> literal 0xFF byte in user data
+ *
+ * BINARY (RFC 856), opt-in since Navigator 1.7 (telnet_proto_set_binary_ok,
+ * the BBS tab only; every other caller keeps the refusals above):
+ *   WILL BINARY      -> DO   BINARY, receive side binary
+ *   DO   BINARY      -> WILL BINARY, send side binary
+ *   WONT / DONT      -> DONT / WONT, back to NVT
+ * Each is answered only on a change of state (RFC 1143), so a server that
+ * repeats itself is not answered twice. A Zmodem sender behind the Telnet
+ * server (Synchronet sexyz -telnet) asks for both directions right before
+ * a transfer and reverts after it; a client that refused would be entitled
+ * to apply NVT CR rules to the 8-bit stream, which corrupts every Zmodem
+ * subpacket that holds a 0x0D byte (a lesson of The Teletext's own Telnet
+ * Zmodem service: a too-permissive loopback peer hides it, only a real
+ * client shows it).
  */
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -45,6 +59,7 @@
 #define SB_    0xFA
 #define SE_    0xF0
 
+#define OPT_BINARY 0
 #define OPT_ECHO   1
 #define OPT_SGA    3
 #define OPT_TTYPE  24
@@ -81,6 +96,13 @@ struct TelnetProto {
      * WONT ECHO. Written on the rx thread, read on the UI thread; a plain
      * int is fine for this one-bit hint. */
     int           server_echo;
+
+    /* BINARY (RFC 856): accepted only when the owner opted in. The two
+     * directions are separate options. Written on the rx thread, read on
+     * the UI thread as plain hints. */
+    volatile LONG binary_ok;
+    int           binary_rx;      /* server sends binary (we said DO)   */
+    int           binary_tx;      /* we send binary (we said WILL)      */
 
     /* Send-side serialization. */
     CRITICAL_SECTION send_lock;
@@ -199,6 +221,14 @@ static int parse_chunk(TelnetProto *t,
 
         case IS_VERB: {
             unsigned char opt = b;
+            if (opt == OPT_BINARY && t->binary_ok) {
+                if (t->verb == WILL_ && !t->binary_rx)      { t->binary_rx = 1; send_iac_2(t, DO_,   OPT_BINARY); }
+                else if (t->verb == DO_ && !t->binary_tx)   { t->binary_tx = 1; send_iac_2(t, WILL_, OPT_BINARY); }
+                else if (t->verb == WONT_ && t->binary_rx)  { t->binary_rx = 0; send_iac_2(t, DONT_, OPT_BINARY); }
+                else if (t->verb == DONT_ && t->binary_tx)  { t->binary_tx = 0; send_iac_2(t, WONT_, OPT_BINARY); }
+                t->is_state = IS_NORMAL;
+                break;
+            }
             if (t->verb == WILL_) {
                 if (opt == OPT_ECHO)      { send_iac_2(t, DO_, OPT_ECHO); t->server_echo = 1; }
                 else if (opt == OPT_SGA)  send_iac_2(t, DO_,   OPT_SGA);
@@ -536,3 +566,11 @@ void telnet_proto_free_chunk(TelnetDataChunk *chunk)
     if (chunk->data) free(chunk->data);
     free(chunk);
 }
+
+void telnet_proto_set_binary_ok(TelnetProto *t, int ok)
+{
+    if (t) InterlockedExchange(&t->binary_ok, ok ? 1 : 0);
+}
+
+int telnet_proto_binary_rx(TelnetProto *t) { return t ? t->binary_rx : 0; }
+int telnet_proto_binary_tx(TelnetProto *t) { return t ? t->binary_tx : 0; }

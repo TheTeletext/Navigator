@@ -55,6 +55,7 @@
 512 BITMAP "../assets/w31icons/gwbasic.bmp"
 513 BITMAP "../assets/w31icons/ftp.bmp"
 514 BITMAP "../assets/w31icons/newsgroups.bmp"
+515 BITMAP "../assets/w31icons/bbs.bmp"
 520 BITMAP "../assets/cusmicons/testpattern.bmp"   /* IDB_CUSM_TESTPATTERN */
 530 BITMAP "../assets/w31icons/gt_menu.bmp"
 531 BITMAP "../assets/w31icons/gt_text.bmp"

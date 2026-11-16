@@ -1,21 +1,21 @@
 # Teletext Navigator
 
-The retro internet client of [The Teletext](http://www.teletext.ca): one
+The retro internet client of [The Teletext](https://www.teletext.ca): one
 Windows app with a client for each live retro service of The Teletext, each
 speaking the real protocol to a real server rather than imitating it.
 
-[![download](https://img.shields.io/badge/download-Teletext__Navigator__1.6.0.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
+[![download](https://img.shields.io/badge/download-Teletext__Navigator__1.7.0.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![release](https://img.shields.io/github/v/release/TheTeletext/Navigator?label=release&color=blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](COPYING)
 
-Download: [Teletext_Navigator_1.6.0.msi](https://github.com/TheTeletext/Navigator/releases/latest)
+Download: [Teletext_Navigator_1.7.0.msi](https://github.com/TheTeletext/Navigator/releases/latest)
 (SHA-256 published beside it).
 
 ---
 
 ## Status
 
-**1.6**, November 2026.
+**1.7**, November 2026.
 
 ---
 
@@ -23,10 +23,11 @@ Download: [Teletext_Navigator_1.6.0.msi](https://github.com/TheTeletext/Navigato
 
 | tab | protocol | default server |
 | --- | --- | --- |
-| RIPscrip | RIPscrip 1.54 over telnet | ripscrip.teletext.ca:23 |
+| RIPscrip | RIPscrip 1.54 over telnet, with Zmodem downloads | ripscrip.teletext.ca:23 |
+| BBS | an ANSI bulletin board terminal (CP437, 80 x 25) over telnet, with Zmodem downloads | bbs.teletext.ca:2026 |
 | NABU | a built-in NABU PC on the NABU adapter protocol | nabu.teletext.ca:5816 |
 | Videotex | Minitel (port 516) and NAPLPS (port 1983) | videotex.teletext.ca |
-| Retro Web Browser | HTTP, W3C libwww 5.4.1; Flash movies through Ruffle | http://www.teletext.ca/ |
+| Retro Web Browser | HTTP, W3C libwww 5.4.1; Flash movies through Ruffle | http://www.teletext.ca/ (plain HTTP, as the browsers of the period) |
 | Gopher | RFC 1436 | gopher.teletext.ca:70 |
 | ARPANET FTP-Mail | RFC 765 and RFC 691 | arpanet.teletext.ca:2121 |
 | WAIS | Z39.50-1988, freeWAIS-sf | wais.teletext.ca:210, database `teletext` |
@@ -35,7 +36,7 @@ Download: [Teletext_Navigator_1.6.0.msi](https://github.com/TheTeletext/Navigato
 | Newsgroups | NNTP, RFC 3977, read-only | news.teletext.ca:119 |
 | IRC | RFC 1459, read-only view | irc.teletext.ca:6667, channel `#retro` |
 | CU-SeeMe Live TV | Cornell CU-SeeMe over UDP | cu-seeme.teletext.ca:7648 |
-| Terminal | Telnet VT220 with Zmodem, Finger and QOTD | telnet.teletext.ca |
+| Terminal | Telnet VT220, Finger and QOTD | telnet.teletext.ca |
 | GW-BASIC | Microsoft GW-BASIC on a built-in IBM PC | (local) |
 
 The NABU tab emulates a NABU Personal Computer inside the app (the Marduk
@@ -57,18 +58,35 @@ Windows 3.1, brought back to Windows 11: **The Teletext WinHelp**
 (`TTWINHLP.EXE`), a native port of the Wine project's WinHelp viewer, LGPL
 2.1 or later, source at https://github.com/TheTeletext/WinHelp. The help
 file, `help/TELETEXT.HLP`, is compiled from `help/src/` with the Microsoft
-Help Compiler of the period. The 79-page *Teletext Navigator User's Guide*
+Help Compiler of the period. The 91-page *Teletext Navigator User's Guide*
 (`manual/`, built with Typst) installs beside the app with a Start Menu
 entry.
+
+Files the app saves without asking where (the BBS and RIPscrip Zmodem
+downloads) go to the Downloads directory chosen under Settings,
+Configuration; the FTP tab starts there too.
+
+---
+
+## Screenshots
+
+<p><img src="manual/shots/home.png" width="640" alt="Teletext Navigator at its Home screen: one button per service"></p>
+<p><em>Home: one button for each service. Windows 3.1 chrome on Windows 11.</em></p>
+
+<p><img src="manual/shots/bbs.png" width="640" alt="The BBS tab at the main menu of The Teletext BBS"></p>
+<p><em>The BBS tab, live at the main menu of The Teletext BBS (bbs.teletext.ca:2026).</em></p>
+
+<p><img src="manual/shots/help_contents.png" width="480" alt="Teletext Navigator Help in The Teletext WinHelp"></p>
+<p><em>Help, a real WinHelp file in The Teletext WinHelp.</em></p>
 
 ---
 
 ## Download
 
 The installer, with its SHA-256, is on the download page:
-http://www.teletext.ca/software
+https://www.teletext.ca/software
 
-Run `Teletext_Navigator_1.6.0.msi`. It installs to
+Run `Teletext_Navigator_1.7.0.msi`. It installs to
 `Program Files\Teletext Navigator` for all users.
 
 **The installer is not code-signed.** Windows SmartScreen will probably show
@@ -85,7 +103,8 @@ installer against the SHA-256 in that manifest before running it.
 ## Requirements
 
 Tested on 64-bit Windows 10 22H2 and later, including Windows 11.
-Earlier versions are untested. Nothing else to install.
+Earlier versions are untested. A screen of at least 1280 by 960 pixels.
+Nothing else to install.
 
 ---
 
@@ -134,4 +153,4 @@ Despina Kavalou-Papadopoulos
 ## Contact
 
 The Teletext
-http://www.teletext.ca
+https://www.teletext.ca

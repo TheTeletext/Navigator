@@ -21,6 +21,9 @@
 /* Help context numbers ([MAP] in help\src): the Contents topic is 1, and the
  * tab at ribbon index i has its overview at 100 * (i + 1). */
 #define NAV_HELP_CONTENTS_ID   1
+/* Until 1.6 a tab's context was 100 x (ribbon index + 1). Since 1.7 each
+ * tab carries its own number in suite_shell.c (g_ribbon), the shipped
+ * ones kept, so this is kept only for the record. */
 #define NAV_HELP_TAB_ID(i)     (100 * ((i) + 1))
 
 BOOL suite_help_context(HWND owner, DWORD context);   /* HELP_CONTEXT */

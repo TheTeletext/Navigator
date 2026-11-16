@@ -31,7 +31,7 @@ Two services do contain emulated machines, because their programs were written f
 - A computer running a 64-bit edition of Windows. Teletext Navigator is tested on 64-bit Windows 10 22H2 and later, including Windows 11. Earlier versions are untested.
 - A connection to the Internet. Every service except GW-BASIC reaches a server on the Internet.
 - A sound device, for the sound of CU-SeeMe, NABU, GW-BASIC and the sounds in Gopher and the Web.
-- A screen of at least 1024 by 768 pixels. The Navigator window is never smaller than that.
+- A screen of at least 1280 by 960 pixels. The Navigator window is never smaller than that.
 - For RealAudio links in the Web service, RealPlayer or another program that Windows uses for .ram files.
 
 @topic intro_conventions | Conventions Used in This Manual | conventions;typographic conventions;keys | intro:030

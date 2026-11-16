@@ -34,6 +34,12 @@ static int   g_suspend = 0;
 /* Window properties carried by a restyled window. */
 #define PROP_OLDPROC  "NavW31.Proc"
 #define PROP_KIND     "NavW31.Kind"
+/* Set on a window that was Unicode when it was subclassed (Navigator 1.7):
+ * its old procedure is called with CallWindowProcW, so it stays Unicode.
+ * Before, SetWindowLongPtrA turned every hooked Unicode window ANSI, and
+ * a Greek letter typed into the Settings > Configuration field became
+ * '?' (found by test/verify_settings_2026-11-15.ps1). */
+#define PROP_UNI      "NavW31.Uni"
 #define PROP_DEFAULT  "NavW31.Def"
 #define PROP_TERM     "NavW31.Term"
 
@@ -340,15 +346,26 @@ void w31_draw_button(HDC hdc, const RECT *rcIn, const w31_button_t *b)
             int n = (i == 0 && nl) ? (int)(nl - text) : (int)strlen(seg);
             RECT r;
             SIZE sz;
-            GetTextExtentPoint32A(hdc, seg, n, &sz);
+            /* A label with '&' shows its mnemonic underlined, as Windows
+             * 3.1 buttons did ("&Browse..." in Program Item Properties;
+             * Navigator 1.7, the Configuration dialog). No label before
+             * 1.7 has one, so they draw as before, '&' never processed. */
+            UINT pfx = memchr(seg, '&', (size_t)n) ? 0 : DT_NOPREFIX;
+            if (pfx) {
+                GetTextExtentPoint32A(hdc, seg, n, &sz);
+            } else {
+                RECT m = { 0, 0, 0, 0 };
+                DrawTextA(hdc, seg, n, &m, DT_SINGLELINE | DT_CALCRECT);
+                sz.cx = m.right - m.left;
+            }
             r.left   = body.left + ((body.right - body.left) - sz.cx) / 2 + shift;
             r.right  = r.left + sz.cx;
             r.top    = top + i * line_h;
             r.bottom = r.top + line_h;
             if (b->disabled)
-                w31_draw_text_disabled(hdc, seg, n, &r, DT_SINGLELINE | DT_NOPREFIX | DT_LEFT);
+                w31_draw_text_disabled(hdc, seg, n, &r, DT_SINGLELINE | pfx | DT_LEFT);
             else
-                DrawTextA(hdc, seg, n, &r, DT_SINGLELINE | DT_NOPREFIX | DT_LEFT);
+                DrawTextA(hdc, seg, n, &r, DT_SINGLELINE | pfx | DT_LEFT);
             if (!have_focus_rc) { focus_rc = r; have_focus_rc = TRUE; }
             else UnionRect(&focus_rc, &focus_rc, &r);
             if (nl) seg = nl + 1;
@@ -413,6 +430,8 @@ HBRUSH w31_ctlcolor(UINT msg, HDC hdc, HWND ctl)
 static LRESULT call_old(HWND h, UINT m, WPARAM w, LPARAM l)
 {
     WNDPROC old = (WNDPROC)GetPropA(h, PROP_OLDPROC);
+    if (GetPropA(h, PROP_UNI))
+        return old ? CallWindowProcW(old, h, m, w, l) : DefWindowProcW(h, m, w, l);
     return old ? CallWindowProcA(old, h, m, w, l) : DefWindowProcA(h, m, w, l);
 }
 
@@ -599,6 +618,48 @@ static void paint_edit_selection(HWND h)
     if (GetFocus() != h && !(style & ES_NOHIDESEL)) return;
     SendMessageA(h, EM_GETSEL, (WPARAM)&s0, (LPARAM)&s1);
     if (s1 <= s0) return;
+    if (IsWindowUnicode(h)) {
+        /* A Unicode field (Navigator 1.7: Settings > Configuration, whose
+         * Downloads directory may be Greek): the same overlay in UTF-16, or
+         * the selected letters would be painted as '?'. */
+        wchar_t *wb;
+        len = GetWindowTextLengthW(h);
+        if (len <= 0 || (int)s1 > len) return;
+        wb = (wchar_t *)malloc(((size_t)len + 1) * sizeof(wchar_t));
+        if (!wb) return;
+        GetWindowTextW(h, wb, len + 1);
+        f = (HFONT)SendMessageW(h, WM_GETFONT, 0, 0);
+        txh = (int)(INT_PTR)GetPropA(h, PROP_TXH);
+        dc = GetDC(h);
+        if (!dc) { free(wb); return; }
+        of = SelectObject(dc, f);
+        p = SendMessageW(h, EM_POSFROMCHAR, s0, 0);
+        x0 = (short)LOWORD(p);
+        y  = (short)HIWORD(p);
+        if ((int)s1 < len) {
+            p = SendMessageW(h, EM_POSFROMCHAR, s1, 0);
+            x1 = (short)LOWORD(p);
+        } else {
+            SIZE sz;
+            p = SendMessageW(h, EM_POSFROMCHAR, (WPARAM)(len - 1), 0);
+            GetTextExtentPoint32W(dc, wb + len - 1, 1, &sz);
+            x1 = (short)LOWORD(p) + sz.cx;
+        }
+        SendMessageW(h, EM_GETRECT, 0, (LPARAM)&fr);
+        SetRect(&r, x0, y, x1, y + (txh > 0 ? txh : 13));
+        IntersectRect(&r, &r, &fr);
+        if (!IsRectEmpty(&r)) {
+            HideCaret(h);
+            SetBkColor(dc, W31_NAVY);
+            SetTextColor(dc, W31_HILITE);
+            ExtTextOutW(dc, x0, y, ETO_OPAQUE | ETO_CLIPPED, &r, wb + s0, (UINT)(s1 - s0), NULL);
+            ShowCaret(h);
+        }
+        SelectObject(dc, of);
+        ReleaseDC(h, dc);
+        free(wb);
+        return;
+    }
     len = GetWindowTextLengthA(h);
     if (len <= 0 || (int)s1 > len) return;
     buf = (char *)malloc((size_t)len + 1);
@@ -2546,9 +2607,13 @@ static LRESULT W31ProcInner(HWND h, UINT m, WPARAM w, LPARAM l)
 
     if (m == WM_NCDESTROY) {
         WNDPROC old = (WNDPROC)GetPropA(h, PROP_OLDPROC);
+        BOOL uni = GetPropA(h, PROP_UNI) != NULL;
         if (kind & KIND_SCROLL) sb_detach(h);
-        SetWindowLongPtrA(h, GWLP_WNDPROC, (LONG_PTR)old);
+        if (uni) SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)old);
+        else     SetWindowLongPtrA(h, GWLP_WNDPROC, (LONG_PTR)old);
         RemovePropA(h, PROP_OLDPROC);
+        RemovePropA(h, PROP_UNI);
+        if (uni) return old ? CallWindowProcW(old, h, m, w, l) : 0;
         RemovePropA(h, PROP_KIND);
         RemovePropA(h, PROP_DEFAULT);
         RemovePropA(h, PROP_TERM);
@@ -2559,7 +2624,10 @@ static LRESULT W31ProcInner(HWND h, UINT m, WPARAM w, LPARAM l)
     }
 
     if (kind & KIND_DLGCHILD) {
-        if (m == WM_SETFONT && !font_is_fixed((HFONT)w) && g_w31_font)
+        /* W31_PROP_KEEPFONT (1.7): a dialog child that must show a script
+         * the period bitmap face lacks keeps the font it is sent. */
+        if (m == WM_SETFONT && !font_is_fixed((HFONT)w) && g_w31_font &&
+            !GetPropA(h, W31_PROP_KEEPFONT))
             w = (WPARAM)g_w31_font;
     }
 
@@ -2767,10 +2835,17 @@ static void subclass(HWND h, UINT kind)
 {
     UINT have = (UINT)(UINT_PTR)GetPropA(h, PROP_KIND);
     if (!have) {
-        WNDPROC old = (WNDPROC)GetWindowLongPtrA(h, GWLP_WNDPROC);
+        BOOL uni = IsWindowUnicode(h);
+        WNDPROC old = (WNDPROC)(uni ? GetWindowLongPtrW(h, GWLP_WNDPROC)
+                                    : GetWindowLongPtrA(h, GWLP_WNDPROC));
         if (!old || old == W31Proc) return;
         SetPropA(h, PROP_OLDPROC, (HANDLE)old);
-        SetWindowLongPtrA(h, GWLP_WNDPROC, (LONG_PTR)W31Proc);
+        if (uni) {
+            SetPropA(h, PROP_UNI, (HANDLE)1);
+            SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)W31Proc);
+        } else {
+            SetWindowLongPtrA(h, GWLP_WNDPROC, (LONG_PTR)W31Proc);
+        }
     }
     SetPropA(h, PROP_KIND, (HANDLE)(UINT_PTR)(have | kind));
 }

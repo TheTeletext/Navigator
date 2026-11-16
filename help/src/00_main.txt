@@ -11,12 +11,13 @@
 %config BrowseButtons()
 ;; Pictures (help\make_bitmaps.ps1): the launcher logo, and each service's
 ;; ribbon icon, shown in the title of every topic of that service.
-%bitmap TTLOGO.BMP HOME.BMP RIPSCRIP.BMP NABU.BMP VIDEOTEX.BMP WEB.BMP GOPHER.BMP
+%bitmap TTLOGO.BMP HOME.BMP RIPSCRIP.BMP BBS.BMP NABU.BMP VIDEOTEX.BMP WEB.BMP GOPHER.BMP
 %bitmap ARPANET.BMP WAIS.BMP ARCHIE.BMP FTP.BMP NEWSGRPS.BMP IRC.BMP CUSEEME.BMP
 %bitmap TERMINAL.BMP GWBASIC.BMP
 %seqicon general TTLOGO.BMP
 %seqicon home HOME.BMP
 %seqicon rip RIPSCRIP.BMP
+%seqicon bbs BBS.BMP
 %seqicon nabu NABU.BMP
 %seqicon vtx VIDEOTEX.BMP
 %seqicon web WEB.BMP
@@ -48,6 +49,7 @@ To learn how to use Help, press F1 in this window, or choose How to Use Help fro
 - [[nav_ribbon|Choosing a Service: the Ribbon]]
 - [[nav_status|The Status Bar]]
 - [[nav_menus|Menu Commands]]
+- [[nav_config|Configuration]]
 - [[nav_updates|Checking for Updates]]
 - [[nav_help|Getting Help]]
 
@@ -55,6 +57,8 @@ To learn how to use Help, press F1 in this window, or choose How to Use Help fro
 {bmc HOME.BMP} [[home_overview|Home]]
 
 {bmc RIPSCRIP.BMP} [[rip_overview|RIPscrip]]
+
+{bmc BBS.BMP} [[bbs_overview|BBS]]
 
 {bmc NABU.BMP} [[nabu_overview|NABU]]
 
@@ -94,7 +98,7 @@ The Navigator window has five parts, from top to bottom:
 - The **work area**, where the chosen service is shown.
 - The **status bar**, which reports what the service is doing. See [[nav_status|The Status Bar]].
 
-The window can be sized by dragging its border. It cannot be made smaller than 1024 by 768 pixels, or smaller than your screen if your screen is smaller than that. Navigator opens at that size each time it starts; it does not remember a size or position.
+The window can be sized by dragging its border. It cannot be made smaller than 1280 by 960 pixels, or smaller than your screen if your screen is smaller than that. Navigator opens at that size each time it starts; it does not remember a size or position.
 
 @topic nav_ribbon | Choosing a Service: the Ribbon | ribbon;tabs;choosing a service;switching services | general
 Each button on the ribbon opens one service. The button of the service you are using stays pressed in. Point to a button to see the service's full name.
@@ -109,9 +113,12 @@ When you choose another service, the one you leave keeps its place: its screen, 
 
 The [[home_overview|Home]] service, shown when Navigator starts, has one large button for every other service.
 
-@topic nav_menus | Menu Commands | menus;File menu;Help menu;Exit;About | general
+@topic nav_menus | Menu Commands | menus;File menu;Settings menu;Help menu;Exit;Configuration;About | general
 = File menu
 - **Exit** closes Navigator. Any connection that is open is closed.
+
+= Settings menu
+- **Configuration** sets where Navigator saves the files it downloads without asking. See [[nav_config|Configuration]].
 
 = Help menu
 - **Contents** opens this Help at its Contents.
@@ -125,9 +132,21 @@ The menus can be opened with the mouse, or with the ALT key and the underlined l
 @topic nav_status | The Status Bar | status bar;status line;progress;messages | general
 The status bar at the bottom of the window shows one line of text from the service you are using: what it is connecting to, what it has received, and any error. It shows "Ready" when you change services.
 
-While a service receives something whose size it knows, a small progress bar at the right end of the status bar shows how much has arrived. The Archie, FTP, Newsgroups, RIPscrip, WAIS and Web services use it.
+While a service receives something whose size it knows, a small progress bar at the right end of the status bar shows how much has arrived. The Archie, BBS, FTP, Newsgroups, RIPscrip, WAIS and Web services use it.
 
 Some services show messages in their own windows instead: the Terminal prints them in the terminal, Videotex has its own status line under the screen, and CU-SeeMe has a status line under its picture.
+
+@topic nav_config | Configuration | Configuration;Settings menu;Downloads directory;downloads;Browse;NAVIGATR.INI | general
+Choose **Configuration** from the Settings menu.
+
+= Downloads Directory
+The directory where Navigator saves the files it receives without asking where: files downloaded by {{gl_zmodem|Zmodem}} in the BBS and RIPscrip services. The FTP service's local list starts there too.
+
+Type the path, or choose **Browse** to pick a directory, then choose **OK**. If the directory does not exist, Navigator creates it. A path that cannot be a directory is refused with a message.
+
+Until you choose one, it is Teletext Navigator in your Downloads folder. Downloads that ask where to save, in the Archie and Gopher services, still ask.
+
+The setting is kept in NAVIGATR.INI, in the Teletext Navigator folder of your local application data.
 
 @topic nav_updates | Checking for Updates | updates;Check for Updates;new version;installing an update | general
 Navigator can check whether a newer version has been published.

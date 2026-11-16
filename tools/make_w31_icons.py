@@ -174,18 +174,22 @@ def icon_ripscrip():
 
 
 def icon_nabu():
+    # 2026-11-15 (operator): the NABU came by cable: a TV set standing on a
+    # cable-TV box (the adaptor), its channel display lit.
     ic = Icon()
-    ic.line(10, 1, 14, 7, K); ic.line(21, 1, 17, 7, K)              # rabbit ears
-    ic.px(10, 1, RED); ic.px(21, 1, RED)
-    ic.box(3, 7, 28, 24, OLI)                                       # wooden TV
-    ic.frame(5, 9, 22, 22); ic.fill(6, 10, 21, 21, TEA)
-    ic.text(6, 13, "NABU", WHT)
-    ic.fill(24, 10, 26, 11, K); ic.fill(24, 14, 26, 15, K)          # knobs
-    ic.line(24, 19, 26, 19, YEL)
-    ic.fill(6, 25, 8, 26, K); ic.fill(23, 25, 25, 26, K)            # legs
-    ic.line(28, 20, 30, 20, K); ic.line(30, 20, 30, 30, K)          # the cable
-    ic.line(30, 30, 18, 30, K); ic.box(12, 27, 18, 31, DG, hi=False)  # adaptor
-    ic.px(13, 29, RED)
+    ic.box(3, 1, 28, 19, OLI)                                       # wooden TV
+    ic.frame(5, 3, 22, 17); ic.fill(6, 4, 21, 16, TEA)
+    ic.text(6, 8, "NABU", WHT)
+    ic.fill(24, 4, 26, 5, K); ic.fill(24, 8, 26, 9, K)              # knobs
+    ic.line(24, 14, 26, 14, YEL)
+    ic.fill(7, 20, 9, 21, K); ic.fill(22, 20, 24, 21, K)            # feet
+    ic.box(1, 22, 30, 30, DG)                                       # the cable box
+    ic.line(2, 23, 29, 23, BG)
+    ic.fill(4, 25, 12, 28, K)                                       # channel display
+    ic.fill(5, 26, 6, 27, RED); ic.fill(8, 26, 9, 27, RED); ic.px(11, 27, RED)
+    for x in (16, 19, 22, 25):                                      # channel buttons
+        ic.fill(x, 26, x + 1, 27, BG); ic.px(x + 1, 27, K)
+    ic.px(28, 26, LIM)                                              # power lamp
     return ic
 
 
@@ -236,17 +240,21 @@ def icon_web():
 
 
 def icon_gopher():
+    # 2026-11-15 (operator): a gopher's incisors are white and square, not
+    # yellow triangles; the muzzle is the fur's own colour, the two teeth a
+    # white block with a black outline and a parting line.
     ic = Icon()
     ic.disc(16, 27, 13, 3.5, K, outline=None)                       # burrow
     ic.disc(16, 17, 9, 10, OLI)                                     # body
     ic.disc(9, 7, 2.5, 2.5, OLI); ic.disc(23, 7, 2.5, 2.5, OLI)     # ears
     ic.px(9, 7, MAR); ic.px(23, 7, MAR)
     ic.disc(16, 13, 8, 7, OLI)                                      # head
-    ic.disc(16, 17, 4, 3, YEL, outline=None)                        # muzzle
     ic.fill(12, 10, 13, 11, K); ic.fill(19, 10, 20, 11, K)          # eyes
     ic.px(12, 10, WHT); ic.px(19, 10, WHT)
-    ic.fill(15, 15, 17, 15, K)                                      # nose
-    ic.fill(15, 18, 17, 20, WHT); ic.line(16, 18, 16, 20, DG)       # teeth
+    ic.fill(15, 14, 17, 15, K)                                      # nose
+    ic.line(13, 16, 15, 17, K); ic.line(19, 16, 17, 17, K)          # mouth
+    ic.fill(14, 18, 18, 21, WHT); ic.frame(13, 17, 19, 22)          # two square incisors
+    ic.line(16, 18, 16, 21, K)
     ic.fill(9, 21, 12, 22, OLI); ic.fill(20, 21, 23, 22, OLI)       # paws
     ic.frame(9, 21, 12, 22); ic.frame(20, 21, 23, 22)
     ic.fill(0, 28, 31, 31, GRN)
@@ -366,30 +374,43 @@ def icon_irc():
 
 
 def icon_cuseeme():
+    # 2026-11-15 (operator): the camera without the lens hood on the right.
     ic = Icon()
-    ic.box(3, 9, 21, 25, DG)                                        # camera body
-    ic.box(5, 5, 13, 9, DG, hi=False)                               # viewfinder
-    ic.tri(((21, 13), (29, 8), (29, 26)), K)                        # lens hood
-    ic.tri(((22, 14), (28, 10), (28, 24)), DG)
-    ic.disc(16, 17, 4.5, 4.5, K, outline=None)                      # lens
-    ic.disc(16, 17, 3, 3, BLU, outline=None)
-    ic.px(15, 16, CYA); ic.px(14, 15, WHT)
-    ic.fill(6, 12, 7, 13, RED)                                      # on air lamp
-    ic.fill(9, 26, 15, 27, K); ic.line(12, 27, 12, 30, K)           # tripod
-    ic.line(12, 28, 8, 31, K); ic.line(12, 28, 16, 31, K)
+    ic.box(7, 9, 25, 25, DG)                                        # camera body
+    ic.box(9, 5, 17, 9, DG, hi=False)                               # viewfinder
+    ic.disc(19, 17, 5, 5, K, outline=None)                          # lens
+    ic.disc(19, 17, 3.5, 3.5, BLU, outline=None)
+    ic.px(18, 16, CYA); ic.px(17, 15, WHT)
+    ic.fill(10, 12, 11, 13, RED)                                    # on air lamp
+    ic.fill(13, 26, 19, 27, K); ic.line(16, 27, 16, 30, K)          # tripod
+    ic.line(16, 28, 12, 31, K); ic.line(16, 28, 20, 31, K)
     return ic
 
 
 def icon_terminal():
+    # 2026-11-15 (operator): the screen alone, no keyboard strip under it.
     ic = Icon()
-    crt(ic, 1, 1, 30, 24, K)
-    ic.text(6, 6, ">", YEL)
-    ic.line(11, 8, 19, 8, YEL); ic.line(6, 12, 22, 12, YEL)
-    ic.line(6, 15, 16, 15, YEL)
-    ic.text(18, 14, "_", YEL)
-    ic.box(1, 28, 30, 31, BG)                                       # keyboard
-    for x in range(4, 28, 3):
-        ic.px(x, 29, DG)
+    crt(ic, 1, 3, 30, 26, K)
+    ic.text(6, 8, ">", YEL)
+    ic.line(11, 10, 19, 10, YEL); ic.line(6, 14, 22, 14, YEL)
+    ic.line(6, 17, 16, 17, YEL)
+    ic.text(18, 16, "_", YEL)
+    return ic
+
+
+def icon_bbs():                                  # 2026-11-15: the BBS tab (1.7)
+    """An external modem, the caller's half of a bulletin board call: a
+    beige-gray case with its row of red status lamps lit across the front.
+    (Operator, 2026-11-15: the modem alone, nothing hanging below it.)"""
+    ic = Icon()
+    ic.box(1, 12, 30, 24, BG)                                       # the case
+    ic.line(2, 13, 29, 13, WHT)
+    ic.fill(3, 10, 28, 11, BG); ic.line(3, 10, 28, 10, K)           # sloped top
+    ic.line(2, 11, 3, 10, K); ic.line(28, 10, 29, 11, K)
+    ic.fill(3, 16, 28, 20, K)                                       # the lamp panel
+    for i, c in enumerate((RED, RED, MAR, RED, RED, RED, MAR, RED)):
+        ic.fill(5 + 3 * i, 17, 6 + 3 * i, 18, c)                    # HS AA CD OH RD SD TR MR
+    ic.line(4, 22, 9, 22, DG)                                       # the badge
     return ic
 
 
@@ -410,7 +431,7 @@ def icon_gwbasic():
 
 
 ICONS = [
-    ("home", icon_home), ("ripscrip", icon_ripscrip), ("nabu", icon_nabu),
+    ("home", icon_home), ("ripscrip", icon_ripscrip), ("bbs", icon_bbs), ("nabu", icon_nabu),
     ("videotex", icon_videotex), ("web", icon_web), ("gopher", icon_gopher),
     ("arpanet", icon_arpanet), ("wais", icon_wais), ("archie", icon_archie),
     ("ftp", icon_ftp), ("newsgroups", icon_newsgroups), ("irc", icon_irc), ("cuseeme", icon_cuseeme), ("terminal", icon_terminal),

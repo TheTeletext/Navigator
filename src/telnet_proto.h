@@ -78,6 +78,15 @@ int  telnet_proto_send(TelnetProto *t, const void *buf, size_t len);
  * during the brief negotiation window is benign. */
 int  telnet_proto_server_echo(TelnetProto *t);
 
+/* Accept Telnet BINARY (RFC 856) in both directions when the server asks
+ * (Navigator 1.7, the BBS tab, for Zmodem). Off by default: the other
+ * tabs refuse BINARY exactly as before. Call right after
+ * telnet_proto_open; a server asks only at transfer time. The two
+ * queries report the current state of each direction. */
+void telnet_proto_set_binary_ok(TelnetProto *t, int ok);
+int  telnet_proto_binary_rx(TelnetProto *t);   /* server -> us binary */
+int  telnet_proto_binary_tx(TelnetProto *t);   /* us -> server binary */
+
 /* Tear down: signal the worker to stop, close the socket, join the
  * thread, free the handle. After this returns the handle is invalid. */
 void telnet_proto_close(TelnetProto *t);

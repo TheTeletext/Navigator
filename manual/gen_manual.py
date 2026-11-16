@@ -24,7 +24,7 @@ DPI = 160            # every screenshot at the same scale: 160 pixels to the inc
 # overview topic's own title). Ribbon order for the services.
 CHAPTERS = [
     ("intro", None), ("install", None), ("general", "Getting Started"),
-    ("home", None), ("rip", None), ("nabu", None), ("vtx", None), ("web", None),
+    ("home", None), ("rip", None), ("bbs", None), ("nabu", None), ("vtx", None), ("web", None),
     ("gopher", None), ("arpa", None), ("wais", None), ("archie", None), ("ftp", None),
     ("news", None), ("irc", None), ("cusm", None), ("term", None), ("gwb", None),
     ("helpuse", None), ("howto", None),

@@ -58,6 +58,10 @@ typedef enum {
     ZMR_ABORTED            /* the transport closed under us             */
 } ZmrStatus;
 
+/* Paths are UTF-8 (Navigator 1.7), so a Downloads directory with Greek
+ * letters works; this is their capacity in bytes. */
+#define ZMR_PATH_CAP 1024
+
 typedef struct ZmrProgress {
     unsigned long long received;   /* bytes written so far              */
     unsigned long long total;      /* advertised size, 0 if unknown     */
@@ -69,7 +73,7 @@ typedef struct ZmrResult {
     unsigned long long received;
     unsigned long long total;
     char               name[260];   /* sanitized local file name        */
-    char               path[MAX_PATH]; /* full local path, empty if none */
+    char               path[ZMR_PATH_CAP]; /* full local path, UTF-8, empty if none */
     char               detail[160]; /* human-readable one-liner         */
 
     /* Bytes that arrived after the Zmodem conversation ended. They
@@ -87,8 +91,8 @@ typedef struct ZmodemRecv ZmodemRecv;
  * Returns 0 on success. */
 typedef int (*ZmrSendFn)(void *ctx, const void *buf, size_t len);
 
-/* Start a session. `download_dir` may be NULL, in which case the
- * default download directory is used (see zmodem_recv_default_dir).
+/* Start a session. `download_dir` (UTF-8) may be NULL, in which case
+ * the configured Downloads directory is used (zmodem_recv_default_dir).
  * Returns 0 and writes *out on success. */
 int  zmodem_recv_start(const char *download_dir,
                        HWND notify_hwnd, UINT notify_msg,
@@ -111,8 +115,9 @@ ZmrResult *zmodem_recv_finish(ZmodemRecv *z);
 void zmodem_recv_free_result(ZmrResult *r);
 void zmodem_recv_free_progress(ZmrProgress *p);
 
-/* Where downloads land: %MGT_ZMODEM_DIR% if set, else the user's
- * Downloads folder, else the temporary directory. Writes at most
+/* Where downloads land, UTF-8: %MGT_ZMODEM_DIR% if set (a test hook),
+ * else the Settings > Configuration Downloads directory (suite_config.h;
+ * since Navigator 1.7, before that the user's Downloads). Writes at most
  * `cap` bytes including the terminator and returns `out`. */
 char *zmodem_recv_default_dir(char *out, size_t cap);
 

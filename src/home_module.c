@@ -36,6 +36,8 @@ typedef struct {
 static const home_tile_t g_tiles[] = {
     { SUITE_ID_BTN_RIPSCRIP, IDB_W31_RIPSCRIP, "RIPscrip",
       "A graphical bulletin board in RIPscrip 1.54" },
+    { SUITE_ID_BTN_BBS,      IDB_W31_BBS,      "BBS",
+      "The Teletext BBS: ANSI screens, files by Zmodem" },
     { SUITE_ID_BTN_NABUNAT,  IDB_W31_NABU,     "NABU",
       "The NABU Network, emulated or on a real NABU" },
     { SUITE_ID_BTN_NAPLPS,   IDB_W31_VIDEOTEX, "Videotex",
@@ -239,8 +241,8 @@ void home_module_resize(HWND content, int w, int h)
     g_header.bottom = MARGIN + HEADER_H;
 
     /* Two columns only on a narrow window that is tall enough for six
-     * rows; otherwise three. Since the 1024x768 minimum (2026-11-12) the
-     * content is at least 1008 px wide, so this branch is reached only on
+     * rows; otherwise three. Since the 1280x960 minimum (Navigator 1.7) the
+     * content is well over 900 px wide, so this branch is reached only on
      * a work area smaller than the minimum (suite_shell.c caps it). */
     cols = 3;
     if (w < 900) {

@@ -71,6 +71,7 @@
 #include <shlobj.h>
 
 #include "zmodem_recv.h"
+#include "suite_config.h"
 
 /* winerror.h defines an IS_ERROR() for HRESULT severity and the Zmodem
  * core defines its own for ZRESULT codes. Only the Zmodem one is used
@@ -137,7 +138,7 @@ struct ZmodemRecv {
     ZmrSendFn        send_fn;
     void            *send_ctx;
 
-    char             dir[MAX_PATH];
+    char             dir[ZMR_PATH_CAP];   /* UTF-8 */
 
     /* Ring buffer, producer = caller's thread, consumer = worker. */
     CRITICAL_SECTION ring_lock;
@@ -161,7 +162,7 @@ struct ZmodemRecv {
     unsigned long long received;
     unsigned long long total;
     char               name[260];
-    char               path[MAX_PATH];
+    char               path[ZMR_PATH_CAP];   /* UTF-8 */
     char               detail[160];
 
     DWORD              last_progress_tick;
@@ -405,6 +406,9 @@ int zmodem_recv_sanitize_name(const char *raw, char *out, size_t cap)
     for (i = 0; i < n; i++) {
         unsigned char c = (unsigned char)base[i];
         if (c < 0x20 || c == 0x7f) goto bad;
+        /* The local path is UTF-8 since 1.7, so a byte the sender meant in
+         * its own code page would not survive; it becomes '_'. */
+        if (c >= 0x80) c = '_';
         if (c == '<' || c == '>' || c == ':' || c == '"' ||
             c == '/' || c == '\\' || c == '|' || c == '?' || c == '*')
             goto bad;
@@ -452,28 +456,35 @@ bad:
 
 char *zmodem_recv_default_dir(char *out, size_t cap)
 {
-    const char *env;
-    char profile[MAX_PATH];
+    wchar_t wenv[MAX_PATH];
+    DWORD n;
 
     if (!out || cap == 0) return out;
     out[0] = '\0';
 
-    env = getenv("MGT_ZMODEM_DIR");
-    if (env && env[0] && strlen(env) < cap) {
-        strcpy(out, env);
+    /* MGT_ZMODEM_DIR is a test hook (test/verify_progress_2026-11-11.ps1);
+     * everything else follows Settings > Configuration (Navigator 1.7). */
+    n = GetEnvironmentVariableW(L"MGT_ZMODEM_DIR", wenv, MAX_PATH);
+    if (n > 0 && n < MAX_PATH &&
+        WideCharToMultiByte(CP_UTF8, 0, wenv, -1, out, (int)cap, NULL, NULL))
         return out;
-    }
 
-    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, profile))) {
-        if (strlen(profile) + 11 < cap) {
-            strcpy(out, profile);
-            strcat(out, "\\Downloads");
-            return out;
-        }
-    }
+    return suite_config_downloads_dir_utf8(out, cap);
+}
 
-    if (GetTempPathA((DWORD)cap, out) == 0) out[0] = '\0';
-    return out;
+/* UTF-8 to UTF-16 for the file system calls. */
+static int u8w(const char *s, wchar_t *w, int wcap)
+{
+    if (!s || !w || wcap <= 0) return 0;
+    w[0] = 0;
+    return MultiByteToWideChar(CP_UTF8, 0, s, -1, w, wcap) > 0;
+}
+
+static int exists_u8(const char *path)
+{
+    wchar_t w[ZMR_PATH_CAP];
+    if (!u8w(path, w, ZMR_PATH_CAP)) return 1;   /* unusable: treat as taken */
+    return GetFileAttributesW(w) != INVALID_FILE_ATTRIBUTES;
 }
 
 /* dir + name, with " (n)" inserted before the extension if the name is
@@ -489,7 +500,7 @@ static int build_unique_path(const char *dir, const char *name,
 
     _snprintf(out, cap - 1, "%s\\%s", dir, name);
     out[cap - 1] = '\0';
-    if (GetFileAttributesA(out) == INVALID_FILE_ATTRIBUTES) return 1;
+    if (!exists_u8(out)) return 1;
 
     dot = strrchr(name, '.');
     if (dot && dot != name && strlen(dot) < sizeof ext) {
@@ -507,7 +518,7 @@ static int build_unique_path(const char *dir, const char *name,
     for (n = 1; n < 1000; n++) {
         _snprintf(out, cap - 1, "%s\\%s (%d)%s", dir, stem, n, ext);
         out[cap - 1] = '\0';
-        if (GetFileAttributesA(out) == INVALID_FILE_ATTRIBUTES) return 1;
+        if (!exists_u8(out)) return 1;
     }
     return 0;
 }
@@ -793,7 +804,30 @@ static DWORD WINAPI zmr_thread(LPVOID lp)
 
             /* A second file in one session: finish the first cleanly
              * and start again, but keep counting against one ceiling. */
-            out_close(&out);
+
+            /* The SAME file again before a byte of it arrived is not a
+             * second file: it is the sender repeating its ZFILE, which it
+             * does when it saw two ZRINITs (ours, sent unprompted at the
+             * start, and the one answering its ZRQINIT; found 2026-11-15
+             * on the BBS tab, which hands the receiver the first ZRQINIT
+             * whole). Keep the file already open and ask for byte 0 again,
+             * rather than leave an empty file and write the data to
+             * "name (1)". */
+            if (out.open && z->received == 0 && strcmp(name, z->name) == 0) {
+                z->total = advertised;
+                zsend_pos(z, ZRPOS, 0);
+                break;
+            }
+            {
+                /* a file abandoned before its first byte leaves nothing */
+                int was_empty = out.open && z->received == 0 && z->path[0];
+                out_close(&out);
+                if (was_empty) {
+                    wchar_t wp[ZMR_PATH_CAP];
+                    if (u8w(z->path, wp, ZMR_PATH_CAP)) DeleteFileW(wp);
+                    z->path[0] = '\0';
+                }
+            }
 
             strncpy(z->name, name, sizeof z->name - 1);
             z->name[sizeof z->name - 1] = '\0';
@@ -807,7 +841,10 @@ static DWORD WINAPI zmr_thread(LPVOID lp)
                 running = 0;
                 break;
             }
-            out.fp = fopen(z->path, "wb");
+            {
+                wchar_t wp[ZMR_PATH_CAP];
+                out.fp = u8w(z->path, wp, ZMR_PATH_CAP) ? _wfopen(wp, L"wb") : NULL;
+            }
             if (!out.fp) {
                 zsend_cancel(z);
                 z->status = ZMR_IO_ERROR;
@@ -992,7 +1029,8 @@ static DWORD WINAPI zmr_thread(LPVOID lp)
      * is more use to the user gone than half-written under the right
      * name, so it is removed and the path cleared. */
     if (z->status != ZMR_OK && z->path[0]) {
-        DeleteFileA(z->path);
+        wchar_t wp[ZMR_PATH_CAP];
+        if (u8w(z->path, wp, ZMR_PATH_CAP)) DeleteFileW(wp);
         z->path[0] = '\0';
     }
 
@@ -1034,8 +1072,12 @@ int zmodem_recv_start(const char *download_dir,
 
     /* The folder has to exist before the first ZFILE arrives, and the
      * user's Downloads folder can be missing on a fresh profile. */
-    if (z->dir[0] && GetFileAttributesA(z->dir) == INVALID_FILE_ATTRIBUTES)
-        CreateDirectoryA(z->dir, NULL);
+    if (z->dir[0]) {
+        wchar_t wd[ZMR_PATH_CAP];
+        if (u8w(z->dir, wd, ZMR_PATH_CAP) &&
+            GetFileAttributesW(wd) == INVALID_FILE_ATTRIBUTES)
+            suite_config_ensure_dir_w(wd);
+    }
 
     z->ring = (unsigned char *)malloc(ZMR_RING_BYTES);
     if (!z->ring) { free(z); return 4; }

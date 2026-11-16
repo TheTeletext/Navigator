@@ -550,12 +550,14 @@ implied.
   the tab is `src/gwbasic_module.[ch]`. Those are Navigator's own work and
   are AGPLv3 like the rest of it.
 
-## Modern DOS (the GW-BASIC tab's screen font)
+## Modern DOS (the GW-BASIC and BBS tabs' screen font)
 
 - What it is: "Modern DOS" 8x16 and 8x8 by **Jayvee Enaguas**
   (HarvettFox96), a raster font based on the IBM VGA and Verite ROM fonts.
   The tab draws text mode in the 8x16 face and characters in the CGA
   graphics modes in the 8x8 face.
+  Since 1.7 the BBS tab draws the CP437 box, block and shade characters
+  of its ANSI screen from the same 8x16 face (src/bbs_module.c).
 - Origin: the original source repository (notabug.org/HarvettFox96/
   ttf-moderndos) is no longer online; the font was taken from its
   distribution archive (2019-01-04), which carries the licence file. The

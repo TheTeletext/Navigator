@@ -1,4 +1,4 @@
-TELETEXT NAVIGATOR 1.6
+TELETEXT NAVIGATOR 1.7
 The Teletext, November 2026
 
 Teletext Navigator is the retro internet client of The Teletext
@@ -6,8 +6,11 @@ Teletext Navigator is the retro internet client of The Teletext
 the live retro services of The Teletext, the way they were reached
 in the 1980s and 1990s.
 
-  RIPscrip     a RIPscrip 1.54 graphical terminal
-               (ripscrip.teletext.ca)
+  RIPscrip     a RIPscrip 1.54 graphical terminal, with Zmodem
+               downloads (ripscrip.teletext.ca)
+  BBS          an ANSI bulletin board terminal (PC characters,
+               sixteen colours, 80 x 25) with Zmodem downloads
+               (bbs.teletext.ca, port 2026)
   NABU         a built-in NABU Personal Computer that boots onto
                The Teletext NABU channel (nabu.teletext.ca)
   Videotex     Minitel and NAPLPS terminals (videotex.teletext.ca)
@@ -26,8 +29,8 @@ in the 1980s and 1990s.
                (irc.teletext.ca)
   CU-SeeMe     CU-SeeMe live television over UDP
                (cu-seeme.teletext.ca)
-  Terminal     a VT220 Telnet terminal with Zmodem downloads and
-               Finger and QOTD shortcuts (telnet.teletext.ca)
+  Terminal     a VT220 Telnet terminal with Finger and QOTD
+               shortcuts (telnet.teletext.ca)
   GW-BASIC     Microsoft's own GW-BASIC, running inside the app
 
 Every tab starts on its teletext.ca address.
@@ -63,6 +66,13 @@ of every component built into it, are in the LICENSES directory
 (LICENSE.ruffle.txt, LICENSE.ruffle-crates.txt). Flash is a
 trademark of Adobe Inc.; Ruffle is independent of Adobe.
 
+The BBS tab calls The Teletext BBS, a text bulletin board drawn in
+ANSI: news, weather, traffic, markets and numbers, public alerts,
+text games and file areas. Files are received by Zmodem, as on a
+1990s terminal program, into the Downloads directory set under
+Settings, Configuration (the RIPscrip tab's downloads go there
+too, and the FTP tab starts there).
+
 The GW-BASIC tab runs Microsoft's 1983 GW-BASIC source (MIT),
 built by T. K. Chia's project, unmodified on a small IBM PC inside
 the app (the libx86emu x86 core). LOAD and SAVE use the Teletext
@@ -82,18 +92,19 @@ Compiler of the period: a page for every tab and service, with
 Search, Back, History and the glossary. Help, How to Use Help
 explains the viewer itself.
 
-The Teletext Navigator User's Guide, a 79-page PDF, installs
+The Teletext Navigator User's Guide, a 91-page PDF, installs
 beside the app; the Start Menu entry "Teletext Navigator Manual"
 opens it.
 
 REQUIREMENTS
 
 Tested on 64-bit Windows 10 22H2 and later, including Windows 11.
-Earlier versions are untested. Nothing else to install.
+Earlier versions are untested. A screen of at least 1280 by 960
+pixels. Nothing else to install.
 
 INSTALL
 
-Run the installer, Teletext_Navigator_1.6.0.msi. It installs to
+Run the installer, Teletext_Navigator_1.7.0.msi. It installs to
 Program Files\Teletext Navigator for all users and adds a Start
 Menu entry; the desktop shortcut is optional and can be turned off
 during setup. Uninstall from Settings, Apps and features.

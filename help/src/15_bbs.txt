@@ -1,0 +1,71 @@
+%map bbs_overview 1600
+%map bbs_connect 1601
+%map bbs_usage 1602
+%map bbs_download 1603
+%map bbs_trouble 1604
+
+@topic bbs_overview | BBS | BBS;bulletin board;The Teletext BBS;ANSI;Telnet;overview | bbs
+= About bulletin boards
+A bulletin board system, a BBS, was a computer that callers reached by modem, one caller per telephone line, to read news and messages, play games and download files. The first, CBBS, went online in Chicago in 1978, and its authors described it in BYTE magazine that November. Most callers used an IBM PC with a terminal program, so boards drew their screens in the PC's own text characters, with lines, boxes and blocks in sixteen colours, using ANSI codes.
+
+Publishers soon used bulletin boards to reach readers directly. Computer magazines put the programs printed in their pages online for readers to download: PC Magazine distributed its utilities through its PC MagNet service, and BYTE opened its own conferencing system, BIX, in 1985. Newspapers followed with local editions by modem. The Middlesex News of Framingham, Massachusetts, let callers to its board read the next day's headlines, send press releases and write letters to the editor; The News & Observer of Raleigh opened a bulletin board that grew into one of the first newspaper Internet services, Nando.net, in 1994. At their height in the mid-1990s the United States had more than 60,000 bulletin boards, about 60 of them run by newspapers. Within a few years the World Wide Web replaced them, and public news services on a bulletin board are now exceptionally rare.
+
+The Teletext BBS is a text board in that tradition, reached by {{gl_telnet|Telnet}} at bbs.teletext.ca, port 2026: news, weather, traffic, markets and numbers, public alerts, text games, and file areas with the print replica edition. Its screens are sent at the speed of a 4,800 bits per second modem, so you watch them draw; file downloads are not slowed.
+
+= The BBS in Navigator
+The BBS service is an ANSI terminal: an 80 by 25 character screen in the PC's character set and colours. It receives the board's files by {{gl_zmodem|Zmodem}}, into the Downloads directory set in Settings, Configuration.
+
+- [[bbs_connect|Calling the BBS]]
+- [[bbs_usage|Using the BBS]]
+- [[bbs_download|Downloading Files from the BBS]]
+- [[bbs_trouble|BBS Troubleshooting]]
+
+@topic bbs_connect | Calling the BBS | BBS;connecting;Connect button;Disconnect;host;port;Telnet;welcome | bbs
+1. Choose **BBS** on the ribbon.
+2. Host and Port are set for The Teletext BBS: bbs.teletext.ca and 2026. To call another board, type its host and port.
+3. Choose **Connect**.
+
+The board checks your terminal, then shows its welcome screen. Press ENTER within 40 seconds to enter. The main menu follows.
+
+To end the call, press Q at the main menu, or choose **Disconnect**. The last screen stays in view until you call again.
+
+@topic bbs_usage | Using the BBS | BBS;keys;hotkeys;main menu;sections;numbers;N;P;B;M;Q | bbs
+The board is driven by single keys. Each screen names the keys it accepts on its bottom line; press only those.
+
+= The main menu
+Press the letter shown in brackets: N for the news, W weather, T traffic, M markets and numbers, P public alerts, G text games, F file areas, A about the board, Q to log off.
+
+= Inside a section
+Choose an item by typing its number. N and P turn to the next and previous page or item where the screen says so; B goes back one screen and M returns to the main menu.
+
+Important: the board counts keys a screen does not name. After four in a row it ends the call.
+
+= What is sent
+Navigator sends only the keys you press. Letters, digits, ENTER, BACKSPACE and the arrow keys go to the board; the function keys send nothing. The board shows what you type, so Navigator does not.
+
+@topic bbs_download | Downloading Files from the BBS | BBS;downloading files;Zmodem;File Areas;Downloads directory | bbs
+1. Press F at the main menu for the File Areas.
+2. Type the number of an area, then the number of a file. The file's details appear, with its size and SHA-256 checksum.
+3. Press D.
+
+The board sends the file by {{gl_zmodem|Zmodem}}, and Navigator receives it. No dialog box appears:
+
+- A window over the screen shows the file's name, its size and the bytes received; the status bar shows the same, with the progress bar.
+- The file is saved in the Downloads directory set in Settings, Configuration. See [[nav_config|Configuration]].
+- A file of the same name is never replaced: the new one is saved as name (1), name (2) and so on.
+- Press ESC to cancel. A file that does not arrive completely is deleted.
+
+When the file is complete the status bar shows "Transfer: Done" and where the file was saved. The board then says the transfer has ended; press ENTER to return to the file list.
+
+@topic bbs_trouble | BBS Troubleshooting | BBS;troubleshooting;errors;call ended;plain text;download stopped | bbs
+= "Too many invalid entries. Session ended."
+The board ended the call after four keys in a row that the screen did not name. Call again, and press only the keys on the screen's bottom line.
+
+= The board offers plain text
+The board did not recognise an ANSI terminal. This happens only with another terminal program; Navigator answers the board's check.
+
+= A download stopped
+The status bar gives the reason, such as "The sender stopped responding." The partial file has been deleted; choose the file and press D again. The board allows three downloads in one call.
+
+= No dialog box asked where to save the file
+That is how the BBS and RIPscrip services work. The file is in the Downloads directory; to change it, choose Configuration from the Settings menu.

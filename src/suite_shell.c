@@ -18,6 +18,8 @@
 #include "irc_module.h"
 #include "archie_module.h"
 #include "ripscrip_module.h"
+#include "bbs_module.h"
+#include "suite_config.h"
 #include "naplps_module.h"
 #include "nabu_native_module.h"
 #include "gwbasic_module.h"
@@ -53,16 +55,20 @@
 #define BTN_MAX_W   76
 
 /* Min window size: 800x600 per dispatch decision 11 until 2026-11-12;
- * since then 1024x768 (operator decision, docs/2026-11-13_NETNEWS_TAB.md
- * step 0: nobody on Windows 10 or 11 runs 800x600). It is also the
+ * then 1024x768 (operator decision, docs/2026-11-13_NETNEWS_TAB.md step 0:
+ * nobody on Windows 10 or 11 runs 800x600); since Navigator 1.7 1280x960
+ * (docs/2026-11-15_NAVIGATOR_17_BBS_TAB.md): sixteen ribbon buttons at the
+ * normal spacing, every label whole ("Newsgroups" included, 76 px), need a
+ * 1258 px client area; 1152 (the next 4:3 size up from 1024) does not
+ * hold them, 1280x960, the next period 4:3 size, does. It is also the
  * launch size (Navigator keeps no saved placement, so every launch is a
  * first run). Both are capped to the monitor's work area, so a screen
- * whose work area is smaller (1366x768 less a taskbar) is never forced
- * to hold a window taller than itself. */
-#define MIN_WINDOW_W   1024
-#define MIN_WINDOW_H   768
-#define DEFAULT_WINDOW_W 1024
-#define DEFAULT_WINDOW_H 768
+ * whose work area is smaller is never forced to hold a window bigger
+ * than itself. */
+#define MIN_WINDOW_W   1280
+#define MIN_WINDOW_H   960
+#define DEFAULT_WINDOW_W 1280
+#define DEFAULT_WINDOW_H 960
 
 /* Command IDs (also doubles as button HMENU IDs and accelerator commands).
  * IDs are stable across the Phase 6a reorder; only the array order and
@@ -86,13 +92,14 @@
 #define ID_BTN_GWBASIC  SUITE_ID_BTN_GWBASIC
 #define ID_BTN_FTP      SUITE_ID_BTN_FTP
 #define ID_BTN_NEWSGROUPS SUITE_ID_BTN_NEWSGROUPS
+#define ID_BTN_BBS      SUITE_ID_BTN_BBS
 /* 2026-09-25: 10 -> 11 with the NAPLPS (videotex) tab.
  * 2026-09-27: UNCHANGED at 11. That tab became "Videotex" with a Format
  * dropdown (NAPLPS or Minitel): one tab, two formats (operator decision
  * D-M5), so the module table grows by zero.
  * 2026-10-20: 11 -> 12 with the GW-BASIC tab (Microsoft's interpreter on
  * an in-process 8088; docs/GWBASIC_PHASE_A_2026-10-20.md). */
-#define ID_MODULE_COUNT 15   /* 1.1: + Home, the launcher, at index 0; + FTP 2026-11-12; + Newsgroups 2026-11-13 */
+#define ID_MODULE_COUNT 16   /* 1.1: + Home, the launcher, at index 0; + FTP 2026-11-12; + Newsgroups 2026-11-13; + BBS 2026-11-15 (1.7) */
 
 #define ID_HELP_ABOUT   200   /* Help > About (mouse / Alt+H mnemonic) */
 #define ID_HELP_UPDATE  201   /* Help > Check for Updates              */
@@ -100,6 +107,7 @@
 #define ID_HELP_CONTENTS 203  /* Help > Contents (TELETEXT.HLP, Navigator 1.6) */
 #define ID_HELP_SEARCH   204  /* Help > Search for Help on... */
 #define ID_HELP_HOWTO    205  /* Help > How to Use Help */
+#define ID_SETTINGS_CONFIG 206 /* Settings > Configuration (Navigator 1.7) */
 
 /* The automatic update check does not run at WM_CREATE. It runs a few
  * seconds after the window is up, on a one-shot timer, so it is not
@@ -138,6 +146,13 @@ static const suite_module_t g_modules[ID_MODULE_COUNT] = {
       ripscrip_module_activate, ripscrip_module_deactivate,
       ripscrip_module_resize,   ripscrip_module_on_command,
       ripscrip_module_has_unsaved },
+    /* 2026-11-15 (Navigator 1.7): the BBS after RIPscrip, the two bulletin
+     * boards side by side, graphical then text, command id 116
+     * (docs/2026-11-15_NAVIGATOR_17_BBS_TAB.md). */
+    { "BBS",                       ID_BTN_BBS,
+      bbs_module_activate, bbs_module_deactivate,
+      bbs_module_resize,   bbs_module_on_command,
+      bbs_module_has_unsaved },
     { "NABU",                      ID_BTN_NABUNAT,
       nabu_native_module_activate, nabu_native_module_deactivate,
       nabu_native_module_resize,   nabu_native_module_on_command,
@@ -196,23 +211,29 @@ static const suite_module_t g_modules[ID_MODULE_COUNT] = {
 };
 
 /* Ribbon icons and tooltips, in g_modules order. The labels under the
- * icons are the short names above; the tooltip carries the full name. */
-static const struct { int icon; const char *tip; } g_ribbon[ID_MODULE_COUNT] = {
-    { IDB_W31_HOME,     "Home: every destination" },
-    { IDB_W31_RIPSCRIP, "RIPscrip graphical bulletin board" },
-    { IDB_W31_NABU,     "The NABU Network" },
-    { IDB_W31_VIDEOTEX, "Videotex: Minitel and NAPLPS" },
-    { IDB_W31_WEB,      "Retro Web Browser" },
-    { IDB_W31_GOPHER,   "Gopher" },
-    { IDB_W31_ARPANET,  "ARPANET FTP-Mail" },
-    { IDB_W31_WAIS,     "WAIS full-text search" },
-    { IDB_W31_ARCHIE,   "Archie FTP archive search" },
-    { IDB_W31_FTP,      "FTP: anonymous file download" },
-    { IDB_W31_NEWSGROUPS, "Newsgroups: read Netnews" },
-    { IDB_W31_IRC,      "IRC" },
-    { IDB_W31_CUSEEME,  "CU-SeeMe Live TV" },
-    { IDB_W31_TERMINAL, "Terminal: Telnet, Finger, QOTD" },
-    { IDB_W31_GWBASIC,  "GW-BASIC" },
+ * icons are the short names above; the tooltip carries the full name.
+ * help is the tab's context number in TELETEXT.HLP (F1). Until 1.6 it was
+ * computed from the ribbon position, 100 x (index + 1); the BBS tab, put
+ * in at index 2, would have moved every later tab's number, so since 1.7
+ * each tab carries its own, the shipped numbers kept and the BBS given
+ * the next free one, 1600. */
+static const struct { int icon; const char *tip; DWORD help; } g_ribbon[ID_MODULE_COUNT] = {
+    { IDB_W31_HOME,     "Home: every destination",               100 },
+    { IDB_W31_RIPSCRIP, "RIPscrip graphical bulletin board",     200 },
+    { IDB_W31_BBS,      "The Teletext BBS: ANSI bulletin board", 1600 },
+    { IDB_W31_NABU,     "The NABU Network",                      300 },
+    { IDB_W31_VIDEOTEX, "Videotex: Minitel and NAPLPS",          400 },
+    { IDB_W31_WEB,      "Retro Web Browser",                     500 },
+    { IDB_W31_GOPHER,   "Gopher",                                600 },
+    { IDB_W31_ARPANET,  "ARPANET FTP-Mail",                      700 },
+    { IDB_W31_WAIS,     "WAIS full-text search",                 800 },
+    { IDB_W31_ARCHIE,   "Archie FTP archive search",             900 },
+    { IDB_W31_FTP,      "FTP: anonymous file download",          1000 },
+    { IDB_W31_NEWSGROUPS, "Newsgroups: read Netnews",            1100 },
+    { IDB_W31_IRC,      "IRC",                                   1200 },
+    { IDB_W31_CUSEEME,  "CU-SeeMe Live TV",                      1300 },
+    { IDB_W31_TERMINAL, "Terminal: Telnet, Finger, QOTD",        1400 },
+    { IDB_W31_GWBASIC,  "GW-BASIC",                              1500 },
 };
 
 static HWND g_hwndMain    = NULL;
@@ -547,12 +568,18 @@ static HMENU build_menu(void)
 {
     HMENU root = CreateMenu();
     HMENU file = CreatePopupMenu();
+    HMENU settings = CreatePopupMenu();
     HMENU help = CreatePopupMenu();
     /* File, the first item, as in every Windows 3.1 application
      * (2026-11-13, Navigator 1.6, operator). Exit sends WM_CLOSE, the same
      * path as Alt+F4, the system menu's Close and the taskbar. */
     AppendMenuA(file, MF_STRING, ID_FILE_EXIT, "E&xit");
     AppendMenuA(root, MF_POPUP, (UINT_PTR)file, "&File");
+    /* Settings, right of File (Navigator 1.7, operator): one entry,
+     * Configuration..., the dialog with the Downloads directory
+     * (suite_config.c). The ellipsis: the item opens a dialog. */
+    AppendMenuA(settings, MF_STRING, ID_SETTINGS_CONFIG, "&Configuration...");
+    AppendMenuA(root, MF_POPUP, (UINT_PTR)settings, "&Settings");
     /* The Windows 3.1 Help menu (2026-11-13, Navigator 1.6): Contents,
      * Search for Help on, How to Use Help, as every 3.1 application had
      * them, opening TELETEXT.HLP in The Teletext WinHelp (suite_help.c). */
@@ -575,9 +602,10 @@ static HMENU build_menu(void)
 static int suite_dpi_scaled(int base) { return MulDiv(base, g_dpi, 96); }
 
 /* The ribbon's current padding and gap (layout_children), and the width
- * the widest ribbon label asks for. "Newsgroups" (69 px) is left out:
- * the operator chose to let it clip below 76 px rather than shorten it
- * or squeeze every other button for it. */
+ * the widest ribbon label asks for. Until 1.6 "Newsgroups" (69 px) was
+ * left out (the operator let it clip below 76 px at the 1024 minimum);
+ * since 1.7 the minimum holds every label whole, so it counts like the
+ * rest. */
 static int g_btn_pad = BTN_PAD, g_btn_gap = BTN_GAP;
 static int ribbon_label_need(HWND hwnd)
 {
@@ -589,7 +617,6 @@ static int ribbon_label_need(HWND hwnd)
         for (i = 0; i < ID_MODULE_COUNT; i++) {
             SIZE sz;
             const char *t = g_modules[i].button_label;
-            if (g_modules[i].command_id == SUITE_ID_BTN_NEWSGROUPS) continue;
             if (GetTextExtentPoint32A(dc, t, (int)strlen(t), &sz) && sz.cx > wmax) wmax = sz.cx;
         }
         SelectObject(dc, of);
@@ -621,7 +648,10 @@ static void layout_children(HWND hwnd)
      * from the spacing, never the names (operator decision): the padding
      * and gap tighten, one step at a time, only while a button is still
      * narrower than its widest label needs (label + 3 px frame and bevel
-     * a side + 1 px for a latched button's shift), capped at BTN_MAX_W. */
+     * a side + 1 px for a latched button's shift), capped at BTN_MAX_W.
+     * Since 1.7 (sixteen tabs, the 1280x960 minimum) the first step, the
+     * normal spacing, holds every label whole at 76 px; the tighter steps
+     * remain for a work area smaller than the minimum. */
     {
         static const int steps[][2] = { { BTN_PAD, BTN_GAP }, { 4, 2 }, { 4, 1 }, { 2, 1 }, { 2, 0 }, { 1, 0 } };
         int need = ribbon_label_need(hwnd), k;
@@ -847,6 +877,7 @@ static LRESULT CALLBACK SuiteWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
         case ID_BTN_TELNET:
         case ID_BTN_CUSEEME:
         case ID_BTN_IRC:
+        case ID_BTN_BBS:          /* 2026-11-15, Navigator 1.7 */
         case SUITE_ID_HOME: {
             int idx = command_id_to_index(wmId);
             if (idx >= 0) switch_to_module(idx);
@@ -854,6 +885,9 @@ static LRESULT CALLBACK SuiteWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
         }
         case ID_FILE_EXIT:
             PostMessageA(hwnd, WM_CLOSE, 0, 0);
+            return 0;
+        case ID_SETTINGS_CONFIG:
+            suite_config_dialog(hwnd);
             return 0;
         case ID_HELP_ABOUT:
             suite_about_show(hwnd);
@@ -1085,7 +1119,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
             !(GetKeyState(VK_SHIFT) & 0x8000) && !(GetKeyState(VK_CONTROL) & 0x8000) &&
             !help_f1_is_the_tabs(focused)) {
             suite_help_context(g_hwndMain, g_active_module >= 0
-                               ? (DWORD)NAV_HELP_TAB_ID(g_active_module)
+                               ? g_ribbon[g_active_module].help
                                : (DWORD)NAV_HELP_CONTENTS_ID);
             continue;
         }
@@ -1104,6 +1138,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
     suite_help_quit(NULL);   /* as 3.1 applications did: WinHelp(HELP_QUIT) */
     suite_update_shutdown();
     ripscrip_module_shutdown();
+    bbs_module_shutdown();
     naplps_module_shutdown();
     nabu_native_module_shutdown();
     gwbasic_module_shutdown();

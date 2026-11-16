@@ -486,7 +486,8 @@ static int rip_zmr_send(void *ctx, const void *buf, size_t len)
  * window in which the service's first frame could reach the parser. */
 static int rip_zmodem_begin(const char *why)
 {
-    char dir[MAX_PATH];
+    /* UTF-8, the Settings > Configuration Downloads directory (1.7) */
+    char dir[ZMR_PATH_CAP];
 
     if (g_zmodem_active || g_zmr) return 0;
     if (!g_connected || !g_telnet) return 0;

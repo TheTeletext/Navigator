@@ -69,6 +69,7 @@ typedef struct suite_module {
 #define SUITE_ID_BTN_GWBASIC  (SUITE_ID_BTN_BASE + 13)  /* 2026-10-20 */
 #define SUITE_ID_BTN_FTP      (SUITE_ID_BTN_BASE + 14)  /* 2026-11-12, docs/2026-11-12_FTP_TAB.md */
 #define SUITE_ID_BTN_NEWSGROUPS (SUITE_ID_BTN_BASE + 15) /* 2026-11-13, docs/2026-11-13_NETNEWS_TAB.md */
+#define SUITE_ID_BTN_BBS      (SUITE_ID_BTN_BASE + 16)  /* 2026-11-15, docs/2026-11-15_NAVIGATOR_17_BBS_TAB.md */
 /* Navigator 1.5: the Home launcher, the first ribbon button and the
  * launch default. Kept apart from the tab block so no old id moves. */
 #define SUITE_ID_HOME         150

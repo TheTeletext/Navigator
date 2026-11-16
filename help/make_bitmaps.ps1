@@ -11,7 +11,7 @@
 $root = Split-Path $PSScriptRoot
 $out = Join-Path $PSScriptRoot "src"
 $map = [ordered]@{
-    home = "HOME"; ripscrip = "RIPSCRIP"; nabu = "NABU"; videotex = "VIDEOTEX"; web = "WEB";
+    home = "HOME"; ripscrip = "RIPSCRIP"; bbs = "BBS"; nabu = "NABU"; videotex = "VIDEOTEX"; web = "WEB";
     gopher = "GOPHER"; arpanet = "ARPANET"; wais = "WAIS"; archie = "ARCHIE"; ftp = "FTP";
     newsgroups = "NEWSGRPS"; irc = "IRC"; cuseeme = "CUSEEME"; terminal = "TERMINAL"; gwbasic = "GWBASIC"
 }
