@@ -257,7 +257,7 @@ if errorlevel 1 (
 
 echo.
 echo BUILD SUCCESSFUL: %OUTDIR%\%MSINAME%
-powershell -NoProfile -Command "$h=(Get-FileHash '%OUTDIR%\%MSINAME%' -Algorithm SHA256).Hash.ToLower(); $s=(Get-Item '%OUTDIR%\%MSINAME%').Length; Write-Host ''; Write-Host ('  bytes  : ' + $s); Write-Host ('  sha256 : ' + $h); $h | Set-Content -NoNewline '%OUTDIR%\%MSINAME%.sha256'"
+powershell -NoProfile -Command "$h=(Get-FileHash '%OUTDIR%\%MSINAME%' -Algorithm SHA256).Hash.ToLower(); $s=(Get-Item '%OUTDIR%\%MSINAME%').Length; Write-Host ''; Write-Host ('  bytes  : ' + $s); Write-Host ('  sha256 : ' + $h); [IO.File]::WriteAllText('%OUTDIR%\%MSINAME%.sha256', ($h + '  %MSINAME%' + [char]10))"
 echo.
-echo   sha256 also written to %OUTDIR%\%MSINAME%.sha256
+echo   sha256 also written to %OUTDIR%\%MSINAME%.sha256 (published format: hash, two spaces, name, LF; 1.7.1)
 endlocal

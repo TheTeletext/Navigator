@@ -160,9 +160,13 @@ Choose **Check for Updates** from the Help menu. Navigator reports either that i
 = Installing an update
 When a new version is available, a dialog box shows the version and its release notes. Choose:
 
-- **Update Now** to download it. Navigator checks the download against its published SHA-256 checksum, then closes and starts the installer. Open Navigator again when the installer has finished.
+- **Update Now** to download it. Navigator checks the download against its published SHA-256 checksum, then tells you that it will close, update to the new version, and reopen by itself. Choose **OK** to go ahead, or **Cancel** to keep the version you have for now.
 - **Remind Me Later** to be asked again at a later start.
 - **Skip This Version** not to be offered that version again by the automatic check.
+
+After **OK**, Windows asks once for permission to install (User Account Control). Nothing else needs a click: the update installs while a small box says so, and Navigator opens again by itself, where it was on the screen. If the update cannot be installed, Navigator says why and shows where the downloaded installer is, so that you can run it yourself.
+
+This is how updates work from version 1.7.1 on. Version 1.7 still starts the installer's own setup wizard, one last time: click through it, then open Navigator again.
 
 Navigator downloads updates only from apps.teletext.ca. A download that does not match its checksum is deleted and is never run.
 

@@ -1041,6 +1041,10 @@ static HFONT cap_font(void)
     return g_cap_font ? g_cap_font : g_w31_font_bold;
 }
 
+/* The bold System face for the info dialogs' text (Navigator 1.7.1,
+ * suite_infodlg.c): the same face as the captions and the menus. */
+HFONT w31_system_font(void) { return cap_font(); }
+
 static const cap_mitem_t *md_of(ULONG_PTR data)
 {
     int i;

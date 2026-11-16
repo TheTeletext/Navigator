@@ -1,4 +1,4 @@
-TELETEXT NAVIGATOR 1.7
+TELETEXT NAVIGATOR 1.7.1
 The Teletext, November 2026
 
 Teletext Navigator is the retro internet client of The Teletext
@@ -80,6 +80,19 @@ BASIC folder in your Documents, which comes with two type-in
 listings (LOAD "RETRO649" and LOAD "DIALUP"). Ctrl+V types in a
 listing copied from the web.
 
+NEW IN 1.7.1
+
+New in 1.7.1: updates now install and reopen by themselves. When
+Navigator offers a new version and you choose Update Now, it
+downloads the installer, checks it against its published SHA-256,
+closes, installs the update after one Windows permission prompt,
+and opens again where it was, with no setup wizard to click
+through. Navigator's information boxes, About among them, now show
+their text the Windows 3.1 way, in a white box with a scroll bar
+when the text is long. One exception: going from 1.7 to 1.7.1
+still runs the old setup wizard, one last time, because 1.7 does
+the installing; click through it, then open Navigator again.
+
 HELP AND THE MANUAL
 
 Help, Contents (or F1 on any tab) opens the help in WinHelp, the
@@ -104,7 +117,7 @@ pixels. Nothing else to install.
 
 INSTALL
 
-Run the installer, Teletext_Navigator_1.7.0.msi. It installs to
+Run the installer, Teletext_Navigator_1.7.1.msi. It installs to
 Program Files\Teletext Navigator for all users and adds a Start
 Menu entry; the desktop shortcut is optional and can be turned off
 during setup. Uninstall from Settings, Apps and features.

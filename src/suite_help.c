@@ -13,6 +13,7 @@
  * another tab moves the same Help window to that tab's topic.
  */
 #include "suite_help.h"
+#include "suite_infodlg.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -46,7 +47,13 @@ static void help_error(HWND owner, const char *what, const char *dir)
     snprintf(msg, sizeof msg,
              "Help is not available: %s was not found in\n%s\n\n"
              "Install Teletext Navigator again to restore it.", what, dir);
-    MessageBoxA(owner, msg, "Teletext Navigator", MB_OK | MB_ICONEXCLAMATION);
+    w31_info_t in;
+    ZeroMemory(&in, sizeof in);
+    in.caption = "Teletext Navigator";
+    in.body = msg;
+    in.buttons = W31INFO_OK;
+    in.width = 420;
+    w31_info_dialog(owner, &in);     /* 1.7.1: the Windows 3.1 info box */
 }
 
 /* The running viewer, or NULL. */

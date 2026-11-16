@@ -30,12 +30,16 @@
 #endif
 #include <windows.h>
 #include <shlobj.h>
+#include <shellapi.h>
+#include <objbase.h>
 
 #include "suite_update.h"
 #include "suite_shell.h"
 #include "suite_version.h"
 #include "http_fetch.h"
 #include "suite_sha256.h"
+#include "suite_infodlg.h"
+#include "suite_w31.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -916,8 +920,7 @@ static DLGTEMPLATE *upd_build_template(int mode, int required)
     pp = emit_item(pp, SS_LEFT, 0, 10, 50, 100, 9,
                    (WORD)-1, 0x0082, L"Release notes:");
     pp = emit_item(pp,
-                   ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL |
-                   WS_VSCROLL | WS_BORDER | WS_TABSTOP,
+                   ES_MULTILINE | ES_READONLY | WS_TABSTOP,
                    WS_EX_CLIENTEDGE, 10, 62, 280, 82,
                    IDC_UPD_NOTES, 0x0081, L"");
     pp = emit_item(pp, BS_AUTOCHECKBOX | WS_TABSTOP, 0, 10, 152, 180, 10,
@@ -940,6 +943,61 @@ static DLGTEMPLATE *upd_build_template(int mode, int required)
                        224, 172, 62, 14, IDCANCEL, 0x0080, L"Cancel");
     }
     return dt;
+}
+
+static HWND upd_notes_make(HWND dlg, const RECT *r, int scroll, const char *text, HFONT f)
+{
+    HWND e = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "",
+                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE |
+                             ES_READONLY | (scroll ? (WS_VSCROLL | ES_AUTOVSCROLL) : 0),
+                             r->left, r->top, r->right - r->left, r->bottom - r->top,
+                             dlg, (HMENU)(INT_PTR)IDC_UPD_NOTES, GetModuleHandleA(NULL), NULL);
+    if (!e) return NULL;
+    SetPropA(e, W31_PROP_KEEPFONT, (HANDLE)1);
+    SendMessageA(e, WM_SETFONT, (WPARAM)f, FALSE);
+    SendMessageA(e, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELONG(5, 5));
+    SetWindowTextA(e, text);
+    /* keep the tab order: the notes right after the version line */
+    SetWindowPos(e, GetDlgItem(dlg, IDC_UPD_VERSIONS), 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    return e;
+}
+
+/* Navigator 1.7.1, Windows 3.1 dialog text (refshots/ref37): the release
+ * notes sit in the white box in the BOLD System face, and the box carries
+ * a scroll bar only when the notes are longer than it is tall. The edit is
+ * born without WS_VSCROLL in the template; once the notes are known it is
+ * re-created in the System face, asked how many lines they wrap to and
+ * how far apart its lines are, and re-created once more WITH the bar (the
+ * hook gives it the Windows 3.1 one) only if they do not fit. */
+static void upd_notes_fit(HWND dlg, const char *text)
+{
+    HWND old = GetDlgItem(dlg, IDC_UPD_NOTES), e;
+    HFONT f = w31_system_font();
+    RECT r, cr;
+    int count, pitch = 16, room;
+
+    if (!old) return;
+    GetWindowRect(old, &r);
+    MapWindowPoints(NULL, dlg, (POINT *)&r, 2);
+    DestroyWindow(old);
+
+    e = upd_notes_make(dlg, &r, 0, text, f);
+    if (!e) return;
+    count = (int)SendMessageA(e, EM_GETLINECOUNT, 0, 0);
+    if (count > 1) {
+        LRESULT p0 = SendMessageA(e, EM_POSFROMCHAR, 0, 0);
+        LRESULT p1 = SendMessageA(e, EM_POSFROMCHAR,
+                                  (WPARAM)SendMessageA(e, EM_LINEINDEX, 1, 0), 0);
+        int d = (short)HIWORD(p1) - (short)HIWORD(p0);
+        if (d > 0 && d < 64) pitch = d;
+    }
+    GetClientRect(e, &cr);
+    room = (cr.bottom - 2) / pitch;
+    if (count > room) {
+        DestroyWindow(e);
+        upd_notes_make(dlg, &r, 1, text, f);
+    }
 }
 
 static INT_PTR CALLBACK upd_dlg_proc(HWND dlg, UINT msg,
@@ -985,12 +1043,11 @@ static INT_PTR CALLBACK upd_dlg_proc(HWND dlg, UINT msg,
                     crlf[o++] = src[i];
                 }
                 crlf[o] = 0;
-                SetDlgItemTextA(dlg, IDC_UPD_NOTES,
-                                crlf[0] ? crlf
-                                        : "No release notes were published.");
+                upd_notes_fit(dlg, crlf[0] ? crlf
+                                           : "No release notes were published.");
                 free(crlf);
             } else {
-                SetDlgItemTextA(dlg, IDC_UPD_NOTES, src);
+                upd_notes_fit(dlg, src);
             }
         }
 
@@ -1040,53 +1097,354 @@ static INT_PTR upd_show_dialog(HWND parent, const UpdManifest *m,
 }
 
 /* ------------------------------------------------------------------ */
-/* Handing over to the installer                                       */
+/* Handing over to the installer (Navigator 1.7.1: the seamless path)  */
 /* ------------------------------------------------------------------ */
 
 /*
- * Start msiexec on the verified package, detached, then ask Navigator to
- * close so the MSI is upgrading an application that is not running.
+ * Until 1.7 Update Now ended in the installer's own wizard: Navigator
+ * started msiexec /i with its full UI and closed, and the user clicked
+ * through the wizard and reopened Navigator by hand. Since 1.7.1:
  *
- * Two details that matter and are easy to get wrong:
+ *   1. one dialog, "Navigator will now close, update to <version>, and
+ *      reopen by itself.", OK / Cancel;
+ *   2. on OK, a COPY of this exe is started as the update helper
+ *      (--update-helper), from the Update folder, and Navigator closes;
+ *   3. the helper waits for Navigator's process to end, checks the
+ *      package's SHA-256 again, runs msiexec /i /qn elevated (the one UAC
+ *      prompt) while a "please wait" box is up, and starts the updated
+ *      Navigator again;
+ *   4. only if that fails does anyone see where the verified package is
+ *      (the fallback; until 1.7 that box followed a Cancel, ref35).
  *
- *   THE CHILD'S WORKING DIRECTORY. A process inherits its parent's, and
- *   Navigator's shortcuts set WorkingDirectory to the install folder,
- *   which is exactly the directory the MSI is about to replace. The
- *   child is therefore given the system directory explicitly.
+ * WHY A COPY: the exe in the install folder is what the MSI replaces; a
+ * helper running from it would hold the very file being upgraded. The copy
+ * lives in %LOCALAPPDATA%\Teletext Navigator\Update beside the package and
+ * is overwritten by the next update. WHY ITS OWN WAIT: Navigator's shutdown
+ * tail can take seconds (telnet_proto_close waits up to 3 s per handle, the
+ * Zmodem receiver up to 5 s), and a /qn install that finds the exe still
+ * running schedules a reboot rather than asking. The helper therefore
+ * holds Navigator's process handle, inherited through an explicit handle
+ * list so that nothing else of Navigator's (its sockets) is inherited, and
+ * starts msiexec only once that handle is signalled.
  *
- *   THE SHUTDOWN TAIL. WM_CLOSE is the clean path: DefWindowProc turns
- *   it into DestroyWindow, WM_DESTROY posts the quit message, and
- *   WinMain then joins the module workers. That tail can take several
- *   seconds, because telnet_proto_close waits up to 3 s per handle and
- *   the Zmodem receiver up to 5 s if a transfer is in flight. msiexec is
- *   already running by then; if it reaches the files first it raises its
- *   own in-use handling, which the package is authored to survive.
+ * Users first take this path when they upgrade FROM 1.7.1: the 1.7 ->
+ * 1.7.1 upgrade is still run by 1.7's code, the wizard's last ride.
  */
-static int launch_installer(const wchar_t *msi_path)
-{
-    wchar_t sysdir[MAX_PATH];
-    wchar_t cmd[MAX_PATH * 2 + 64];
-    STARTUPINFOW si;
-    PROCESS_INFORMATION pi;
 
-    if (!msi_path || !msi_path[0]) return 0;
-    if (GetSystemDirectoryW(sysdir, MAX_PATH) == 0) return 0;
+#define UPD_HELPER_NAME     L"TeletextNavigator_update_helper.exe"
+#define UPD_HELPER_ARG_W    L"--update-helper"
+#define UPD_PARENT_WAIT_MS  (120 * 1000)
+
+/* Every message of the updater in the Windows 3.1 information dialog
+ * (Navigator 1.7.1): the text in the white box, bold System face, OK. */
+static void upd_info(HWND owner, const char *body)
+{
+    w31_info_t in;
+    ZeroMemory(&in, sizeof in);
+    in.caption = "Software Update";
+    in.body = body;
+    in.buttons = W31INFO_OK;
+    in.width = 420;
+    w31_info_dialog(owner, &in);
+}
+
+static void fallback_dialog(HWND owner, int anchored, POINT anchor,
+                            const char *version, const char *reason,
+                            const wchar_t *msi_path)
+{
+    char body[2048], path_a[MAX_PATH * 2];
+    w31_info_t in;
+    WideCharToMultiByte(CP_ACP, 0, msi_path ? msi_path : L"", -1,
+                        path_a, sizeof path_a, NULL, NULL);
+    _snprintf(body, sizeof body - 1,
+              "The update to %s was not installed.\n\n%s\n\n"
+              "The verified installer is here if you want to run it "
+              "yourself:\n%s", version, reason, path_a);
+    body[sizeof body - 1] = 0;
+    ZeroMemory(&in, sizeof in);
+    in.caption = "Software Update";
+    in.body = body;
+    in.buttons = W31INFO_OK;
+    in.max_lines = 10;
+    in.width = 460;
+    in.has_anchor = anchored;
+    in.anchor = anchor;
+    w31_info_dialog(owner, &in);
+}
+
+/* Only [0-9A-Za-z.+-] reaches a command line from the manifest. */
+static void safe_token(char *dst, size_t cap, const char *src)
+{
+    size_t o = 0;
+    for (; src && *src && o + 1 < cap; src++) {
+        char c = *src;
+        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') ||
+            (c >= 'a' && c <= 'z') || c == '.' || c == '+' || c == '-')
+            dst[o++] = c;
+    }
+    dst[o] = 0;
+    if (!o && cap > 1) { dst[0] = '?'; dst[1] = 0; }
+}
+
+/* Start the helper. Returns 1 when it is running (Navigator must now
+ * close), 0 with err filled otherwise. */
+static int launch_helper(HWND hwnd, const UpdDownload *d, char *err, size_t errcap)
+{
+    wchar_t dir[MAX_PATH], helper[MAX_PATH], self[MAX_PATH];
+    wchar_t cmd[MAX_PATH * 4];
+    wchar_t wver[64], wsha[SUITE_SHA256_HEXLEN];
+    char    ver[64];
+    HANDLE  me = NULL;
+    RECT    wr;
+    int     zoomed;
+    WINDOWPLACEMENT wp;
+    SIZE_T  attr_size = 0;
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = NULL;
+    STARTUPINFOEXW si;
+    PROCESS_INFORMATION pi;
+    int ok = 0;
+
+    err[0] = 0;
+    if (update_dir(dir, MAX_PATH) != 0 ||
+        GetModuleFileNameW(NULL, self, MAX_PATH) == 0) {
+        copy_str(err, errcap, "The update helper has nowhere to run from.");
+        return 0;
+    }
+    _snwprintf(helper, MAX_PATH - 1, L"%s\\%s", dir, UPD_HELPER_NAME);
+    helper[MAX_PATH - 1] = 0;
+    if (!CopyFileW(self, helper, FALSE)) {
+        copy_str(err, errcap, "The update helper could not be prepared.");
+        return 0;
+    }
+    if (!DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(),
+                         GetCurrentProcess(), &me, SYNCHRONIZE, TRUE, 0)) {
+        copy_str(err, errcap, "The update helper could not be prepared.");
+        return 0;
+    }
+
+    safe_token(ver, sizeof ver, d->m.version);
+    MultiByteToWideChar(CP_ACP, 0, ver, -1, wver, 64);
+    MultiByteToWideChar(CP_ACP, 0, d->got_hash, -1, wsha, SUITE_SHA256_HEXLEN);
+    /* where Navigator is now, so that it reopens there (--reopen) */
+    zoomed = IsZoomed(hwnd) ? 1 : 0;
+    wp.length = sizeof wp;
+    if (zoomed && GetWindowPlacement(hwnd, &wp)) wr = wp.rcNormalPosition;
+    else if (!GetWindowRect(hwnd, &wr)) SetRect(&wr, 0, 0, 0, 0);
 
     _snwprintf(cmd, sizeof cmd / sizeof cmd[0] - 1,
-               L"\"%s\\msiexec.exe\" /i \"%s\"", sysdir, msi_path);
+               L"\"%s\" " UPD_HELPER_ARG_W L" %llu %ld %ld %ld %ld %d %s %s \"%s\" \"%s\"",
+               helper, (unsigned long long)(ULONG_PTR)me,
+               (long)wr.left, (long)wr.top, (long)wr.right, (long)wr.bottom, zoomed,
+               wver, wsha, d->path, self);
     cmd[sizeof cmd / sizeof cmd[0] - 1] = 0;
 
+    InitializeProcThreadAttributeList(NULL, 1, 0, &attr_size);
+    attrs = (LPPROC_THREAD_ATTRIBUTE_LIST)malloc(attr_size);
+    if (attrs && InitializeProcThreadAttributeList(attrs, 1, 0, &attr_size)) {
+        if (UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                      &me, sizeof me, NULL, NULL)) {
+            ZeroMemory(&si, sizeof si);
+            si.StartupInfo.cb = sizeof si;
+            si.lpAttributeList = attrs;
+            ZeroMemory(&pi, sizeof pi);
+            if (CreateProcessW(helper, cmd, NULL, NULL, TRUE,
+                               EXTENDED_STARTUPINFO_PRESENT, NULL, dir,
+                               &si.StartupInfo, &pi)) {
+                /* the helper's boxes and its UAC request come up in front */
+                AllowSetForegroundWindow(pi.dwProcessId);
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+                ok = 1;
+            }
+        }
+        DeleteProcThreadAttributeList(attrs);
+    }
+    free(attrs);
+    CloseHandle(me);
+    if (!ok) copy_str(err, errcap, "The update helper could not be started.");
+    return ok;
+}
+
+/* Pump messages until h is signalled. */
+static void wait_pumping(HANDLE h)
+{
+    for (;;) {
+        MSG msg;
+        DWORD r = MsgWaitForMultipleObjects(1, &h, FALSE, INFINITE, QS_ALLINPUT);
+        if (r != WAIT_OBJECT_0 + 1) return;
+        while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+    }
+}
+
+static void relaunch(const wchar_t *exe, const wchar_t *place)
+{
+    wchar_t dir[MAX_PATH], cmd[MAX_PATH + 128];
+    wchar_t *slash;
+    STARTUPINFOW si;
+    PROCESS_INFORMATION pi;
+    if (GetFileAttributesW(exe) == INVALID_FILE_ATTRIBUTES) return;
+    lstrcpynW(dir, exe, MAX_PATH);
+    slash = wcsrchr(dir, L'\\');
+    if (slash) *slash = 0;
+    _snwprintf(cmd, MAX_PATH + 127, L"\"%s\" --reopen %s", exe, place);
+    cmd[MAX_PATH + 127] = 0;
     ZeroMemory(&si, sizeof si);
     si.cb = sizeof si;
-    ZeroMemory(&pi, sizeof pi);
+    AllowSetForegroundWindow(ASFW_ANY);
+    if (CreateProcessW(exe, cmd, NULL, NULL, FALSE, 0, NULL, dir, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+}
 
-    if (!CreateProcessW(NULL, cmd, NULL, NULL, FALSE,
-                        0, NULL, sysdir, &si, &pi))
-        return 0;
+/*
+ * The helper process: TeletextNavigator_update_helper.exe --update-helper
+ *   <parent handle> <left> <top> <right> <bottom> <zoomed> <version>
+ *   <sha256> "<msi>" "<navigator exe>"
+ * The rectangle is Navigator's window (its restored rectangle when it was
+ * maximized): the helper's boxes come up centred on that monitor, and
+ * Navigator is started again with --reopen <the same five numbers>, so it
+ * reopens where it was (suite_shell.c, WinMain). Exit code 0 = installed, else the
+ * msiexec code (or 1) after the fallback was shown. Either way the
+ * Navigator at <navigator exe> is started again at the end.
+ */
+int suite_update_helper_main(void)
+{
+    int argc = 0, rc = 1;
+    wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    HANDLE parent;
+    POINT anchor;
+    wchar_t place[96];
+    char version[64], sha[SUITE_SHA256_HEXLEN], got[SUITE_SHA256_HEXLEN];
+    char reason[512], err[256], wait_text[256];
+    const wchar_t *msi, *exe;
+    HWND wait_box = NULL;
+    w31_info_t in;
 
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    return 1;
+    if (!argv || argc < 12) return 2;
+    parent   = (HANDLE)(ULONG_PTR)_wcstoui64(argv[2], NULL, 10);
+    {
+        long l = wcstol(argv[3], NULL, 10), t = wcstol(argv[4], NULL, 10);
+        long r = wcstol(argv[5], NULL, 10), b = wcstol(argv[6], NULL, 10);
+        int  z = (int)wcstol(argv[7], NULL, 10) ? 1 : 0;
+        anchor.x = (LONG)((l + r) / 2);
+        anchor.y = (LONG)((t + b) / 2);
+        _snwprintf(place, 95, L"%ld %ld %ld %ld %d", l, t, r, b, z);
+        place[95] = 0;
+    }
+    WideCharToMultiByte(CP_ACP, 0, argv[8], -1, err, sizeof err, NULL, NULL);
+    safe_token(version, sizeof version, err);
+    WideCharToMultiByte(CP_ACP, 0, argv[9], -1, sha, sizeof sha, NULL, NULL);
+    msi = argv[10];
+    exe = argv[11];
+
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    w31_init();
+    w31_hook_install();
+    reason[0] = 0;
+
+    /* 1. Navigator must be gone before msiexec touches its files. */
+    if (WaitForSingleObject(parent, UPD_PARENT_WAIT_MS) != WAIT_OBJECT_0) {
+        copy_str(reason, sizeof reason,
+                 "Teletext Navigator did not close, so its files could not "
+                 "be replaced.");
+        goto fail;
+    }
+    CloseHandle(parent);
+
+    _snprintf(wait_text, sizeof wait_text - 1,
+              "Updating Teletext Navigator to %s.\n\n"
+              "It will reopen by itself when the update is installed.",
+              version);
+    wait_text[sizeof wait_text - 1] = 0;
+    ZeroMemory(&in, sizeof in);
+    in.caption = "Software Update";
+    in.body = wait_text;
+    in.buttons = W31INFO_NONE;
+    in.width = 420;
+    in.has_anchor = 1;
+    in.anchor = anchor;
+    wait_box = w31_info_modeless(&in);
+    if (wait_box) SetForegroundWindow(wait_box);
+
+    /* 2. The package must still be the one that was verified. */
+    err[0] = 0;
+    if (suite_sha256_file(msi, got, err, sizeof err) != 0 ||
+        !suite_sha256_hex_equal(got, sha)) {
+        copy_str(reason, sizeof reason,
+                 "The downloaded installer no longer matches its published "
+                 "checksum, so it was not run.");
+        goto fail;
+    }
+
+    /* 3. msiexec, quiet, elevated: the one UAC prompt. */
+    {
+        wchar_t sysdir[MAX_PATH], file[MAX_PATH + 16], params[MAX_PATH * 3];
+        wchar_t log[MAX_PATH], wver[64];
+        SHELLEXECUTEINFOW se;
+        DWORD code = 1;
+        wchar_t *sl;
+        GetSystemDirectoryW(sysdir, MAX_PATH);
+        _snwprintf(file, MAX_PATH + 15, L"%s\\msiexec.exe", sysdir);
+        file[MAX_PATH + 15] = 0;
+        MultiByteToWideChar(CP_ACP, 0, version, -1, wver, 64);
+        lstrcpynW(log, msi, MAX_PATH - 40);
+        sl = wcsrchr(log, L'\\');
+        if (sl) _snwprintf(sl + 1, 38, L"install_%s.log", wver);
+        log[MAX_PATH - 1] = 0;
+        _snwprintf(params, sizeof params / sizeof params[0] - 1,
+                   L"/i \"%s\" /qn /norestart /l*v \"%s\"", msi, log);
+        params[sizeof params / sizeof params[0] - 1] = 0;
+        ZeroMemory(&se, sizeof se);
+        se.cbSize = sizeof se;
+        se.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+        se.hwnd = wait_box;
+        se.lpVerb = L"runas";
+        se.lpFile = file;
+        se.lpParameters = params;
+        se.lpDirectory = sysdir;
+        se.nShow = SW_HIDE;
+        if (!ShellExecuteExW(&se) || !se.hProcess) {
+            DWORD e = GetLastError();
+            copy_str(reason, sizeof reason,
+                     e == ERROR_CANCELLED
+                       ? "Permission to install was not given."
+                       : "The installer could not be started.");
+            goto fail;
+        }
+        wait_pumping(se.hProcess);
+        GetExitCodeProcess(se.hProcess, &code);
+        CloseHandle(se.hProcess);
+        /* 0 done; 3010 / 1641 done, a restart is wanted (Navigator's own
+         * files are replaced either way, so it is started again). */
+        if (code != 0 && code != ERROR_SUCCESS_REBOOT_REQUIRED &&
+            code != ERROR_SUCCESS_REBOOT_INITIATED) {
+            rc = (int)code;
+            if (code == ERROR_INSTALL_USEREXIT)
+                copy_str(reason, sizeof reason, "The installation was cancelled.");
+            else {
+                _snprintf(reason, sizeof reason - 1,
+                          "The installer stopped with error %lu.",
+                          (unsigned long)code);
+                reason[sizeof reason - 1] = 0;
+            }
+            goto fail;
+        }
+    }
+    if (wait_box) DestroyWindow(wait_box);
+    relaunch(exe, place);
+    LocalFree(argv);
+    return 0;
+
+fail:
+    if (wait_box) { DestroyWindow(wait_box); wait_box = NULL; }
+    fallback_dialog(NULL, 1, anchor, version, reason, msi);
+    relaunch(exe, place);
+    LocalFree(argv);
+    return rc ? rc : 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1120,8 +1478,7 @@ static void start_check(HWND main_hwnd, int mode)
     if (!g_thread) {
         InterlockedExchange(&g_busy, 0);
         if (mode == UPD_MODE_MANUAL)
-            MessageBoxA(main_hwnd, "The update check could not be started.",
-                        "Software Update", MB_OK | MB_ICONWARNING);
+            upd_info(main_hwnd, "The update check could not be started.");
     }
 }
 
@@ -1162,8 +1519,7 @@ static void start_download(HWND hwnd, const UpdManifest *m)
     if (!g_thread) {
         free(d);
         InterlockedExchange(&g_busy, 0);
-        MessageBoxA(hwnd, "The download could not be started.",
-                    "Software Update", MB_OK | MB_ICONWARNING);
+        upd_info(hwnd, "The download could not be started.");
     }
 }
 
@@ -1184,7 +1540,7 @@ static void on_result(HWND hwnd, UpdResult *r)
                       "Could not check for updates.\r\n\r\n%s\r\n\r\n"
                       "You are running %s.", r->error, SUITE_VERSION_STR);
             msg[sizeof msg - 1] = 0;
-            MessageBoxA(hwnd, msg, "Software Update", MB_OK | MB_ICONWARNING);
+            upd_info(hwnd, msg);
         }
         /* A startup check that cannot reach the network says nothing.
          * The user did not ask, and a modal box on every launch behind a
@@ -1209,7 +1565,7 @@ static void on_result(HWND hwnd, UpdResult *r)
                       "You are running %s.\r\n\r\n%s",
                       SUITE_VERSION_STR, tail);
             msg[sizeof msg - 1] = 0;
-            MessageBoxA(hwnd, msg, "Software Update", MB_OK);
+            upd_info(hwnd, msg);
         }
         free(r);
         InterlockedExchange(&g_busy, 0);
@@ -1257,7 +1613,6 @@ static void on_result(HWND hwnd, UpdResult *r)
 static void on_download_done(HWND hwnd, UpdDownload *d)
 {
     char msg[1400];
-    char path_a[MAX_PATH * 2];
 
     if (!d) return;
 
@@ -1268,55 +1623,54 @@ static void on_download_done(HWND hwnd, UpdDownload *d)
                   "You are still running %s, and nothing has changed.",
                   d->error, SUITE_VERSION_STR);
         msg[sizeof msg - 1] = 0;
-        MessageBoxA(hwnd, msg, "Software Update", MB_OK | MB_ICONWARNING);
+        upd_info(hwnd, msg);
         free(d);
         InterlockedExchange(&g_busy, 0);
         return;
     }
 
-    WideCharToMultiByte(CP_ACP, 0, d->path, -1, path_a, sizeof path_a,
-                        NULL, NULL);
     suite_set_status("Update downloaded and verified.");
 
-    _snprintf(msg, sizeof msg - 1,
-              "Version %s has been downloaded and its SHA-256 matches the "
-              "published checksum.\r\n\r\n"
-              "Teletext Navigator will now close and the installer will start.\r\n"
-              "Reopen it when the installer has finished.\r\n\r\n"
-              "Continue?", d->m.version);
-    msg[sizeof msg - 1] = 0;
-
-    if (MessageBoxA(hwnd, msg, "Ready to install",
-                    MB_OKCANCEL | MB_ICONINFORMATION) != IDOK) {
-        _snprintf(msg, sizeof msg - 1,
-                  "The verified installer is here if you want to run it "
-                  "yourself:\r\n\r\n%s", path_a);
-        msg[sizeof msg - 1] = 0;
-        MessageBoxA(hwnd, msg, "Software Update", MB_OK);
-        suite_set_status("Update ready but not installed.");
-        free(d);
-        InterlockedExchange(&g_busy, 0);
-        return;
+    {
+        w31_info_t in;
+        char body[256];
+        _snprintf(body, sizeof body - 1,
+                  "Navigator will now close, update to %s, and reopen by "
+                  "itself.", d->m.version);
+        body[sizeof body - 1] = 0;
+        ZeroMemory(&in, sizeof in);
+        in.caption = "Software Update";
+        in.body = body;
+        in.buttons = W31INFO_OKCANCEL;
+        in.width = 480;
+        if (w31_info_dialog(hwnd, &in) != IDOK) {
+            /* The package stays in the Update folder. Since 1.7.1 its
+             * path is shown only when an install fails. */
+            suite_set_status("Update ready but not installed.");
+            free(d);
+            InterlockedExchange(&g_busy, 0);
+            return;
+        }
     }
 
-    if (!launch_installer(d->path)) {
-        _snprintf(msg, sizeof msg - 1,
-                  "The installer could not be started.\r\n\r\n"
-                  "It is here if you want to run it yourself:\r\n%s",
-                  path_a);
-        msg[sizeof msg - 1] = 0;
-        MessageBoxA(hwnd, msg, "Software Update", MB_OK | MB_ICONWARNING);
-        free(d);
-        InterlockedExchange(&g_busy, 0);
-        return;
+    {
+        char err[256];
+        if (!launch_helper(hwnd, d, err, sizeof err)) {
+            POINT none = { 0, 0 };
+            fallback_dialog(hwnd, 0, none, d->m.version, err, d->path);
+            suite_set_status("The update was not installed.");
+            free(d);
+            InterlockedExchange(&g_busy, 0);
+            return;
+        }
     }
 
-    /* The installer is running. Release the busy flag before asking for
+    /* The helper is running. Release the busy flag before asking for
      * the close: the shutdown path joins this module's worker, and a
      * flag still held would be the last thing anyone saw. */
     free(d);
     InterlockedExchange(&g_busy, 0);
-    suite_set_status("Closing so the installer can run...");
+    suite_set_status("Closing so the update can be installed...");
     PostMessageA(hwnd, WM_CLOSE, 0, 0);
 }
 

@@ -1,10 +1,10 @@
-TELETEXT NAVIGATOR 1.7 (Win x64)
+TELETEXT NAVIGATOR 1.7.1 (Win x64)
 Retro internet client of The Teletext:
 RIPscrip, an ANSI BBS with Zmodem, NABU,
 Videotex (Minitel and NAPLPS), Web 1.0,
 Gopher, ARPANET mail, WAIS, Archie, FTP,
 Newsgroups, IRC, CU-SeeMe, Telnet, GW-BASIC.
+New in 1.7.1: updates install by themselves.
 http://www.teletext.ca
-Help in WinHelp. Free software, AGPLv3.
+Help in WinHelp. AGPLv3. (c) The Teletext
 Source: github.com/TheTeletext/Navigator
-(c) 2026 The Teletext

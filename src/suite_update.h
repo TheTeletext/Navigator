@@ -161,6 +161,11 @@ int suite_update_compare_versions(const char *a, const char *b);
  * from the code. */
 const char *suite_update_manifest_url(void);
 
+/* Navigator 1.7.1: the update helper's entry point. WinMain calls it, and
+ * returns its result, when the command line starts with --update-helper
+ * (suite_update.c, "Handing over to the installer"). */
+int suite_update_helper_main(void);
+
 #ifdef __cplusplus
 }
 #endif

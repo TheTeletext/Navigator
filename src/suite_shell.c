@@ -996,6 +996,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
         return rc;
     }
 
+    /* Navigator 1.7.1: the update helper (a copy of this exe in the
+     * Update folder) waits for Navigator to close, installs, reopens it.
+     * No window, no module of Navigator's own is started. */
+    if (lpCmdLine && strstr(lpCmdLine, "--update-helper") == lpCmdLine) {
+        int rc = suite_update_helper_main();
+        WSACleanup();
+        return rc;
+    }
+
     /* Pin the UI thread to STA before any module init runs. The shared
      * audio meter and GDI+ logo service run on an STA UI thread, and
      * audio_meter_init already handles the RPC_E_CHANGED_MODE its own MTA
@@ -1084,6 +1093,28 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
     }
     ShowWindow(g_hwndContent, SW_SHOW);
     ShowWindow(g_hwndStatus,  SW_SHOW);
+
+    /* Navigator 1.7.1: reopened by the update helper (suite_update.c) with
+     * --reopen <left> <top> <right> <bottom> <zoomed>, the window it had
+     * when it closed for the update. It reopens there, provided that
+     * rectangle is still on a monitor; WM_GETMINMAXINFO keeps the minimum.
+     * Later versions must keep accepting this argument: the helper of the
+     * version being replaced is the one that passes it. */
+    if (lpCmdLine && strstr(lpCmdLine, "--reopen ") == lpCmdLine) {
+        long l = 0, t = 0, r = 0, b = 0;
+        int  z = 0;
+        if (sscanf(lpCmdLine + 9, "%ld %ld %ld %ld %d", &l, &t, &r, &b, &z) == 5
+            && r - l >= 200 && b - t >= 150) {
+            POINT c;
+            c.x = (LONG)((l + r) / 2);
+            c.y = (LONG)((t + b) / 2);
+            if (MonitorFromPoint(c, MONITOR_DEFAULTTONULL)) {
+                SetWindowPos(g_hwndMain, NULL, (int)l, (int)t, (int)(r - l), (int)(b - t),
+                             SWP_NOZORDER | SWP_NOACTIVATE);
+                if (z) nShow = SW_SHOWMAXIMIZED;
+            }
+        }
+    }
 
     ShowWindow(g_hwndMain, nShow);
     UpdateWindow(g_hwndMain);

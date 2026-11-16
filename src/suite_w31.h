@@ -143,6 +143,10 @@ void w31_untheme(HWND h);
  * the font it is sent, instead of putting the period face back. */
 #define W31_PROP_KEEPFONT "NavW31.KeepFont"
 
+/* The bold System face (captions, menus, and since 1.7.1 the text of the
+ * info dialogs: suite_infodlg.c). Owned by suite_w31.c; do not delete. */
+HFONT w31_system_font(void);
+
 /* Windows 3.1 scrollbars (2026-11-11, docs/2026-11-11_W31_SCROLLBARS.md).
  * A window of one of Navigator's own classes born with WS_VSCROLL or
  * WS_HSCROLL is adopted by the hook: the style comes off, so Windows draws

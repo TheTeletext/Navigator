@@ -31,7 +31,7 @@ On the Start Menu: **Teletext Navigator**, and **Teletext Navigator Manual**, wh
 @topic install_start | Starting and Updating | starting Navigator;updating;new version | install:020
 To start Teletext Navigator, choose **Teletext Navigator** on the Start Menu, or its desktop shortcut.
 
-Navigator checks for a new version by itself, at most once a day, and you can check at any time with **Check for Updates** on the Help menu. An update downloads the new installer, checks it, and installs it over the old version: your settings are kept. See [[nav_updates|Checking for Updates]].
+Navigator checks for a new version by itself, at most once a day, and you can check at any time with **Check for Updates** on the Help menu. An update downloads the new installer, checks it, and installs it over the old version: Navigator closes, the update installs after one Windows permission prompt, and Navigator reopens by itself. Your settings are kept. See [[nav_updates|Checking for Updates]].
 
 @topic install_remove | Removing Teletext Navigator | uninstalling;removing | install:030
 Open **Settings** in Windows and choose **Apps**, then **Installed apps** (on Windows 10, **Apps and features**). Choose Teletext Navigator, then **Uninstall**.
