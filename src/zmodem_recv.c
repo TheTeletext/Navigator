@@ -17,7 +17,7 @@
  * THE TWO ESCAPE LAYERS, AND WHY THEY CANNOT COLLIDE
  * ------------------------------------------------------------------
  *
- * The service runs Synchronet's sexyz with -telnet, so on the wire a
+ * The service runs its Zmodem sender with -telnet, so on the wire a
  * literal 0xFF is doubled per RFC 854. There are two escape schemes in
  * play and their order matters:
  *

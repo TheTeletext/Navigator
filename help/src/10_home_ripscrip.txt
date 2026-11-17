@@ -37,7 +37,7 @@ To connect:
 
 The status bar shows "Connecting to" and the host. While the connection is being made the button reads Disconnect and is dimmed; it cannot be stopped, but it gives up after 20 seconds. When the board answers, the status bar shows "Connected to" and the host, the Host and Port boxes are locked, and the screen waits for the board's first picture.
 
-Navigator answers the board's request for its RIPscrip version automatically, as a RIPscrip 1.54 terminal.
+Navigator answers the board's request for its RIPscrip version automatically, as a RIPscrip 1.54 terminal. It also reports its cursor position when the board asks, as an ANSI terminal does, so boards that first check for an ANSI terminal send their RIPscrip screens too. Plain text that a board sends between its pictures, such as a login prompt or a menu, appears in the RIPscrip text window, in the board's colours. A button that asks for it clears the screen before its command is sent, for example a Continue button that leads from a board's opening picture to its login prompt.
 
 To disconnect, choose **Disconnect**. The status bar shows "Disconnected from" and the host, and the screen is cleared. If the board ends the session, the same thing happens. Navigator does not reconnect by itself; choose Connect again.
 
@@ -80,7 +80,7 @@ The name in the Host box could not be found. Check its spelling; use the host's 
 The host did not accept a connection on that port. Check the Port box (23 for The Teletext's board), and that your network allows Telnet connections.
 
 = The screen stays black after connecting
-The status bar says the session is waiting for the RIPscrip scene. Some hosts send plain text to a terminal that is not RIPscrip; Navigator draws only RIPscrip screens. The Teletext's board at ripscrip.teletext.ca sends RIPscrip.
+The status bar says the session is waiting for the RIPscrip scene: the board has not yet sent anything to show. Navigator shows a board's RIPscrip pictures and also the plain text it sends, such as a login prompt or a menu, so a black screen means the board has not answered yet. Wait a few seconds; if nothing appears, disconnect and check the Host and Port boxes. The Teletext's board at ripscrip.teletext.ca sends RIPscrip.
 
 = Typing does nothing
 On a screen with buttons, only the buttons' keys are sent. Click a button instead.

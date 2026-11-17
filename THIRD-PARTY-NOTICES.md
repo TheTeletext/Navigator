@@ -571,6 +571,28 @@ implied.
   `tools/font_ttf_to_cp437.py` into the C tables `src/gwb_font8x16.h` and
   `src/gwb_font8x8.h` (all 256 CP437 code points), compiled into the exe.
 
+## "The Sound of dial-up Internet" (the BBS tab's modem handshake)
+
+- What it is: a recording of a dial-up modem's call and handshake by
+  **wtermini**, published on Freesound as sound 546450,
+  https://freesound.org/people/wtermini/sounds/546450/ (28.7 s).
+  Since 1.7.2 the BBS tab plays it while its modem handshake simulation
+  shows the call being dialed (Settings > BBS...).
+- Licence: **Creative Commons Zero (CC0) 1.0 Universal**, public domain
+  dedication (http://creativecommons.org/publicdomain/zero/1.0/). CC0 asks
+  for nothing; the recording is credited anyway.
+- How it ships: `tools/make_dialup_sound.py` fetches Freesound's public
+  high-quality preview of the sound (pinned by SHA-256), averages it to
+  mono, trims the leading and trailing silence and resamples it to 22,050
+  Hz 16-bit PCM (`assets/sound/dialup.wav`, 25.3 s), which is embedded in
+  the exe as a resource.
+
+## The BBS tab's intercept announcement
+
+- Announcement voice generated with Google Gemini text-to-speech (voice
+  Despina). It is heard in `assets/sound/intercept.wav`, which the BBS tab
+  plays when a call cannot be completed.
+
 ## Ruffle (the Flash player of the Retro Web Browser tab)
 
 - What it is: Ruffle, a Flash Player emulator written in Rust

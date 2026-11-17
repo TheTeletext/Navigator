@@ -30,7 +30,7 @@
  *   WONT / DONT      -> DONT / WONT, back to NVT
  * Each is answered only on a change of state (RFC 1143), so a server that
  * repeats itself is not answered twice. A Zmodem sender behind the Telnet
- * server (Synchronet sexyz -telnet) asks for both directions right before
+ * server (its sz run with -telnet) asks for both directions right before
  * a transfer and reverts after it; a client that refused would be entitled
  * to apply NVT CR rules to the 8-bit stream, which corrupts every Zmodem
  * subpacket that holds a 0x0D byte (a lesson of The Teletext's own Telnet

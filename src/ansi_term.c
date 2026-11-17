@@ -196,7 +196,7 @@ static void csi_dispatch(AnsiTerm *t, unsigned char f)
 
     if (t->priv) {
         /* CSI ? 25 h/l cursor, CSI ? 7 h/l autowrap; everything else in
-         * the private ranges (CSI = ..., SyncTERM's extensions) ignored */
+         * the private ranges (CSI = ..., terminal-specific extensions) ignored */
         if (t->priv == '?' && (f == 'h' || f == 'l')) {
             int i;
             for (i = 0; i < t->nparams; i++) {

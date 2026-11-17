@@ -113,12 +113,13 @@ When you choose another service, the one you leave keeps its place: its screen, 
 
 The [[home_overview|Home]] service, shown when Navigator starts, has one large button for every other service.
 
-@topic nav_menus | Menu Commands | menus;File menu;Settings menu;Help menu;Exit;Configuration;About | general
+@topic nav_menus | Menu Commands | menus;File menu;Settings menu;Help menu;Exit;Configuration;BBS settings;About | general
 = File menu
 - **Exit** closes Navigator. Any connection that is open is closed.
 
 = Settings menu
 - **Configuration** sets where Navigator saves the files it downloads without asking. See [[nav_config|Configuration]].
+- **BBS** turns the BBS service's modem handshake on or off: the dialing window and the sound of the modems before the board is called. See [[bbs_modem|The Modem Handshake]].
 
 = Help menu
 - **Contents** opens this Help at its Contents.

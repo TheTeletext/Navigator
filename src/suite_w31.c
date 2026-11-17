@@ -214,6 +214,68 @@ void w31_draw_text_disabled(HDC hdc, const char *s, int n, RECT *rc, UINT fmt)
     DeleteDC(mem);
 }
 
+/* The Windows 3.1 check box (Navigator 1.7.2, docs/2026-11-16_NAVIGATOR_172_
+ * MODEM_SIM.md), measured on refshots/connect.png "Use Print Manager" at
+ * native pixels: a 13 x 13 white box with a 1-pixel black frame, checked =
+ * an X from corner to corner (both diagonals through the frame's corners),
+ * the box centred on the label's line, the label 6 pixels to its right in
+ * the bold dialog face with its mnemonic underlined. The focus is the
+ * dotted rectangle around the label. Disabled: the label stippled, the box
+ * frame gray. */
+void w31_draw_checkbox(HDC hdc, const RECT *rc, const char *label, BOOL checked,
+                       BOOL focused, BOOL disabled, HFONT font)
+{
+    RECT box, tr, mr;
+    HGDIOBJ of;
+    HBRUSH white, frame;
+    int bx, by, i, th;
+    COLORREF ink = disabled ? W31_SHADOW : RGB(0, 0, 0);
+
+    FillRect(hdc, rc, g_w31_br_face);
+    of = SelectObject(hdc, font ? font : g_w31_font_bold);
+    {
+        TEXTMETRICA tm;
+        GetTextMetricsA(hdc, &tm);
+        th = tm.tmHeight;
+    }
+    bx = rc->left;
+    by = rc->top + ((rc->bottom - rc->top) - 13) / 2;
+    SetRect(&box, bx, by, bx + 13, by + 13);
+    white = CreateSolidBrush(W31_HILITE);
+    frame = CreateSolidBrush(ink);
+    FillRect(hdc, &box, white);
+    FrameRect(hdc, &box, frame);
+    if (checked)
+        for (i = 1; i < 12; i++) {
+            SetPixelV(hdc, bx + i, by + i, ink);
+            SetPixelV(hdc, bx + 12 - i, by + i, ink);
+        }
+    DeleteObject(white);
+    DeleteObject(frame);
+
+    /* the label, its line centred on the box */
+    SetRect(&tr, bx + 13 + 6, rc->top + ((rc->bottom - rc->top) - th) / 2, rc->right, 0);
+    tr.bottom = tr.top + th;
+    mr = tr;
+    DrawTextA(hdc, label, -1, &mr, DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
+    SetBkMode(hdc, TRANSPARENT);
+    if (disabled) {
+        w31_draw_text_disabled(hdc, label, -1, &tr, DT_LEFT | DT_SINGLELINE | DT_TOP);
+    } else {
+        SetTextColor(hdc, RGB(0, 0, 0));
+        DrawTextA(hdc, label, -1, &tr, DT_LEFT | DT_SINGLELINE | DT_TOP);
+    }
+    if (focused) {
+        RECT f = mr;
+        InflateRect(&f, 1, 1);
+        f.bottom += 1;                 /* the underline sits inside it */
+        SetTextColor(hdc, RGB(0, 0, 0));
+        SetBkColor(hdc, W31_FACE);
+        DrawFocusRect(hdc, &f);
+    }
+    SelectObject(hdc, of);
+}
+
 /* Blit a 16-colour icon with its #C0C0C0 pixels left out. TransparentBlt
  * (msimg32, already linked) does exactly that. A disabled icon takes the
  * same stipple as disabled text: every other non-face pixel black. */

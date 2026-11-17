@@ -159,7 +159,18 @@ void rip_parser_reset(RipParser *p)
     p->button_count = 0;
     p->scene_dropped = 0;
     rip_button_style_default(&p->btn_style);
+    /* 1.54: "set the Text Window to a full 80x43 EGA hi-res text mode,
+     * place the cursor in the upper left corner, clear the screen" */
+    rip_tty_reset(&p->tty);
     if (p->surf) rip_ega_reset(p->surf);
+}
+
+int rip_parser_text_screen(RipParser *p)
+{
+    if (!p) return 0;
+    rip_tty_reset(&p->tty);
+    if (p->surf) memset(p->surf->pix, 0, sizeof p->surf->pix);
+    return 1;
 }
 
 /* Commands parsed but not rendered. A RIP_BUTTON counts here only when
@@ -321,6 +332,7 @@ void rip_parser_init(RipParser *p, RipEga *surf)
     memset(p, 0, sizeof *p);
     p->surf = surf;
     p->at_line_start = 1;
+    p->text_col0 = 1;
     /* Installed here rather than in the tab so the offline harness
      * renders through exactly the same metrics the tab does. */
     rip_text_metrics_init();
@@ -405,6 +417,13 @@ static int rip_exec(RipParser *p, const char *level, char cmd,
              * Button is a Mouse Button flag", so both are required. */
             b.invert = ((p->btn_style.flags & RIP_BF_INVERTABLE) &&
                         (p->btn_style.flags & RIP_BF_MOUSE)) ? 1 : 0;
+            /* 1.54, flag 4: "used when the button is considered a Mouse
+             * Button (flag 1024) ... when the user clicks on the button,
+             * the screen will be reset exactly the same as a
+             * RIP_RESET_WINDOWS command will do. The reset is performed
+             * before the host command is processed." */
+            b.reset_after = ((p->btn_style.flags & RIP_BF_RESET_AFTER) &&
+                             (p->btn_style.flags & RIP_BF_MOUSE)) ? 1 : 0;
             rip_add_region(p, &b);
 
             if (drew) {
@@ -423,6 +442,9 @@ static int rip_exec(RipParser *p, const char *level, char cmd,
             b.x0 = a[1]; b.y0 = a[2];
             b.x1 = a[3]; b.y1 = a[4];
             b.invert = a[5] ? 1 : 0;    /* clk: invert while held */
+            /* clr: "will physically zoom the text window to full screen
+             * size and clear the screen" when the region is clicked */
+            b.reset_after = a[6] ? 2 : 0;
             /* A mouse region has no chrome, so its image is itself. */
             b.ix0 = b.x0; b.iy0 = b.y0; b.ix1 = b.x1; b.iy1 = b.y1;
             rip_expand_caret(b.command, sizeof b.command, text);
@@ -664,14 +686,20 @@ static int rip_exec(RipParser *p, const char *level, char cmd,
         return 0;
 
     case 'w':                       /* RIP_TEXT_WINDOW       */
-    case 'e':                       /* RIP_ERASE_WINDOW      */
-    case 'g':                       /* RIP_GOTOXY            */
-    case 'H':                       /* RIP_HOME              */
-    case '>':                       /* RIP_ERASE_EOL         */
-        /* The TTY text window is a later phase. Arguments are consumed
-         * correctly, which is what keeps the rest of the line parsing. */
-        p->stats.tty_cmds++;
+        if (na < 6) { p->stats.malformed++; return 0; }
+        rip_tty_window(&p->tty, a[0], a[1], a[2], a[3], a[4], a[5]);
         return 0;
+    case 'e':                       /* RIP_ERASE_WINDOW      */
+        return rip_tty_erase_window(&p->tty, s);
+    case 'g':                       /* RIP_GOTOXY            */
+        if (na < 2) { p->stats.malformed++; return 0; }
+        rip_tty_gotoxy(&p->tty, a[0], a[1]);
+        return 0;
+    case 'H':                       /* RIP_HOME              */
+        rip_tty_home(&p->tty);
+        return 0;
+    case '>':                       /* RIP_ERASE_EOL         */
+        return rip_tty_erase_eol(&p->tty, s);
 
     case 's':                       /* RIP_FILL_PATTERN, custom 8x8 */
         p->stats.unsup_fill_pat++;
@@ -836,8 +864,9 @@ static int rip_handle_line(RipParser *p, char *line, int len)
             return rip_run_line(p, line + i + 1, len - i - 1);
     }
 
-    /* Rule 6: anything else is raw text for the TTY window, which is a
-     * later phase. */
+    /* Rule 6: anything else is raw text for the TTY window. Since 1.7.2
+     * text never reaches here (rip_parser_feed streams it to the window);
+     * a line that does is counted and dropped as before. */
     if (len > 0) p->stats.raw_text_lines++;
     return 0;
 }
@@ -855,6 +884,27 @@ static int rip_trailing_backslashes(const char *s, int len)
     return n;
 }
 
+/* A RIP command line (rules 1, 2, 5, 12, 13) is assembled exactly as
+ * before 1.7.2: from "!|" at column 0, or ^A / ^B followed by '|' anywhere,
+ * to the end of the physical line, with backslash continuation. EVERY OTHER
+ * BYTE is text for the TTY window and is drawn as it arrives (prompts end
+ * without a line end; progress bars redraw in place). A RIP line's own CR
+ * and LF never reach the window. */
+static int rip_text_byte(RipParser *p, unsigned char c)
+{
+    int drew = 0;
+    if (c == '\r' || c == '\n') {
+        if (p->text_on_line) p->stats.raw_text_lines++;
+        p->text_on_line = 0;
+        p->text_col0 = 1;
+    } else {
+        p->text_col0 = 0;
+        if (c >= 0x20) p->text_on_line = 1;
+    }
+    if (p->surf) drew = rip_tty_put(&p->tty, p->surf, c);
+    return drew;
+}
+
 int rip_parser_feed(RipParser *p, const unsigned char *data, int len)
 {
     int i, drew = 0;
@@ -863,46 +913,66 @@ int rip_parser_feed(RipParser *p, const unsigned char *data, int len)
     for (i = 0; i < len; i++) {
         char c = (char)data[i];
 
-        if (c == '\r' || c == '\n') {
-            /* CR, LF and CRLF all end one physical line. The LF of a
-             * CRLF pair must be swallowed explicitly rather than left to
-             * the empty-line guard below: when the CR ended a line that
-             * was a backslash continuation (rule 5) the buffer is not
-             * empty, so the guard would let the LF terminate the very
-             * line the backslash asked to continue. That splits long
-             * wrapped commands, which is exactly what the weather map's
-             * multi-line fill polygons are. */
-            if (c == '\n' && p->last_was_cr) { p->last_was_cr = 0; continue; }
-            p->last_was_cr = (c == '\r');
-
-            if (p->line_len == 0 && !p->continued) continue;
-
-            if (rip_trailing_backslashes(p->line, p->line_len) % 2 == 1) {
-                /* Continuation: drop the backslash, keep the buffer. */
-                p->line_len--;
-                p->continued = 1;
+        if (p->in_rip_line) {
+            if (c == '\r' || c == '\n') {
+                /* CR, LF and CRLF all end one physical line. The LF of a
+                 * CRLF pair is swallowed explicitly: when the CR ended a
+                 * backslash continuation (rule 5) the buffer is not empty,
+                 * and the LF must not terminate the very line the
+                 * backslash asked to continue (the weather map's long
+                 * fill polygons). */
+                if (c == '\n' && p->last_was_cr) { p->last_was_cr = 0; continue; }
+                p->last_was_cr = (c == '\r');
+                if (rip_trailing_backslashes(p->line, p->line_len) % 2 == 1) {
+                    p->line_len--;             /* continuation: keep going */
+                    p->continued = 1;
+                    continue;
+                }
+                p->line[p->line_len] = '\0';
+                if (rip_handle_line(p, p->line, p->line_len)) drew = 1;
+                p->line_len = 0;
+                p->continued = 0;
+                p->in_rip_line = 0;
+                p->text_col0 = 1;
                 continue;
             }
-            p->line[p->line_len] = '\0';
-            if (rip_handle_line(p, p->line, p->line_len)) drew = 1;
-            p->line_len = 0;
-            p->continued = 0;
+            p->last_was_cr = 0;
+            if (p->line_len < RIP_LINE_MAX - 1) {
+                p->line[p->line_len++] = c;
+            } else {
+                /* Overlong logical line: cut it here rather than lose the
+                 * stream. Counted so it is visible. */
+                p->line[p->line_len] = '\0';
+                if (rip_handle_line(p, p->line, p->line_len)) drew = 1;
+                p->stats.malformed++;
+                p->line_len = 0;
+                p->continued = 0;
+            }
             continue;
         }
 
+        /* The LF of the CRLF that ended a RIP line belongs to that line. */
+        if (c == '\n' && p->last_was_cr) { p->last_was_cr = 0; continue; }
         p->last_was_cr = 0;
 
-        if (p->line_len < RIP_LINE_MAX - 1) {
-            p->line[p->line_len++] = c;
-        } else {
-            /* Overlong logical line: cut it here rather than lose the
-             * stream. Counted so it is visible. */
-            p->line[p->line_len] = '\0';
-            if (rip_handle_line(p, p->line, p->line_len)) drew = 1;
-            p->stats.malformed++;
-            p->line_len = 0;
-            p->continued = 0;
+        if (p->hold) {
+            char h = (char)p->hold;
+            p->hold = 0;
+            if (c == '|') {                    /* a RIP command line starts */
+                p->in_rip_line = 1;
+                p->line_len = 0;
+                p->continued = 0;
+                p->line[p->line_len++] = h;
+                p->line[p->line_len++] = '|';
+                continue;
+            }
+            if (rip_text_byte(p, (unsigned char)h)) drew = 1;   /* it was text */
         }
+        if ((p->text_col0 && c == '!') || c == '\x01' || c == '\x02') {
+            p->hold = (unsigned char)c;
+            continue;
+        }
+        if (rip_text_byte(p, (unsigned char)c)) drew = 1;
     }
     return drew;
 }

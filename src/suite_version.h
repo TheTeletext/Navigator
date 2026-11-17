@@ -62,7 +62,7 @@
 
 #define SUITE_VERSION_MAJOR   1
 #define SUITE_VERSION_MINOR   7
-#define SUITE_VERSION_PATCH   1
+#define SUITE_VERSION_PATCH   2
 
 /* Pre-release suffix, including its leading hyphen. Set to "" for a
  * final release. Ordering rule, which the updater's comparator

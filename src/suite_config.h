@@ -7,8 +7,10 @@
  * Licensed under the GNU Affero General Public License v3.0 or later.
  * See /COPYING for the full license text.
  *
- * Navigator 1.7 (docs/2026-11-15_NAVIGATOR_17_BBS_TAB.md). One setting so
- * far, the Downloads directory: where every download lands whose
+ * Navigator 1.7 (docs/2026-11-15_NAVIGATOR_17_BBS_TAB.md). The Downloads
+ * directory (and since 1.7.2, docs/2026-11-16_NAVIGATOR_172_MODEM_SIM.md,
+ * the BBS tab's modem handshake simulation, Settings > BBS...). The
+ * Downloads directory is where every download lands whose
  * destination the program decides itself, with no Save dialog (the BBS and
  * RIPscrip Zmodem receives, and the FTP tab's starting local folder).
  *
@@ -67,6 +69,16 @@ wchar_t *suite_config_file_w(wchar_t *out, size_t cap);
 
 /* Settings > Configuration: the modal dialog. */
 void suite_config_dialog(HWND owner);
+
+/* Navigator 1.7.2: the BBS tab's modem handshake simulation, key
+ * BBSModemSimulation=1|0 in the same [Navigator] section. ON (1) unless
+ * the file says 0; a missing key is recorded as 1 on first read. */
+int  suite_config_bbs_modem_sim(void);
+int  suite_config_set_bbs_modem_sim(int on);
+
+/* Settings > BBS...: the modal dialog with the "Modem handshake
+ * simulation" check box. */
+void suite_config_bbs_dialog(HWND owner);
 
 #ifdef __cplusplus
 }

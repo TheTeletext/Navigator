@@ -44,7 +44,7 @@
  * cursor-position query (ESC[6n, the BBS's ANSI probe), which the screen
  * computes: ESC[25;80R on the probe's CUP 999;999.
  *
- * ZMODEM. On D the BBS hands the line to Synchronet sexyz, which asks for
+ * ZMODEM. On D the BBS hands the line to its Zmodem sender, which asks for
  * Telnet BINARY both ways (telnet_proto accepts, for this tab only), types
  * "rz" and sends ZRQINIT. The tab watches the stream for a Zmodem hex
  * header (ZPAD ZPAD ZDLE 'B'); from there the bytes go to the receiver,
@@ -56,6 +56,12 @@
  * to the configured Downloads directory, never to a name the sender chose
  * beyond a sanitized base name, never over an existing file.
  *
+ * THE MODEM HANDSHAKE SIMULATION (1.7.2, Settings > BBS..., on by default):
+ * Connect first shows Telix's dialing window and plays the modems'
+ * handshake, then CONNECT 4800; the TCP connection opens only when that
+ * screen clears three seconds later. See the section below and
+ * docs/2026-11-16_NAVIGATOR_172_MODEM_SIM.md.
+ *
  * TEST HOOK. NAV_BBS_SCREEN_DUMP=<file> makes the tab write the 80 x 25
  * screen as UTF-8 text to that file whenever it changes (at most every
  * 200 ms), so a gate can wait for a screen to name a key before pressing
@@ -66,6 +72,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 
 #include "bbs_module.h"
 #include "ansi_term.h"
@@ -75,7 +83,11 @@
 #include "telnet_proto.h"
 #include "zmodem_recv.h"
 #include "gwb_font8x16.h"
+#include "suite_res.h"
 
+#include <mmsystem.h>
+
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -92,9 +104,15 @@
 
 #define WM_BBS_NOTIFY     (WM_USER + 44)
 #define WM_BBS_ZMR        (WM_USER + 45)
+#define WM_BBS_PROBE      (WM_USER + 46)   /* 1.7.2: the dialing probe's result */
 
 #define ID_TIMER_BLINK    0xB301
 #define ID_TIMER_DUMP     0xB302
+#define ID_TIMER_SIM_TICK 0xB303   /* the dialing box's clock, every second */
+#define ID_TIMER_SIM_CONN 0xB304   /* CONNECT shown -> clear + the real call */
+#define ID_TIMER_SIM_NOSND 0xB305  /* no sound device: the sound's length */
+
+#define SIM_CONNECT_HOLD_MS 3000   /* CONNECT 4800 stays this long */
 
 /* ------------------------------------------------------------------ */
 /* State                                                               */
@@ -126,6 +144,16 @@ static char  g_dump_path[MAX_PATH];
 static BOOL  g_dump_pending;
 
 static unsigned char g_last_vk;   /* the key behind the next WM_CHAR */
+
+/* The modem handshake simulation (1.7.2). NO socket exists in any of these
+ * states: the real connection opens only when SIM_CONNECTED ends. */
+/* SIM_INTERCEPT: the dial failed and the intercept recording plays, the
+ * dialing window still up; SIM_FAILED only while NO CARRIER is drawn */
+enum { SIM_OFF = 0, SIM_DIALING, SIM_CONNECTED, SIM_FAILED, SIM_INTERCEPT };
+static int       g_sim;                 /* SIM_* */
+static DWORD     g_sim_t0;              /* GetTickCount at the dial */
+static char      g_sim_log[MAX_PATH];   /* test hook NAV_BBS_EVENT_LOG */
+static BOOL      g_probe_pending;       /* this dial's probe is out */
 
 static void bbs_set_session_ui(BOOL connected);
 
@@ -434,7 +462,7 @@ static void render(HDC ref, int w, int h)
     }
 
     /* the cursor: an underline in the cell's colour, PC style */
-    if (g_connected && !g_zactive && cursor_on && g_term.cursor_visible) {
+    if ((g_connected || g_sim != SIM_OFF) && !g_zactive && cursor_on && g_term.cursor_visible) {
         int x0 = xs[g_term.cx], y0 = ys[g_term.cy];
         int cw = xs[g_term.cx + 1] - x0, ch = ys[g_term.cy + 1] - y0;
         int a = ch * 13 / 16, b = ch * 15 / 16;
@@ -498,9 +526,11 @@ static void dump_screen(void)
         line[n++] = '\n';
         fwrite(line, 1, (size_t)n, f);
     }
-    fprintf(f, "@cursor %d,%d connected=%d zmodem=%d done=%lu bytes=%lu\n",
+    fprintf(f, "@cursor %d,%d connected=%d zmodem=%d done=%lu bytes=%lu sim=%d socket=%d cursor=%d probe=%d\n",
             g_term.cy + 1, g_term.cx + 1, g_connected ? 1 : 0, g_zactive ? 1 : 0,
-            g_zdone, g_term.bytes);
+            g_zdone, g_term.bytes, g_sim, g_telnet ? 1 : 0,
+            ((g_connected || g_sim != SIM_OFF) && g_term.cursor_visible) ? 1 : 0,
+            g_probe_pending ? 1 : 0);
     fclose(f);
     MoveFileExA(tmp, g_dump_path, MOVEFILE_REPLACE_EXISTING);
 }
@@ -689,6 +719,656 @@ static void close_session(void)
     screen_changed();
 }
 
+/* ------------------------------------------------------------------ */
+/* The modem handshake simulation (Navigator 1.7.2)                    */
+/* ------------------------------------------------------------------ */
+/*
+ * docs/2026-11-16_NAVIGATOR_172_MODEM_SIM.md. With Settings > BBS...
+ * "Modem handshake simulation" checked (the default), Connect first plays
+ * the call the way a DOS terminal program showed it: the dialing box over
+ * the terminal, the modems' handshake through the normal audio path (the
+ * waveOut default output, as every other sound in Navigator), then the
+ * modem's result code CONNECT 4800 (the BBS's real line rate; another
+ * board gets CONNECTED) and the connect chime. Three seconds after the
+ * chime the screen clears and only THEN is the session's TCP connection
+ * opened, so the show holds none of the BBS's connection slots (5 in all,
+ * 2 per address) and the board's 40-second welcome gate is all the
+ * caller's. Since the operator's change of 2026-11-17 the dialing IS the
+ * connection attempt: a probe connection when the window appears, closed
+ * at once on success (a hangup before the welcome); on failure the
+ * special information tones and NO CARRIER instead of a handshake. Esc
+ * (or Disconnect) during the show cancels. Unchecked, Connect calls at
+ * once, as in 1.7.
+ */
+
+/* the test hook: NAV_BBS_EVENT_LOG=<file> gets one UTC line per step */
+static void sim_event(const char *what)
+{
+    SYSTEMTIME st;
+    FILE *f;
+    if (!g_sim_log[0]) return;
+    GetSystemTime(&st);
+    f = fopen(g_sim_log, "ab");
+    if (!f) return;
+    fprintf(f, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ %s\n",
+            st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+            st.wMilliseconds, what);
+    fclose(f);
+}
+
+/* a RIFF/WAVE PCM recording in the resources (the handshake, the
+ * intercept); any other chunks (cue, LIST, XMP) are skipped */
+static const unsigned char *sim_wav(UINT id, DWORD *len, WAVEFORMATEX *wf)
+{
+    HRSRC r = FindResourceA(NULL, MAKEINTRESOURCEA(id), (LPCSTR)RT_RCDATA);
+    HGLOBAL g;
+    const unsigned char *p, *end, *data = NULL;
+    DWORD size;
+    BOOL have_fmt = FALSE;
+    if (!r || !(g = LoadResource(NULL, r)) || !(p = (const unsigned char *)LockResource(g))) return NULL;
+    size = SizeofResource(NULL, r);
+    if (size < 12 || memcmp(p, "RIFF", 4) || memcmp(p + 8, "WAVE", 4)) return NULL;
+    end = p + size;
+    p += 12;
+    while (p + 8 <= end) {
+        DWORD n = (DWORD)p[4] | ((DWORD)p[5] << 8) | ((DWORD)p[6] << 16) | ((DWORD)p[7] << 24);
+        if (p + 8 + n > end) n = (DWORD)(end - p - 8);
+        if (!memcmp(p, "fmt ", 4) && n >= 16) {
+            ZeroMemory(wf, sizeof *wf);
+            memcpy(wf, p + 8, 16);           /* the PCMWAVEFORMAT part */
+            have_fmt = TRUE;
+        } else if (!memcmp(p, "data", 4)) {
+            data = p + 8;
+            *len = n;
+        }
+        p += 8 + n + (n & 1);
+    }
+    if (!have_fmt || !data || wf->wFormatTag != WAVE_FORMAT_PCM || !wf->nAvgBytesPerSec) return NULL;
+    return data;
+}
+
+/* ---- the sound player: one waveOut stream per sound --------------------
+ * Every sound of the show (the handshake, the connect chime, the special
+ * information tones) goes out the normal way, waveOut on WAVE_MAPPER, the
+ * default output, with its end posted to the canvas as MM_WOM_DONE. */
+typedef struct {
+    HWAVEOUT wo;
+    WAVEHDR  hdr;
+    BOOL     prepared;
+} SimSnd;
+
+static SimSnd g_snd_hand, g_snd_chime, g_snd_sit;
+
+static void snd_stop(SimSnd *s)
+{
+    HWAVEOUT wo = s->wo;
+    if (!wo) return;
+    s->wo = NULL;                    /* a late MM_WOM_DONE is ignored */
+    waveOutReset(wo);
+    if (s->prepared) waveOutUnprepareHeader(wo, &s->hdr, sizeof s->hdr);
+    s->prepared = FALSE;
+    waveOutClose(wo);
+}
+
+/* Returns 1 if the sound is playing. */
+static int snd_play(SimSnd *s, const void *data, DWORD len, const WAVEFORMATEX *wf)
+{
+    if (waveOutOpen(&s->wo, WAVE_MAPPER, wf, (DWORD_PTR)g_hCanvas, 0, CALLBACK_WINDOW) != MMSYSERR_NOERROR) {
+        s->wo = NULL;
+        return 0;
+    }
+    ZeroMemory(&s->hdr, sizeof s->hdr);
+    s->hdr.lpData = (LPSTR)data;              /* read only by the device */
+    s->hdr.dwBufferLength = len;
+    if (waveOutPrepareHeader(s->wo, &s->hdr, sizeof s->hdr) == MMSYSERR_NOERROR) {
+        s->prepared = TRUE;
+        if (waveOutWrite(s->wo, &s->hdr, sizeof s->hdr) == MMSYSERR_NOERROR) return 1;
+    }
+    snd_stop(s);
+    return 0;
+}
+
+static void pcm_format(WAVEFORMATEX *wf, DWORD rate)
+{
+    ZeroMemory(wf, sizeof *wf);
+    wf->wFormatTag = WAVE_FORMAT_PCM;
+    wf->nChannels = 1;
+    wf->nSamplesPerSec = rate;
+    wf->wBitsPerSample = 16;
+    wf->nBlockAlign = 2;
+    wf->nAvgBytesPerSec = rate * 2;
+}
+
+static void sim_stop_all_sound(void)
+{
+    snd_stop(&g_snd_hand);
+    snd_stop(&g_snd_chime);
+    snd_stop(&g_snd_sit);
+}
+
+/* Start the handshake. Returns its length in ms (0: no recording in the
+ * build); when no output device takes it, a timer of the same length
+ * stands in, so the show still ends on time. */
+static DWORD sim_sound_start(void)
+{
+    WAVEFORMATEX wf;
+    DWORD len = 0, ms;
+    const unsigned char *data = sim_wav(IDR_BBS_HANDSHAKE_WAV, &len, &wf);
+    if (!data) return 0;
+    ms = (DWORD)((unsigned long long)len * 1000ULL / wf.nAvgBytesPerSec);
+    if (snd_play(&g_snd_hand, data, len, &wf)) { sim_event("sound-start"); return ms; }
+    sim_event("sound-none");
+    SetTimer(g_hCanvas, ID_TIMER_SIM_NOSND, ms, NULL);
+    return ms;
+}
+
+static void sim_feed(const char *fmt, ...)
+{
+    char buf[1024];
+    va_list ap;
+    int n;
+    va_start(ap, fmt);
+    n = vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    if (n > (int)sizeof buf - 1) n = (int)sizeof buf - 1;
+    if (n > 0) ansi_feed(&g_term, (const unsigned char *)buf, n);
+}
+
+
+/* ---- the screens ------------------------------------------------------
+ *
+ * Modelled on the period evidence (report s2): Telix 3.22's status window
+ * while it dials, the figure in its own manual (TELIX.DOC, "4.8 Automatic
+ * Queue Redial"), CP437 frame and labels as printed there:
+ *
+ *   ╒═╡ Redial ╞═════════════════════════════════════════════════╕
+ *   │ Redial started at 20:15:33    Press: T to change dial time │
+ *   │ Attempt #10       20:19:27           D to delete from list │
+ *   │ This attempt: Dialing My Favorite BBS ... 22               │
+ *   │       number: 967-1111                                     │
+ *   │ Last Attempt: Busy                                         │
+ *   │     Press Space to cycle to next number, Esc to exit.      │
+ *   ╘════════════════════════════════════════════════════════════╛
+ *
+ * "... 22" is the countdown of the current attempt. Only the key the
+ * simulation honours is offered: Esc (Telix 3.51: "Pressing <Esc> ...
+ * will abort the current dial attempt"). The number is what a Telnet
+ * modem dials, the Host and Port fields. Colours are not evidenced; the
+ * window takes the BBS tab's own text-window colours (the Zmodem window:
+ * bright white on blue).
+ *
+ * Operator changes, 2026-11-17: title "Dialing", "Dialing started at",
+ * the Attempt line dropped, "Dialing:" for "This attempt:", "Serial:
+ * 8-N-1" for "Last Attempt:", no cursor while the window stands, and the
+ * connect chime. Later the same day: our own board shows "Dialing:
+ * Teletext BBS" and CONNECT 4800; any other host "Dialing: BBS" and
+ * CONNECTED (its speed is not ours to state); and the dialing is the
+ * connection attempt (the probe below), so a host that cannot be reached
+ * gets the special information tones and NO CARRIER instead of a
+ * handshake.
+ */
+
+#define SIM_BOX_W     62       /* the manual's figure, frame included */
+#define SIM_BOX_H     10       /* the Attempt line dropped (operator) */
+#define SIM_BOX_ROW    8       /* 1-based, centred on 25 rows */
+#define SIM_BOX_COL   10       /* 1-based, centred on 80 columns */
+#define SIM_DIAL_TIME 45       /* the countdown's start, seconds (s2.4) */
+
+static char g_sim_started[16];   /* "HH:MM:SS" of the dial */
+static BOOL g_sim_ours;          /* the host is The Teletext BBS */
+
+/* OUR BBS: the Host field names bbs.teletext.ca, compared without regard
+ * to case, spaces either side and one trailing dot (the DNS root) ignored.
+ * The port is not part of the rule (the operator's: "match
+ * bbs.teletext.ca"). An address typed as an IP, or another name for the
+ * same server, counts as another board. */
+static BOOL sim_host_is_ours(const char *h)
+{
+    char t[256];
+    size_t n;
+    while (*h == ' ' || *h == '\t') h++;
+    snprintf(t, sizeof t, "%s", h);
+    n = strlen(t);
+    while (n > 0 && (t[n - 1] == ' ' || t[n - 1] == '\t')) t[--n] = '\0';
+    if (n > 0 && t[n - 1] == '.') t[--n] = '\0';
+    return _stricmp(t, BBS_DEFAULT_HOST) == 0;
+}
+
+static void sim_row(int r, const unsigned char *cells, int n)
+{
+    sim_feed("\x1b[%d;%dH", SIM_BOX_ROW + r, SIM_BOX_COL);
+    ansi_feed(&g_term, cells, n);
+}
+
+/* one inner line: "│" + text padded to 60 + "│" */
+static void sim_line(int r, const char *text)
+{
+    unsigned char b[SIM_BOX_W];
+    size_t n = text ? strlen(text) : 0;
+    if (n > SIM_BOX_W - 2) n = SIM_BOX_W - 2;
+    memset(b, ' ', sizeof b);
+    b[0] = 0xB3;
+    if (n) memcpy(b + 1, text, n);
+    b[SIM_BOX_W - 1] = 0xB3;
+    sim_row(r, b, SIM_BOX_W);
+}
+
+static void sim_compose(void)
+{
+    ansi_init(&g_term);
+    sim_feed("\x1b[0m\x1b[2J");
+    if (g_sim == SIM_DIALING || g_sim == SIM_INTERCEPT) {
+        unsigned char b[SIM_BOX_W];
+        char t[128];
+        int left = SIM_DIAL_TIME - (int)((GetTickCount() - g_sim_t0) / 1000);
+        if (left < 0) left = 0;
+        sim_feed("\x1b[1;37;44m");
+        /* ╒═╡ Dialing ╞════...╕, the labels right-aligned on their colons
+         * as in Telix's figure */
+        memset(b, 0xCD, sizeof b);
+        b[0] = 0xD5; b[SIM_BOX_W - 1] = 0xB8;
+        b[2] = 0xB5; memcpy(b + 3, " Dialing ", 9); b[12] = 0xC6;
+        sim_row(0, b, SIM_BOX_W);
+        sim_line(1, "");
+        snprintf(t, sizeof t, " Dialing started at %s", g_sim_started);
+        sim_line(2, t);
+        sim_line(3, "");
+        snprintf(t, sizeof t, "      Dialing: %s ... %d", g_sim_ours ? "Teletext BBS" : "BBS", left);
+        sim_line(4, t);
+        snprintf(t, sizeof t, "       number: %.36s:%d", g_host, g_port);
+        sim_line(5, t);
+        sim_line(6, "       Serial: 8-N-1");
+        sim_line(7, "");
+        sim_line(8, "                     Press Esc to exit.");
+        memset(b, 0xCD, sizeof b);
+        b[0] = 0xD4; b[SIM_BOX_W - 1] = 0xBE;
+        sim_row(SIM_BOX_H - 1, b, SIM_BOX_W);
+        /* no cursor while the window stands (operator); the terminal's
+         * cursor comes back with the modem's result code */
+        sim_feed("\x1b[0m\x1b[1;1H\x1b[?25l");
+    } else if (g_sim == SIM_CONNECTED) {
+        /* the modem's result code, at the terminal's cursor: the line rate
+         * for our board, which sends at 4800; no speed for another board */
+        sim_feed("\x1b[1;1H%s\r\n", g_sim_ours ? "CONNECT 4800" : "CONNECTED");
+    } else if (g_sim == SIM_FAILED) {
+        sim_feed("\x1b[1;1HNO CARRIER\r\n");
+    }
+}
+
+/* Esc: the window goes, nothing was called; the tab's resting hint shows */
+static void sim_compose_aborted(void)
+{
+    ansi_init(&g_term);
+}
+
+static void real_connect(void);
+static void sim_connected(void);
+static void sim_failed(int code);
+
+/* ---- the probe: dialing IS the connection attempt (operator, 2026-11-17)
+ * When the dialing window appears, a worker thread opens a TCP connection
+ * to the host (each address the name resolves to, 10 s in all). On
+ * success it closes it AT ONCE, before the board has said anything (a
+ * silent hangup before the welcome), and the show goes on: handshake,
+ * result code, chime, clear, and the real connection as before. On
+ * failure (no such host, refused, no answer) there is no handshake: the
+ * special information tones and NO CARRIER. Esc closes a probe still in
+ * flight. The result reaches the canvas as WM_BBS_PROBE, wParam = the
+ * probe's generation (a stale result after Esc is ignored), lParam = 0 for
+ * success or a PROBE_* code. */
+#define PROBE_LIMIT_MS 10000
+enum { PROBE_OK = 0, PROBE_NONAME, PROBE_REFUSED, PROBE_TIMEOUT, PROBE_ERROR };
+
+typedef struct {
+    char  host[256];
+    char  port[16];
+    UINT  gen;
+    HWND  notify;
+} ProbeJob;
+
+static CRITICAL_SECTION g_probe_cs;
+static BOOL    g_probe_cs_init;
+static SOCKET  g_probe_sock = INVALID_SOCKET;   /* in flight, under g_probe_cs */
+static volatile LONG g_probe_gen;               /* bumped by Esc */
+
+static DWORD WINAPI probe_thread(LPVOID arg)
+{
+    ProbeJob *job = (ProbeJob *)arg;
+    struct addrinfo hints, *res = NULL, *ai;
+    DWORD deadline = GetTickCount() + PROBE_LIMIT_MS;
+    int result = PROBE_ERROR, saw_refused = 0, saw_timeout = 0;
+    WSADATA wsa;
+
+    WSAStartup(MAKEWORD(2, 2), &wsa);
+    ZeroMemory(&hints, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo(job->host, job->port, &hints, &res) != 0 || !res) {
+        result = PROBE_NONAME;
+    } else {
+        for (ai = res; ai && result != PROBE_OK; ai = ai->ai_next) {
+            SOCKET s;
+            u_long nb = 1;
+            int left = (int)(deadline - GetTickCount());
+            if (left <= 0) { saw_timeout = 1; break; }
+            if ((LONG)job->gen != g_probe_gen) break;
+            s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+            if (s == INVALID_SOCKET) continue;
+            ioctlsocket(s, FIONBIO, &nb);
+            EnterCriticalSection(&g_probe_cs);
+            g_probe_sock = s;
+            LeaveCriticalSection(&g_probe_cs);
+            if (connect(s, ai->ai_addr, (int)ai->ai_addrlen) == 0) {
+                result = PROBE_OK;
+            } else if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                fd_set wr, ex;
+                struct timeval tv;
+                FD_ZERO(&wr); FD_ZERO(&ex);
+                FD_SET(s, &wr); FD_SET(s, &ex);
+                tv.tv_sec = left / 1000;
+                tv.tv_usec = (left % 1000) * 1000;
+                if (select(0, NULL, &wr, &ex, &tv) == 0) saw_timeout = 1;
+                else if (FD_ISSET(s, &wr)) result = PROBE_OK;
+                else {
+                    int err = 0, el = sizeof err;
+                    getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&err, &el);
+                    if (err == WSAECONNREFUSED) saw_refused = 1;
+                    else if (err == WSAETIMEDOUT) saw_timeout = 1;
+                }
+            }
+            /* the probe hangs up at once: nothing is read or sent */
+            EnterCriticalSection(&g_probe_cs);
+            if (g_probe_sock == s) { closesocket(s); g_probe_sock = INVALID_SOCKET; }
+            LeaveCriticalSection(&g_probe_cs);
+        }
+        if (result != PROBE_OK)
+            result = saw_refused ? PROBE_REFUSED : saw_timeout ? PROBE_TIMEOUT : PROBE_ERROR;
+    }
+    if (res) freeaddrinfo(res);
+    WSACleanup();
+    PostMessageA(job->notify, WM_BBS_PROBE, (WPARAM)job->gen, (LPARAM)result);
+    free(job);
+    return 0;
+}
+
+static int probe_start(void)
+{
+    ProbeJob *job;
+    HANDLE th;
+    if (!g_probe_cs_init) { InitializeCriticalSection(&g_probe_cs); g_probe_cs_init = TRUE; }
+    job = (ProbeJob *)calloc(1, sizeof *job);
+    if (!job) return 0;
+    snprintf(job->host, sizeof job->host, "%s", g_host);
+    snprintf(job->port, sizeof job->port, "%d", g_port);
+    job->gen = (UINT)InterlockedIncrement(&g_probe_gen);
+    job->notify = g_hCanvas;
+    th = CreateThread(NULL, 0, probe_thread, job, 0, NULL);
+    if (!th) { free(job); return 0; }
+    CloseHandle(th);
+    g_probe_pending = TRUE;
+    sim_event("probe-start");
+    return 1;
+}
+
+/* Esc: forget the probe; close its socket if it is still connecting */
+static void probe_cancel(void)
+{
+    if (!g_probe_pending) return;
+    g_probe_pending = FALSE;
+    InterlockedIncrement(&g_probe_gen);
+    if (g_probe_cs_init) {
+        EnterCriticalSection(&g_probe_cs);
+        if (g_probe_sock != INVALID_SOCKET) { closesocket(g_probe_sock); g_probe_sock = INVALID_SOCKET; }
+        LeaveCriticalSection(&g_probe_cs);
+    }
+}
+
+static const char *probe_reason(int code)
+{
+    switch (code) {
+    case PROBE_NONAME:  return "no such host";
+    case PROBE_REFUSED: return "connection refused";
+    case PROBE_TIMEOUT: return "no answer in 10 seconds";
+    default:            return "the connection could not be made";
+    }
+}
+
+/* the probe's answer (CanvasProc, WM_BBS_PROBE) */
+static void probe_result(UINT gen, int code)
+{
+    char ev[64];
+    if (!g_probe_pending || (LONG)gen != g_probe_gen || g_sim != SIM_DIALING) return;
+    g_probe_pending = FALSE;
+    if (code == PROBE_OK) {
+        sim_event("probe-ok");
+        /* the handshake, as before */
+        if (!sim_sound_start()) SetTimer(g_hCanvas, ID_TIMER_SIM_NOSND, 1000, NULL);
+        else if (!g_snd_hand.wo)
+            bbs_status("Dialing %s... (no sound output)  Esc cancels.", g_sim_ours ? "Teletext BBS" : "BBS");
+        return;
+    }
+    snprintf(ev, sizeof ev, "probe-fail %s", probe_reason(code));
+    sim_event(ev);
+    sim_failed(code);
+}
+
+static void sim_begin(void)
+{
+    SYSTEMTIME lt;
+    g_sim = SIM_DIALING;
+    g_sim_ours = sim_host_is_ours(g_host);
+    g_sim_t0 = GetTickCount();
+    GetLocalTime(&lt);
+    snprintf(g_sim_started, sizeof g_sim_started, "%02u:%02u:%02u", lt.wHour, lt.wMinute, lt.wSecond);
+    if (g_sim_log[0]) DeleteFileA(g_sim_log);
+    sim_event(g_sim_ours ? "dial-start ours" : "dial-start other");
+    EnableWindow(g_hHostEdit, FALSE);
+    EnableWindow(g_hPortEdit, FALSE);
+    w31_toggle_set(g_hConnBtn, TRUE);      /* Disconnect hangs up the show */
+    sim_compose();
+    screen_changed();
+    SetFocus(g_hCanvas);
+    bbs_status("Dialing %s...  Esc cancels.", g_sim_ours ? "Teletext BBS" : "BBS");
+    SetTimer(g_hCanvas, ID_TIMER_SIM_TICK, 1000, NULL);
+    if (!probe_start()) sim_failed(PROBE_ERROR);
+}
+
+/* ---- the connect chime (operator, 2026-11-17) -------------------------
+ * The DOS terminal programs sounded the PC speaker when a call connected
+ * (Telix "sounds an alarm", ProComm "The alarm will sound when you
+ * connect"). The only tones found documented are Qmodem 3.1's: its setup
+ * screen reads "Connect Tones, up to 3 may be defined [1000] [1200]
+ * [1400]", and a Qmodem BEEP "lasts for approximately 1/5 of a second"
+ * (QMODEM.DOC). So: 1000, 1200, 1400 Hz, 200 ms each, back to back, as
+ * square waves (the PC speaker's timbre), synthesized here and played
+ * through the normal audio path with the result code. The 3 s pause
+ * before the clear starts when the chime ends. */
+#define SND_RATE      22050
+#define CHIME_NOTE_MS   200
+/* 2500 = -22 dBFS: a square wave's RMS equals its peak, so this is still
+ * about 4 dB louder (RMS) than the handshake (-26 dBFS RMS); at 5000 the
+ * first build metered half again the handshake's peak, too sharp after it */
+#define CHIME_AMP      2500
+static const int CHIME_HZ[3] = { 1000, 1200, 1400 };
+static short g_chime_pcm[SND_RATE * CHIME_NOTE_MS * 3 / 1000];
+static BOOL  g_chime_made;
+
+/* Returns 1 if the chime is playing (its end arrives as MM_WOM_DONE). */
+static int sim_chime_start(void)
+{
+    WAVEFORMATEX wf;
+    int per = SND_RATE * CHIME_NOTE_MS / 1000, n, i;
+    if (!g_chime_made) {
+        for (n = 0; n < 3; n++)
+            for (i = 0; i < per; i++) {
+                /* the square wave's phase from the sample index, so each
+                 * note starts on its rising edge as the speaker's timer did */
+                long long ph = (long long)i * CHIME_HZ[n] * 2 / SND_RATE;
+                g_chime_pcm[n * per + i] = (short)((ph & 1) ? -CHIME_AMP : CHIME_AMP);
+            }
+        g_chime_made = TRUE;
+    }
+    pcm_format(&wf, SND_RATE);
+    if (!snd_play(&g_snd_chime, g_chime_pcm, (DWORD)sizeof g_chime_pcm, &wf)) return 0;
+    sim_event("chime-start");
+    return 1;
+}
+
+/* the chime is over (or could not play): the 3 s pause before the clear */
+static void sim_chime_done(void)
+{
+    snd_stop(&g_snd_chime);
+    sim_event("chime-end");
+    if (g_sim == SIM_CONNECTED)
+        SetTimer(g_hCanvas, ID_TIMER_SIM_CONN, SIM_CONNECT_HOLD_MS, NULL);
+}
+
+/* ---- the special information tones (operator, 2026-11-17) --------------
+ * A call that cannot be completed meets the telephone network's special
+ * information tones before the intercept message: three rising tones,
+ * ITU-T 950, 1400 and 1800 Hz. SIT_* below carry the documented timing
+ * (report s3.6). Synthesized as sine waves (the network's tones are
+ * sinusoidal, unlike the PC speaker's chime), the triplet played twice
+ * with the documented silence between, then NO CARRIER stands and the tab
+ * is back to disconnected. */
+#define SIT_TONE_MS      330     /* each segment */
+#define SIT_GAP_MS        30     /* the silent interval between segments, at most */
+#define SIT_PAUSE_MS    1000     /* the silence before the triplet repeats */
+#define SIT_TRIPLETS       2
+#define SIT_AMP         3500     /* -19 dBFS peak, -22 dBFS RMS: the chime's loudness */
+#define SIT_FADE_MS        5     /* raised edges, no clicks */
+static const int SIT_HZ[3] = { 950, 1400, 1800 };
+#define SIT_SAMPLES (SND_RATE / 1000 * (SIT_TRIPLETS * 3 * (SIT_TONE_MS + SIT_GAP_MS) + (SIT_TRIPLETS - 1) * SIT_PAUSE_MS) + SND_RATE)
+static short g_sit_pcm[SIT_SAMPLES];
+static DWORD g_sit_len;            /* samples used */
+
+static int sim_sit_start(void)
+{
+    WAVEFORMATEX wf;
+    if (!g_sit_len) {
+        int per = SND_RATE * SIT_TONE_MS / 1000, gap = SND_RATE * SIT_GAP_MS / 1000;
+        int pause = SND_RATE * SIT_PAUSE_MS / 1000, fade = SND_RATE * SIT_FADE_MS / 1000;
+        int t, n, i;
+        DWORD k = 0;
+        for (t = 0; t < SIT_TRIPLETS; t++) {
+            for (n = 0; n < 3; n++) {
+                for (i = 0; i < per && k < SIT_SAMPLES; i++) {
+                    double env = 1.0, v;
+                    if (i < fade) env = (double)i / fade;
+                    else if (i > per - fade) env = (double)(per - i) / fade;
+                    v = sin(6.283185307179586 * SIT_HZ[n] * i / SND_RATE) * SIT_AMP * env;
+                    g_sit_pcm[k++] = (short)v;
+                }
+                if (n < 2) for (i = 0; i < gap && k < SIT_SAMPLES; i++) g_sit_pcm[k++] = 0;
+            }
+            if (t < SIT_TRIPLETS - 1) for (i = 0; i < pause && k < SIT_SAMPLES; i++) g_sit_pcm[k++] = 0;
+        }
+        g_sit_len = k;
+    }
+    pcm_format(&wf, SND_RATE);
+    if (!snd_play(&g_snd_sit, g_sit_pcm, g_sit_len * 2, &wf)) return 0;
+    sim_event("sit-start");
+    return 1;
+}
+
+/* ---- the intercept (operator, 2026-11-17) -------------------------------
+ * A dial that fails now plays the telephone intercept, the operator's
+ * approved recording (RCDATA 404, assets/sound/intercept.wav, 13.96 s):
+ * dial tone, the DTMF dialing, the special information tones, the
+ * announcement "Your call cannot be completed as dialed...", the tones
+ * again, and a hang-up click. The dialing window stays up while it plays;
+ * when it ends, NO CARRIER and the tab is disconnected. The synthesized
+ * tones above remain only as the fallback if the recording cannot be read
+ * from the resources. Esc or Disconnect during the intercept cancels the
+ * call ("Dialing cancelled"), as during dialing. */
+static int g_fail_code;
+
+static int sim_intercept_start(void)
+{
+    WAVEFORMATEX wf;
+    DWORD len = 0;
+    const unsigned char *data = sim_wav(IDR_BBS_INTERCEPT_WAV, &len, &wf);
+    if (!data || !snd_play(&g_snd_sit, data, len, &wf)) return 0;
+    sim_event("intercept-start");
+    return 1;
+}
+
+/* the intercept (or the fallback tones) is over: NO CARRIER, disconnected */
+static void sim_fail_done(void)
+{
+    snd_stop(&g_snd_sit);
+    sim_event("intercept-end");
+    if (g_sim != SIM_INTERCEPT) return;
+    KillTimer(g_hCanvas, ID_TIMER_SIM_TICK);
+    g_sim = SIM_FAILED;
+    sim_compose();                         /* NO CARRIER */
+    sim_event("nocarrier-shown");
+    g_sim = SIM_OFF;
+    bbs_set_session_ui(FALSE);
+    screen_changed();
+    bbs_status("NO CARRIER: %s:%d could not be reached (%s).", g_host, g_port, probe_reason(g_fail_code));
+}
+
+/* the probe failed: no handshake; the intercept, then NO CARRIER */
+static void sim_failed(int code)
+{
+    g_fail_code = code;
+    g_sim = SIM_INTERCEPT;                 /* the window and its countdown stay */
+    if (sim_intercept_start()) return;
+    if (sim_sit_start()) return;           /* no recording: the synthesized tones */
+    sim_fail_done();                       /* no sound output at all */
+}
+
+/* the handshake is over: the modem's result code, and the chime */
+static void sim_connected(void)
+{
+    if (g_sim != SIM_DIALING) return;
+    snd_stop(&g_snd_hand);
+    KillTimer(g_hCanvas, ID_TIMER_SIM_TICK);
+    KillTimer(g_hCanvas, ID_TIMER_SIM_NOSND);
+    sim_event("sound-end");
+    g_sim = SIM_CONNECTED;
+    sim_compose();
+    screen_changed();
+    sim_event("connect-shown");
+    bbs_status(g_sim_ours ? "CONNECT 4800" : "CONNECTED");
+    if (!sim_chime_start()) sim_chime_done();
+}
+
+/* three seconds on: clear the screen, and only now open the connection */
+static void sim_finish(void)
+{
+    KillTimer(g_hCanvas, ID_TIMER_SIM_CONN);
+    if (g_sim != SIM_CONNECTED) return;
+    g_sim = SIM_OFF;
+    ansi_init(&g_term);
+    g_ever_drew = FALSE;
+    screen_changed();
+    sim_event("clear");
+    real_connect();
+    sim_event("socket-open");
+}
+
+static void sim_abort(void)
+{
+    if (g_sim == SIM_OFF) return;
+    probe_cancel();
+    sim_stop_all_sound();
+    KillTimer(g_hCanvas, ID_TIMER_SIM_TICK);
+    KillTimer(g_hCanvas, ID_TIMER_SIM_CONN);
+    KillTimer(g_hCanvas, ID_TIMER_SIM_NOSND);
+    g_sim = SIM_OFF;
+    sim_event("abort");
+    sim_compose_aborted();
+    g_ever_drew = FALSE;                   /* the resting hint again */
+    if (g_hCanvas) InvalidateRect(g_hCanvas, NULL, FALSE);
+    if (g_dump_path[0]) g_dump_pending = TRUE;
+    bbs_set_session_ui(FALSE);
+    bbs_status("Dialing cancelled. The BBS was not called.");
+}
+
+
 static void do_connect(void)
 {
     char host[256], portbuf[16];
@@ -708,6 +1388,17 @@ static void do_connect(void)
     g_zsig_len = 0;
     InvalidateRect(g_hCanvas, NULL, FALSE);
 
+    /* 1.7.2: the dialing show first, when the setting is on: a probe
+     * connection that hangs up at once, then the show; the session's TCP
+     * connection opens from sim_finish(), not here */
+    if (suite_config_bbs_modem_sim()) { sim_begin(); return; }
+    real_connect();
+}
+
+/* Open the TCP connection: at once with the simulation off, at the
+ * CONNECT/clear moment with it on. */
+static void real_connect(void)
+{
     bbs_status("Connecting to %s:%d...", g_host, g_port);
     if (telnet_proto_open(g_host, g_port, g_hCanvas, WM_BBS_NOTIFY, &g_telnet) != 0 || !g_telnet) {
         g_telnet = NULL;
@@ -769,6 +1460,12 @@ static int key_down(WPARAM vk)
     static const unsigned char enter_nvt[2] = { '\r', 0 };
     const char *seq = NULL;
 
+    if (g_sim != SIM_OFF) {
+        /* the dialing show: Esc exits (Telix); every other key belongs to
+         * the terminal program, and there is no line to send it on */
+        if (vk == VK_ESCAPE) sim_abort();
+        return 1;
+    }
     if (g_zactive) {
         if (vk == VK_ESCAPE && g_zmr) {
             bbs_status("Cancelling the transfer...");
@@ -808,7 +1505,7 @@ static int key_down(WPARAM vk)
 static void key_char(WPARAM ch)
 {
     char c;
-    if (g_zactive || !g_connected || !g_telnet) return;
+    if (g_sim != SIM_OFF || g_zactive || !g_connected || !g_telnet) return;
     /* ENTER, BS, TAB and ESC went out at WM_KEYDOWN */
     if (ch == '\r' || ch == '\b' || ch == '\t' || ch == 0x1B || ch == '\n') return;
     if (ch < 0x20) { c = (char)ch; bbs_send(&c, 1); return; }   /* Ctrl+letter */
@@ -860,7 +1557,23 @@ static LRESULT CALLBACK CanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             if (g_dump_pending) { g_dump_pending = FALSE; dump_screen(); }
             return 0;
         }
+        if (wParam == ID_TIMER_SIM_TICK) {
+            if (g_sim == SIM_DIALING || g_sim == SIM_INTERCEPT) { sim_compose(); screen_changed(); }
+            return 0;
+        }
+        if (wParam == ID_TIMER_SIM_NOSND) { KillTimer(hwnd, wParam); sim_connected(); return 0; }
+        if (wParam == ID_TIMER_SIM_CONN)  { sim_finish(); return 0; }
         break;
+    case MM_WOM_DONE:
+        /* the handshake has played to its end (the reset after Esc arrives
+         * with g_sim_wo already cleared and is ignored) */
+        if (g_snd_hand.wo && (HWAVEOUT)wParam == g_snd_hand.wo) sim_connected();
+        else if (g_snd_chime.wo && (HWAVEOUT)wParam == g_snd_chime.wo) sim_chime_done();
+        else if (g_snd_sit.wo && (HWAVEOUT)wParam == g_snd_sit.wo) sim_fail_done();
+        return 0;
+    case WM_BBS_PROBE:
+        probe_result((UINT)wParam, (int)lParam);
+        return 0;
     case WM_BBS_NOTIFY:
         switch (wParam) {
         case TELNET_EVT_CONNECTED:
@@ -975,7 +1688,12 @@ void bbs_module_activate(HWND content)
         ShowWindow(g_hPanel, SW_SHOW);
         GetClientRect(content, &rc);
         bbs_module_resize(content, rc.right - rc.left, rc.bottom - rc.top);
-        if (g_connected) {
+        if (g_sim != SIM_OFF) {
+            SetFocus(g_hCanvas);
+            if (g_sim == SIM_DIALING || g_sim == SIM_INTERCEPT) bbs_status("Dialing %s...  Esc cancels.", g_sim_ours ? "Teletext BBS" : "BBS");
+            else if (g_sim == SIM_CONNECTED) bbs_status(g_sim_ours ? "CONNECT 4800" : "CONNECTED");
+            else bbs_status("NO CARRIER");
+        } else if (g_connected) {
             SetFocus(g_hCanvas);
             bbs_status("Connected to %s:%d.", g_host, g_port);
         } else {
@@ -988,6 +1706,8 @@ void bbs_module_activate(HWND content)
     {
         DWORD n = GetEnvironmentVariableA("NAV_BBS_SCREEN_DUMP", g_dump_path, sizeof g_dump_path);
         if (n == 0 || n >= sizeof g_dump_path) g_dump_path[0] = '\0';
+        n = GetEnvironmentVariableA("NAV_BBS_EVENT_LOG", g_sim_log, sizeof g_sim_log);
+        if (n == 0 || n >= sizeof g_sim_log) g_sim_log[0] = '\0';
     }
     register_classes(hInst);
     GetClientRect(content, &rc);
@@ -1035,6 +1755,10 @@ BOOL bbs_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
 {
     (void)content; (void)lParam;
     if (LOWORD(wParam) == IDC_BBS_CONNECT_BTN) {
+        if (g_sim != SIM_OFF) {               /* hang up the dialing show */
+            sim_abort();
+            return TRUE;
+        }
         if (!g_connected) {
             if (!g_telnet) do_connect();       /* mid-handshake it is grayed */
         } else {
@@ -1050,6 +1774,9 @@ BOOL bbs_module_has_unsaved(void) { return FALSE; }
 
 void bbs_module_shutdown(void)
 {
+    if (g_sim != SIM_OFF) sim_abort();
+    probe_cancel();
+    sim_stop_all_sound();
     if (g_zactive || g_zmr) zmodem_abandon();
     if (g_telnet) { telnet_proto_close(g_telnet); g_telnet = NULL; }
     g_connected = FALSE;

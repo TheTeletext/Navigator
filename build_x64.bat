@@ -57,7 +57,7 @@ set CFLAGS_NEWS=-O2 -fstack-protector-strong -D_WIN32 -Isrc
 @REM 2026-08-02 Phase 4 Zmodem receive: the vendored mbzm core lives in
 @REM third_party\mbzm and is reached only by src\zmodem_recv.c, so the
 @REM include path is confined to those translation units. mbzm is MIT
-@REM (Ross Bamford); its two Synchronet GPL CRC files were removed and
+@REM (Ross Bamford); its two GPL-licensed CRC files were removed and
 @REM replaced with public-domain ones, see third_party\mbzm\MGT-CHANGES.md.
 set CFLAGS_ZMODEM=-O2 -fstack-protector-strong -D_WIN32 -Isrc ^
     -Ithird_party\mbzm\include
@@ -133,7 +133,7 @@ for %%f in (sockets_win win_stubs) do (
 )
 
 echo Compiling Navigator shell and modules...
-for %%f in (suite_shell suite_w31 suite_infodlg suite_config home_module suite_help suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module ansi_term bbs_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service) do (
+for %%f in (suite_shell suite_w31 suite_infodlg suite_config home_module suite_help suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_tty rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module ansi_term bbs_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service) do (
     echo   %%f.c
     %CC% %CFLAGS_SUITE% -c -o src\%%f.o src\%%f.c
     if errorlevel 1 exit /b 1
@@ -249,7 +249,7 @@ echo Linking %TARGET%...
     src\vt_term.o src\telnet_proto.o src\finger_proto.o src\qotd_proto.o ^
     src\telnet_module.o ^
     src\irc_client.o src\irc_module.o ^
-    src\rip_ega.o src\rip_parser.o src\rip_text.o src\rip_button.o ^
+    src\rip_ega.o src\rip_parser.o src\rip_tty.o src\rip_text.o src\rip_button.o ^
     src\rip_hershey_data.o src\rip_font8x8_data.o ^
     src\ripscrip_module.o ^
     src\ansi_term.o src\bbs_module.o ^

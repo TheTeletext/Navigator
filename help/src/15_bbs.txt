@@ -3,6 +3,7 @@
 %map bbs_usage 1602
 %map bbs_download 1603
 %map bbs_trouble 1604
+%map bbs_modem 1605
 
 @topic bbs_overview | BBS | BBS;bulletin board;The Teletext BBS;ANSI;Telnet;overview | bbs
 = About bulletin boards
@@ -16,6 +17,7 @@ The Teletext BBS is a text board in that tradition, reached by {{gl_telnet|Telne
 The BBS service is an ANSI terminal: an 80 by 25 character screen in the PC's character set and colours. It receives the board's files by {{gl_zmodem|Zmodem}}, into the Downloads directory set in Settings, Configuration.
 
 - [[bbs_connect|Calling the BBS]]
+- [[bbs_modem|The Modem Handshake]]
 - [[bbs_usage|Using the BBS]]
 - [[bbs_download|Downloading Files from the BBS]]
 - [[bbs_trouble|BBS Troubleshooting]]
@@ -25,9 +27,32 @@ The BBS service is an ANSI terminal: an 80 by 25 character screen in the PC's ch
 2. Host and Port are set for The Teletext BBS: bbs.teletext.ca and 2026. To call another board, type its host and port.
 3. Choose **Connect**.
 
+Navigator first plays the call as a modem made it: the dialing window, the handshake and the modem's report. See [[bbs_modem|The Modem Handshake]]. The board is called when that screen clears.
+
 The board checks your terminal, then shows its welcome screen. Press ENTER within 40 seconds to enter. The main menu follows.
 
 To end the call, press Q at the main menu, or choose **Disconnect**. The last screen stays in view until you call again.
+
+@topic bbs_modem | The Modem Handshake | BBS;modem;handshake;dialing;CONNECT 4800;CONNECTED;NO CARRIER;Modem handshake simulation;Settings menu | bbs
+When callers reached a board by modem, their terminal program put a window over the screen while it dialed, and the modem's speaker played the two modems agreeing on a connection. Navigator shows the call the same way when you choose **Connect**:
+
+1. A dialing window, in the style of the Telix terminal program, shows the board being dialed, the host and port being called, the serial settings, the time the call started and a countdown. While the window is up, Navigator checks that the board answers.
+2. If it answers, the sound of a dial-up modem's handshake plays. When it ends, the modem's report appears, with a three-note chime, as terminal programs sounded the PC speaker when a call connected.
+3. Three seconds after the chime the screen clears and Navigator calls the board. Its welcome screen follows; on The Teletext BBS you have the full 40 seconds to press ENTER.
+
+= The Teletext BBS and other boards
+For The Teletext BBS (the host bbs.teletext.ca) the window reads "Dialing: Teletext BBS" and the modem reports CONNECT 4800: 4,800 bits per second, the speed at which the board draws its screens. For any other board the window reads "Dialing: BBS" and the modem reports CONNECTED, since its speed is that board's own.
+
+= When the board does not answer
+If the host does not exist, refuses the call or does not answer within 10 seconds, there is no handshake. Instead you hear what a caller heard when a number could not be reached: the dial tone, the number being dialed, the telephone network's three rising tones and a recorded announcement. When it ends, NO CARRIER appears and the BBS service is disconnected. The status bar gives the reason. Check the host and port, and choose **Connect** again.
+
+= Cancelling
+Press ESC, or choose **Disconnect**, at any time before the screen clears to cancel the call. The board is not called.
+
+= Turning it off
+Choose **BBS** from the Settings menu and clear **Modem handshake simulation**, then choose **OK**. **Connect** then calls the board at once, with no dialing window and no sound. The setting is kept in NAVIGATR.INI with the Downloads directory.
+
+The sounds play through the computer's sound output, like every other sound in Navigator. The handshake recording is "The Sound of dial-up Internet" by wtermini, in the public domain.
 
 @topic bbs_usage | Using the BBS | BBS;keys;hotkeys;main menu;sections;numbers;N;P;B;M;Q | bbs
 The board is driven by single keys. Each screen names the keys it accepts on its bottom line; press only those.

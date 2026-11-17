@@ -4,20 +4,20 @@ The retro internet client of [The Teletext](https://www.teletext.ca): one
 Windows app with a client for each live retro service of The Teletext, each
 speaking the real protocol to a real server rather than imitating it.
 
-[![download](https://img.shields.io/badge/download-Teletext__Navigator__1.7.1.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
+[![download](https://img.shields.io/badge/download-Teletext__Navigator__1.7.2.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![release](https://img.shields.io/github/v/release/TheTeletext/Navigator?label=release&color=blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](COPYING)
 
-Download: [Teletext_Navigator_1.7.1.msi](https://github.com/TheTeletext/Navigator/releases/latest)
+Download: [Teletext_Navigator_1.7.2.msi](https://github.com/TheTeletext/Navigator/releases/latest)
 (SHA-256 published beside it).
 
 ---
 
 ## Status
 
-**1.7.1**, November 2026.
+**1.7.2**, November 2026.
 
-New in 1.7.1: updates now install and reopen by themselves. When Navigator offers a new version and you choose Update Now, it downloads the installer, checks it against its published SHA-256, closes, installs the update after one Windows permission prompt, and opens again where it was, with no setup wizard to click through. Navigator's information boxes, About among them, now show their text the Windows 3.1 way, in a white box with a scroll bar when the text is long. One exception: going from 1.7 to 1.7.1 still runs the old setup wizard, one last time, because 1.7 does the installing; click through it, then open Navigator again.
+New in 1.7.2: the BBS tab calls a board the way a modem did. When you choose Connect, a dialing window shows the call, the modems' handshake plays, and the modem reports CONNECT before the board's screen appears. If the board does not answer, you hear the telephone network's tones and a recorded announcement, then NO CARRIER. You can turn it off in Settings, under BBS. The RIPscrip tab now works with more boards: it answers a board's check for an ANSI terminal, shows the plain text a board sends between its pictures, such as a login prompt or a menu, and clears the screen when a button asks for it. From 1.7.1 the update installs and reopens by itself; from 1.7 the old setup wizard runs one last time.
 
 ---
 
@@ -88,7 +88,7 @@ Configuration; the FTP tab starts there too.
 The installer, with its SHA-256, is on the download page:
 https://www.teletext.ca/software
 
-Run `Teletext_Navigator_1.7.1.msi`. It installs to
+Run `Teletext_Navigator_1.7.2.msi`. It installs to
 `Program Files\Teletext Navigator` for all users.
 
 **The installer is not code-signed.** Windows SmartScreen will probably show

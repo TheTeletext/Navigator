@@ -76,6 +76,13 @@ void w31_draw_button(HDC hdc, const RECT *rc, const w31_button_t *b);
  * copy. Readable on the face colour, unlike plain gray. */
 void w31_draw_text_disabled(HDC hdc, const char *s, int n, RECT *rc, UINT fmt);
 
+/* The Windows 3.1 check box (1.7.2, refshots/connect.png): 13 x 13 white
+ * box, black frame, an X when checked, the bold label 6 px right with its
+ * mnemonic, the focus a dotted rectangle round the label. For a
+ * BS_OWNERDRAW button the owner keeps the state; font NULL = bold face. */
+void w31_draw_checkbox(HDC hdc, const RECT *rc, const char *label, BOOL checked,
+                       BOOL focused, BOOL disabled, HFONT font);
+
 /* WM_CTLCOLOR* answer for gray chrome: STATIC/BTN/DLG get black on face,
  * EDIT/LISTBOX get black on white. A read-only edit asks with
  * WM_CTLCOLORSTATIC; ctl lets it keep the white document interior, as

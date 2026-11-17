@@ -21,7 +21,10 @@
  *             the raw 640x350 surface.
  *
  * Build:  gcc -O2 -Isrc -o tools/rip_render.exe tools/rip_render.c \
- *             src/rip_ega.c src/rip_parser.c
+ *             src/rip_ega.c src/rip_parser.c src/rip_tty.c src/rip_text.c \
+ *             src/rip_button.c src/rip_hershey_data.c src/rip_font8x8_data.c
+ *         (the list grew with Phase 2, Phase 3 and, in 1.7.2, the text
+ *         window rip_tty.c, which draws a board's plain text)
  */
 
 #include "rip_ega.h"

@@ -32,6 +32,7 @@
 #define RIP_PARSER_H
 
 #include "rip_ega.h"
+#include "rip_tty.h"
 #include "rip_button.h"
 
 #ifdef __cplusplus
@@ -61,6 +62,11 @@ typedef struct RipButton {
     int  hotkey;            /* ASCII value of the hotkey, 0 = none         */
     int  flags;             /* RIP_BUTTON flags, kept verbatim             */
     int  invert;            /* invert while held: 1U Invertable, 1M clk    */
+    /* Before the command is sent: 1 = RIP_RESET_WINDOWS (RIP_BUTTON whose
+     * style has flag 4 "reset screen after button click" with flag 1024
+     * "mouse button"); 2 = full-screen text window and a clear screen
+     * (RIP_MOUSE <clr> = 1); 0 = nothing (1.7.2, Fix 2). */
+    int  reset_after;
     char label[RIP_BTN_LABEL];  /* display label, may be empty             */
     char command[RIP_BTN_CMD];  /* host command, caret escapes expanded    */
 } RipButton;
@@ -113,6 +119,14 @@ typedef struct RipParser {
     int font_size;         /* RIP_FONT_STYLE size 1-10                  */
     int cur_x, cur_y;      /* drawing position: RIP_MOVE and after text */
 
+    /* The TTY text window: every byte outside a RIP command line is text
+     * for it, drawn as it arrives (1.7.2, Fix 2; rip_tty.h). */
+    RipTty tty;
+    int  hold;             /* '!' at column 0, or ^A / ^B, awaiting '|'  */
+    int  in_rip_line;      /* assembling a RIP command line             */
+    int  text_col0;        /* the next text byte starts a line          */
+    int  text_on_line;     /* this text line has had characters         */
+
     /* Line assembly. */
     char line[RIP_LINE_MAX];
     int  line_len;
@@ -157,6 +171,10 @@ int  rip_meganum(const char *s, int width);
  * family (icons, buttons, mouse regions), flood fill, Bezier and the TTY
  * text window group, and nothing else. */
 unsigned long rip_stats_deferred(const RipStats *st);
+
+/* The click side of RIP_MOUSE <clr> (reset_after 2): the text window
+ * back to full screen and the screen cleared. Returns non-zero (drew). */
+int rip_parser_text_screen(RipParser *p);
 
 /* Topmost region containing (x, y) in surface coordinates, or -1. 1.54
  * scans mouse regions last in, first out, so a region defined later sits

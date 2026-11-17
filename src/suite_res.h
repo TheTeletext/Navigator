@@ -53,6 +53,8 @@
 #define IDR_GWB_EXE                400
 #define IDR_GWB_RETRO649           401
 #define IDR_GWB_DIALUP             402
+#define IDR_BBS_HANDSHAKE_WAV      403   /* 1.7.2, the BBS modem handshake */
+#define IDR_BBS_INTERCEPT_WAV      404   /* 1.7.2, the failed-dial intercept */
 
 /* Navigator 1.5 Windows 3.1 icon set, 32x32 16-colour BITMAPs from
  * tools/make_w31_icons.py (assets/w31icons). */

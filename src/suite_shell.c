@@ -108,6 +108,7 @@
 #define ID_HELP_SEARCH   204  /* Help > Search for Help on... */
 #define ID_HELP_HOWTO    205  /* Help > How to Use Help */
 #define ID_SETTINGS_CONFIG 206 /* Settings > Configuration (Navigator 1.7) */
+#define ID_SETTINGS_BBS    207 /* Settings > BBS... (Navigator 1.7.2) */
 
 /* The automatic update check does not run at WM_CREATE. It runs a few
  * seconds after the window is up, on a one-shot timer, so it is not
@@ -579,6 +580,9 @@ static HMENU build_menu(void)
      * Configuration..., the dialog with the Downloads directory
      * (suite_config.c). The ellipsis: the item opens a dialog. */
     AppendMenuA(settings, MF_STRING, ID_SETTINGS_CONFIG, "&Configuration...");
+    /* 1.7.2: BBS..., the modem handshake simulation check box
+     * (suite_config.c, docs/2026-11-16_NAVIGATOR_172_MODEM_SIM.md). */
+    AppendMenuA(settings, MF_STRING, ID_SETTINGS_BBS, "&BBS...");
     AppendMenuA(root, MF_POPUP, (UINT_PTR)settings, "&Settings");
     /* The Windows 3.1 Help menu (2026-11-13, Navigator 1.6): Contents,
      * Search for Help on, How to Use Help, as every 3.1 application had
@@ -888,6 +892,9 @@ static LRESULT CALLBACK SuiteWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
             return 0;
         case ID_SETTINGS_CONFIG:
             suite_config_dialog(hwnd);
+            return 0;
+        case ID_SETTINGS_BBS:
+            suite_config_bbs_dialog(hwnd);
             return 0;
         case ID_HELP_ABOUT:
             suite_about_show(hwnd);

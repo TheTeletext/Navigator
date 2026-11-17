@@ -33,6 +33,15 @@
  * honoured here. The query and mode sequences are consumed by the
  * scanner so they never reach the parser as raw text.
  *
+ * CURSOR REPORT (1.7.2). A standards-compliant RIP BBS's terminal
+ * autodetect sends ESC[6n with
+ * ESC[! and keeps only a reply that BEGINS WITH ESC; answered with
+ * RIPSCRIP015400 alone it took us for a dumb terminal and sent no RIP. The
+ * scanner now keeps a cursor model (80 x 43, the default text window) and
+ * answers ESC[6n with ESC[<row>;<col>R in stream order: on such a
+ * probe, ESC[43;80R, RIPSCRIP015400, ESC[<r>;4R. See
+ * docs/NAVIGATOR_RIPSCRIP_FIX_2026-11-17.md.
+ *
  * KEYBOARD. Typing in the scene sends raw characters to the host, which
  * is how a host command token such as RWX followed by Return reaches the
  * service. RIP buttons and mouse regions are hit-tested (click, press
@@ -135,7 +144,7 @@ static BOOL  g_notice_persist = FALSE;
 /* ---- Zmodem receive -------------------------------------------------
  *
  * The Digital Replica screen's issue buttons ask the service to send a
- * file, and the service answers with Synchronet sexyz running Zmodem
+ * file, and the service answers with its Zmodem sender (sz, -telnet)
  * over the same telnet session. Until this build there was no receiver,
  * so those commands were recognised and held back rather than sent.
  *
@@ -202,6 +211,7 @@ static BOOL g_press_armed = FALSE;
 static int  g_flash_idx = -1;
 static char g_flash_cmd[RIP_BTN_CMD];
 static char g_flash_label[RIP_BTN_LABEL];
+static int  g_flash_reset = 0;   /* the flashing region's reset_after      */
 
 /* Long enough to register as a press and short enough not to feel like
  * a delay. Below about a tenth of a second the flash is easy to miss on
@@ -216,15 +226,29 @@ static char g_flash_label[RIP_BTN_LABEL];
  * which is the same byte sequence rip_render.exe consumes. */
 static FILE *g_capture = NULL;
 
-/* Handshake scanner state: how much of an ESC [ ... ! sequence we have
- * seen and are holding back from the parser. */
-static int  g_esc_state = 0;     /* 0 none, 1 ESC, 2 ESC[, 3 ESC[<digit> */
-static char g_esc_digit = 0;
+/* The scanner in front of the parser (rip_consume). It answers the RIP
+ * auto-sensing query and the ANSI status requests, and keeps a cursor
+ * model so it can report the cursor position. Since 1.7.2
+ * (docs/NAVIGATOR_RIPSCRIP_FIX_2026-11-17.md): a BBS's autodetect sends
+ * ESC[6n with ESC[! and discards any reply that does not begin with ESC, so a
+ * terminal that answered only RIPSCRIP015400 was taken as a dumb one and
+ * never got RIP. */
+static int  g_esc_state = 0;     /* 0 text, 1 ESC, 2 collecting ESC [ ... */
+static char g_csi[40];           /* the parameters of the ESC [ held      */
+static int  g_csi_len = 0;
+#define RIP_SCR_COLS 80          /* the 1.54 default text window, size 0: */
+#define RIP_SCR_ROWS 43          /* 8x8 cells, columns 0-79, rows 0-42    */
+static int  g_cur_row = 1, g_cur_col = 1;     /* 1-based, as reported     */
+static int  g_sav_row = 1, g_sav_col = 1;     /* ESC[s / ESC[u            */
+static int  g_wrap_pending = 0;  /* written in the last column            */
+static int  g_bol = 1;           /* the next byte starts a line           */
+static int  g_in_ripline = 0;    /* inside a RIP command line: not text   */
 
 static void rip_set_session_ui(BOOL connected);
 static void rip_status(const char *fmt, ...);
 static void rip_press_cancel_for_redraw(void);
 static int  rip_consume(const unsigned char *data, int len);
+static void rip_scan_reset(void);
 static void rip_report_region_overflow(void);
 
 /* ------------------------------------------------------------------ */
@@ -675,15 +699,40 @@ static int rip_press_resume(const RipPressSaved *sv)
     return 0;
 }
 
+/* 1.7.2 (Fix 2): a region that asks for it resets the screen before its
+ * command goes out: 1 = RIP_RESET_WINDOWS (a RIP_BUTTON whose style has
+ * flag 4 with flag 1024), 2 = full-screen text window and a clear screen
+ * (RIP_MOUSE <clr>). That is what lets a board's text after the click be
+ * seen: a Continue button on a board's opening picture, which had hidden
+ * the text window. */
+static void rip_region_reset(int how)
+{
+    int drew = 0;
+    if (how == 1) { rip_parser_reset(&g_parser); drew = 1; }
+    else if (how == 2) drew = rip_parser_text_screen(&g_parser);
+    if (!drew) return;
+    g_ever_drew = TRUE;
+    rip_dib_refresh();
+    if (g_hCanvas) InvalidateRect(g_hCanvas, NULL, FALSE);
+}
+
 /* Send a region's command and report only a send that happened. Shared
- * by the mouse-up path and the end of the hot-key flash. */
+ * by the mouse-up path and the end of the hot-key flash. The command is
+ * copied out first: a reset deletes the regions. */
 static void rip_activate_region(int idx)
 {
+    char cmd[RIP_BTN_CMD], label[RIP_BTN_LABEL];
+    int reset;
     if (idx < 0 || idx >= g_parser.button_count) return;
-    if (rip_send_command(g_parser.buttons[idx].command))
-        rip_status("Sent \"%s\"%s%s", g_parser.buttons[idx].command,
-                   g_parser.buttons[idx].label[0] ? " for " : "",
-                   g_parser.buttons[idx].label);
+    memcpy(cmd, g_parser.buttons[idx].command, sizeof cmd);
+    memcpy(label, g_parser.buttons[idx].label, sizeof label);
+    reset = g_parser.buttons[idx].reset_after;
+    if (reset && g_connected && !g_zmodem_active) {
+        rip_press_cancel_for_redraw();
+        rip_region_reset(reset);
+    }
+    if (rip_send_command(cmd))
+        rip_status("Sent \"%s\"%s%s", cmd, label[0] ? " for " : "", label);
 }
 
 /* Hot-key activation. The pressed look goes on, the screen is painted,
@@ -712,6 +761,7 @@ static void rip_hotkey_activate(HWND hwnd, int idx)
     strncpy(g_flash_label, g_parser.buttons[idx].label,
             sizeof g_flash_label - 1);
     g_flash_label[sizeof g_flash_label - 1] = '\0';
+    g_flash_reset = g_parser.buttons[idx].reset_after;
     g_flash_idx = idx;
 
     g_press_idx   = idx;
@@ -750,76 +800,166 @@ static void rip_page_progress(int len)
     }
 }
 
+static void rip_scan_reset(void)
+{
+    g_esc_state = 0;
+    g_csi_len = 0;
+    g_cur_row = g_cur_col = g_sav_row = g_sav_col = 1;
+    g_wrap_pending = 0;
+    g_bol = 1;
+    g_in_ripline = 0;
+}
+
+static int rip_clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/* A text byte moves the modelled cursor as an ANSI screen would. A RIP
+ * command line (rules 1, 2 and 12: "!" at column 0, or Ctrl-A / Ctrl-B
+ * anywhere) is not displayed, so it does not move it. Wrapping follows the
+ * usual last-column rule: a character written in the last column leaves
+ * the cursor there, and the next one wraps. */
+static void rip_scan_text(unsigned char b)
+{
+    if (b == '\r') { g_cur_col = 1; g_wrap_pending = 0; g_bol = 1; g_in_ripline = 0; return; }
+    if (b == '\n') {
+        if (g_cur_row < RIP_SCR_ROWS) g_cur_row++;
+        g_wrap_pending = 0; g_bol = 1; g_in_ripline = 0;
+        return;
+    }
+    if (g_in_ripline) return;
+    if ((g_bol && b == '!') || b == 0x01 || b == 0x02) { g_in_ripline = 1; g_bol = 0; return; }
+    g_bol = 0;
+    if (b == '\b') { if (g_cur_col > 1) g_cur_col--; g_wrap_pending = 0; return; }
+    if (b == '\t') { g_cur_col = rip_clampi(((g_cur_col - 1) / 8 + 1) * 8 + 1, 1, RIP_SCR_COLS); return; }
+    if (b == 0x0C) { g_cur_row = g_cur_col = 1; g_wrap_pending = 0; return; }   /* FF: clear, home */
+    if (b < 0x20 || b == 0x7F) return;                                         /* other controls */
+    if (g_wrap_pending) {
+        g_cur_col = 1;
+        if (g_cur_row < RIP_SCR_ROWS) g_cur_row++;
+        g_wrap_pending = 0;
+    }
+    if (g_cur_col < RIP_SCR_COLS) g_cur_col++;
+    else g_wrap_pending = 1;
+}
+
+/* An ESC [ sequence that is passed on to the parser still moves the
+ * modelled cursor (CUU CUD CUF CUB, CUP, save/restore, ED 2 homes as
+ * ANSI.SYS did). Private sequences (ESC[? ..., ESC[= ...) do not. */
+static void rip_scan_csi(const char *par, char fin)
+{
+    int a = 0, b = 0, *cur = &a;
+    const char *q;
+    if (par[0] == '?' || par[0] == '=' || par[0] == '>' || par[0] == '<') return;
+    for (q = par; *q; q++) {
+        if (*q >= '0' && *q <= '9') *cur = *cur * 10 + (*q - '0');
+        else if (*q == ';' && cur == &a) cur = &b;
+    }
+    switch (fin) {
+    case 'A': g_cur_row -= a ? a : 1; break;
+    case 'B': g_cur_row += a ? a : 1; break;
+    case 'C': g_cur_col += a ? a : 1; break;
+    case 'D': g_cur_col -= a ? a : 1; break;
+    case 'H': case 'f': g_cur_row = a ? a : 1; g_cur_col = b ? b : 1; break;
+    case 's': g_sav_row = g_cur_row; g_sav_col = g_cur_col; break;
+    case 'u': g_cur_row = g_sav_row; g_cur_col = g_sav_col; break;
+    case 'J': if (a == 2) g_cur_row = g_cur_col = 1; break;
+    default: return;
+    }
+    g_cur_row = rip_clampi(g_cur_row, 1, RIP_SCR_ROWS);
+    g_cur_col = rip_clampi(g_cur_col, 1, RIP_SCR_COLS);
+    g_wrap_pending = 0;
+}
+
+static unsigned char g_scan_out[8192];
+static int           g_scan_o;
+
+static int rip_scan_flush(void)
+{
+    int drew = 0;
+    if (g_scan_o > 0) {
+        if (g_capture) fwrite(g_scan_out, 1, (size_t)g_scan_o, g_capture);
+        if (g_rip_enabled && rip_parser_feed(&g_parser, g_scan_out, g_scan_o)) drew = 1;
+        g_scan_o = 0;
+    }
+    return drew;
+}
+
+static int rip_scan_emit(unsigned char b)
+{
+    int drew = 0;
+    if (g_scan_o == (int)sizeof g_scan_out) drew = rip_scan_flush();
+    g_scan_out[g_scan_o++] = b;
+    return drew;
+}
+
+/* Every byte reaches the parser as before, except the sequences answered
+ * here: ESC[! and ESC[0! (the RIP version query: RIPSCRIP015400), ESC[1!
+ * and ESC[2! (RIP processing off and on), ESC[6n (cursor position report
+ * ESC[<row>;<col>R from the model) and ESC[5n (status: ESC[0n). Replies go
+ * out in stream order, so on such a probe the cursor report precedes
+ * the RIP answer. Nothing is sent for ESC[c (device attributes): claiming
+ * a terminal we are not would be false, and the autodetect does not need
+ * it. */
 static int rip_consume(const unsigned char *data, int len)
 {
-    unsigned char out[8192];
-    int i, o = 0, drew = 0;
+    int i, k, drew = 0;
 
     for (i = 0; i < len; i++) {
         unsigned char b = data[i];
 
-        switch (g_esc_state) {
-        case 0:
+        if (g_esc_state == 0) {
             if (b == 0x1B) { g_esc_state = 1; continue; }
-            break;
-
-        case 1:
-            if (b == '[') { g_esc_state = 2; continue; }
-            /* Not ours: release the ESC we held and reprocess this byte
-             * as an ordinary one. */
-            if (o < (int)sizeof out) out[o++] = 0x1B;
-            g_esc_state = 0;
-            break;
-
-        case 2:
-            if (b == '!') {                       /* ESC [ !  -> query */
-                rip_send_raw(RIP_VERSION_ANSWER,
-                             (int)strlen(RIP_VERSION_ANSWER));
-                g_esc_state = 0;
-                continue;
-            }
-            if (b >= '0' && b <= '2') {
-                g_esc_digit = (char)b;
-                g_esc_state = 3;
-                continue;
-            }
-            if (o + 2 <= (int)sizeof out) { out[o++] = 0x1B; out[o++] = '['; }
-            g_esc_state = 0;
-            break;
-
-        case 3:
-            if (b == '!') {
-                if (g_esc_digit == '0') {         /* same as ESC [ ! */
-                    rip_send_raw(RIP_VERSION_ANSWER,
-                                 (int)strlen(RIP_VERSION_ANSWER));
-                } else if (g_esc_digit == '1') {
-                    g_rip_enabled = FALSE;
-                } else if (g_esc_digit == '2') {
-                    g_rip_enabled = TRUE;
-                }
-                g_esc_state = 0;
-                continue;
-            }
-            if (o + 3 <= (int)sizeof out) {
-                out[o++] = 0x1B; out[o++] = '['; out[o++] = g_esc_digit;
-            }
-            g_esc_state = 0;
-            break;
+            rip_scan_text(b);
+            if (rip_scan_emit(b)) drew = 1;
+            continue;
         }
-
-        if (o < (int)sizeof out) out[o++] = b;
-
-        if (o == (int)sizeof out) {
-            if (g_capture) fwrite(out, 1, (size_t)o, g_capture);
-            if (g_rip_enabled && rip_parser_feed(&g_parser, out, o)) drew = 1;
-            o = 0;
+        if (g_esc_state == 1) {
+            if (b == '[') { g_esc_state = 2; g_csi_len = 0; continue; }
+            /* not a CSI: release the ESC and look at this byte again */
+            g_esc_state = 0;
+            if (rip_scan_emit(0x1B)) drew = 1;
+            i--;
+            continue;
         }
+        /* g_esc_state == 2: parameters and intermediates, then the final.
+         * RIPscrip's own sequences end in '!' (0x21), which ANSI would
+         * class as an intermediate byte: here it is always the final
+         * (found by the replay test: ESC[!_ was read as ESC[ "!" '_'). */
+        if (b != '!' && b >= 0x20 && b <= 0x3F) {
+            if (g_csi_len < (int)sizeof g_csi - 1) { g_csi[g_csi_len++] = (char)b; continue; }
+            /* absurdly long: give it to the parser as it came */
+        } else if (b == '!' || (b >= 0x40 && b <= 0x7E)) {
+            g_csi[g_csi_len] = '\0';
+            g_esc_state = 0;
+            if (b == '!' && (g_csi_len == 0 || !strcmp(g_csi, "0"))) {
+                rip_send_raw(RIP_VERSION_ANSWER, (int)strlen(RIP_VERSION_ANSWER));
+                continue;
+            }
+            if (b == '!' && !strcmp(g_csi, "1")) { g_rip_enabled = FALSE; continue; }
+            if (b == '!' && !strcmp(g_csi, "2")) { g_rip_enabled = TRUE;  continue; }
+            if (b == 'n' && !strcmp(g_csi, "6")) {
+                char cpr[24];
+                int n = _snprintf(cpr, sizeof cpr, "\x1b[%d;%dR", g_cur_row, g_cur_col);
+                if (n > 0) rip_send_raw(cpr, n);
+                continue;
+            }
+            if (b == 'n' && !strcmp(g_csi, "5")) { rip_send_raw("\x1b[0n", 4); continue; }
+            rip_scan_csi(g_csi, (char)b);
+            if (rip_scan_emit(0x1B)) drew = 1;
+            if (rip_scan_emit('[')) drew = 1;
+            for (k = 0; k < g_csi_len; k++) if (rip_scan_emit((unsigned char)g_csi[k])) drew = 1;
+            if (rip_scan_emit(b)) drew = 1;
+            continue;
+        }
+        /* malformed (a control inside the sequence, or overlong): release
+         * what was held and look at this byte again as text */
+        g_esc_state = 0;
+        if (rip_scan_emit(0x1B)) drew = 1;
+        if (rip_scan_emit('[')) drew = 1;
+        for (k = 0; k < g_csi_len; k++) if (rip_scan_emit((unsigned char)g_csi[k])) drew = 1;
+        i--;
     }
 
-    if (o > 0) {
-        if (g_capture) fwrite(out, 1, (size_t)o, g_capture);
-        if (g_rip_enabled && rip_parser_feed(&g_parser, out, o)) drew = 1;
-    }
+    if (rip_scan_flush()) drew = 1;
     if (g_capture) fflush(g_capture);
     rip_report_region_overflow();
     return drew;
@@ -882,7 +1022,7 @@ static void rip_close_session(void)
     rip_press_cancel_for_redraw();
     if (g_telnet) { telnet_proto_close(g_telnet); g_telnet = NULL; }
     g_connected = FALSE;
-    g_esc_state = 0;
+    rip_scan_reset();
     g_zsig_len  = 0;
     if (g_capture) { fclose(g_capture); g_capture = NULL; }
 
@@ -955,6 +1095,7 @@ static void rip_do_connect(void)
 
     rip_status("Connecting to %s:%d...", g_active_host, g_active_port);
 
+    rip_scan_reset();
     rc = telnet_proto_open(g_active_host, g_active_port,
                            g_hCanvas, WM_RIP_NOTIFY, &g_telnet);
     if (rc != 0 || !g_telnet) {
@@ -1372,10 +1513,13 @@ static LRESULT CALLBACK RipCanvasProc(HWND hwnd, UINT msg,
             rip_press_clear();
             if (g_flash_idx >= 0 && g_flash_cmd[0]) {
                 char cmd[RIP_BTN_CMD], label[RIP_BTN_LABEL];
+                int reset = g_flash_reset;
                 memcpy(cmd, g_flash_cmd, sizeof cmd);
                 memcpy(label, g_flash_label, sizeof label);
                 g_flash_idx = -1;
                 g_flash_cmd[0] = '\0';
+                g_flash_reset = 0;
+                if (reset && g_connected && !g_zmodem_active) rip_region_reset(reset);
                 if (rip_send_command(cmd))
                     rip_status("Sent \"%s\"%s%s", cmd,
                                label[0] ? " for " : "", label);

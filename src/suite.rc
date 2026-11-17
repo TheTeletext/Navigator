@@ -38,6 +38,18 @@
 401 RCDATA "../assets/basic/RETRO649.BAS"
 402 RCDATA "../assets/basic/DIALUP.BAS"
 
+/* Navigator 1.7.2: the BBS tab's modem handshake, "The Sound of dial-up
+ * Internet" by wtermini (freesound.org 546450, CC0 1.0), trimmed and made
+ * 22,050 Hz 16-bit mono PCM by tools/make_dialup_sound.py. */
+403 RCDATA "../assets/sound/dialup.wav"
+
+/* Navigator 1.7.2: the BBS tab's failed dial, the telephone intercept
+ * (dial tone, DTMF, SIT, the "cannot be completed" announcement, SIT,
+ * hang-up click), 24 kHz 16-bit mono PCM; the approved cut's fmt and data
+ * chunks only, editor metadata left out by tools/wav_strip_chunks.py
+ * (docs/NAVIGATOR_INTERCEPT_WIRING_2026-11-17.md). */
+404 RCDATA "../assets/sound/intercept.wav"
+
 /* Navigator 1.5: the Windows 3.1 ribbon and launcher icons, 32x32 in
  * the 16-colour VGA palette, drawn by tools/make_w31_icons.py. */
 500 BITMAP "../assets/w31icons/home.bmp"

@@ -34,6 +34,7 @@
 
 #define CFG_SECTION   L"Navigator"
 #define CFG_KEY_DL    L"DownloadsDir"
+#define CFG_KEY_SIM   L"BBSModemSimulation"   /* 1.7.2: 1 (default) or 0 */
 #define CFG_FILE_NAME L"NAVIGATR.INI"
 #define CFG_APP_DIR   L"Teletext Navigator"
 
@@ -197,6 +198,32 @@ int suite_config_set_downloads_dir_w(const wchar_t *dir)
     suite_config_file_w(file, MAX_PATH);
     if (!file[0] || !ensure_file(file)) return 0;
     return WritePrivateProfileStringW(CFG_SECTION, CFG_KEY_DL, dir, file) ? 1 : 0;
+}
+
+/* ---- the modem handshake simulation (Navigator 1.7.2) ---------------- */
+
+int suite_config_bbs_modem_sim(void)
+{
+    wchar_t file[MAX_PATH], val[16];
+    suite_config_file_w(file, MAX_PATH);
+    if (!file[0]) return 1;
+    val[0] = 0;
+    GetPrivateProfileStringW(CFG_SECTION, CFG_KEY_SIM, L"", val, 16, file);
+    if (val[0] == L'0') return 0;
+    if (val[0] == L'1') return 1;
+    /* missing or unreadable: the default, ON, recorded like the Downloads
+     * directory so the file says what is in force */
+    if (ensure_file(file))
+        WritePrivateProfileStringW(CFG_SECTION, CFG_KEY_SIM, L"1", file);
+    return 1;
+}
+
+int suite_config_set_bbs_modem_sim(int on)
+{
+    wchar_t file[MAX_PATH];
+    suite_config_file_w(file, MAX_PATH);
+    if (!file[0] || !ensure_file(file)) return 0;
+    return WritePrivateProfileStringW(CFG_SECTION, CFG_KEY_SIM, on ? L"1" : L"0", file) ? 1 : 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -471,4 +498,119 @@ void suite_config_dialog(HWND owner)
         line[sizeof line - 1] = 0;
         suite_set_status(line);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings > BBS... (Navigator 1.7.2)                                 */
+/* ------------------------------------------------------------------ */
+
+/* One check box, "Modem handshake simulation", in the same Windows 3.1
+ * grammar as Configuration: the setting and a note on the left, OK and
+ * Cancel stacked on the right. The check box is drawn here the Windows
+ * 3.1 way (w31_draw_checkbox: white box, black frame, an X, bold label),
+ * because the system's own check box is the Windows 11 one. */
+
+#define IDC_BBS_SIM   1211
+#define IDC_BBS_NOTE  1212
+
+#define BBS_DLG_W  236
+#define BBS_DLG_H   62
+
+static int g_bbs_sim_state;
+
+static DLGTEMPLATE *build_bbs_template(void)
+{
+    static unsigned char buf[2048];
+    unsigned char *p = buf;
+    DLGTEMPLATE dt;
+
+    memset(buf, 0, sizeof buf);
+    dt.style = DS_MODALFRAME | DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU;
+    dt.dwExtendedStyle = 0;
+    dt.cdit = 4;
+    dt.x = 0; dt.y = 0; dt.cx = BBS_DLG_W; dt.cy = BBS_DLG_H;
+    memcpy(p, &dt, sizeof dt);
+    p += sizeof dt;
+    p = emit_wstr(p, NULL);                 /* menu */
+    p = emit_wstr(p, NULL);                 /* class */
+    p = emit_wstr(p, L"BBS");               /* caption: the menu item, no ellipsis */
+    p = emit_word(p, 8);
+    p = emit_wstr(p, L"MS Sans Serif");
+
+    /* the bold label measures about 170 px = 114 units; the box 13 + 6 */
+    p = emit_item(p, BS_OWNERDRAW | WS_TABSTOP | WS_GROUP, 0, 6, 7, 170, 11,
+                  IDC_BBS_SIM, 0x0080, L"&Modem handshake simulation");
+    p = emit_item(p, SS_LEFT, 0, 6, 24, 170, 34, IDC_BBS_NOTE, 0x0082,
+                  L"When checked, Connect first shows the call being dialed "
+                  L"and plays the modem's handshake, then it connects.");
+    p = emit_item(p, BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP, 0, 184, 6, 46, 14,
+                  IDOK, 0x0080, L"OK");
+    p = emit_item(p, BS_PUSHBUTTON | WS_TABSTOP, 0, 184, 23, 46, 14,
+                  IDCANCEL, 0x0080, L"Cancel");
+    (void)p;
+    return (DLGTEMPLATE *)buf;
+}
+
+static INT_PTR CALLBACK bbs_cfg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    switch (m) {
+    case WM_INITDIALOG: {
+        RECT rc;
+        int x = 0, y = 0;
+        GetWindowRect(h, &rc);
+        suite_center_popup(g_cfg_owner, rc.right - rc.left, rc.bottom - rc.top, &x, &y);
+        SetWindowPos(h, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        g_bbs_sim_state = suite_config_bbs_modem_sim();
+        SetFocus(GetDlgItem(h, IDC_BBS_SIM));
+        return FALSE;
+    }
+    case WM_DRAWITEM: {
+        const DRAWITEMSTRUCT *di = (const DRAWITEMSTRUCT *)l;
+        char label[128];
+        if (!di || di->CtlID != IDC_BBS_SIM) return FALSE;
+        GetWindowTextA(di->hwndItem, label, sizeof label);
+        w31_draw_checkbox(di->hDC, &di->rcItem, label, g_bbs_sim_state ? TRUE : FALSE,
+                          (di->itemState & ODS_FOCUS) != 0,
+                          (di->itemState & ODS_DISABLED) != 0, NULL);
+        return TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(w)) {
+        case IDC_BBS_SIM:
+            if (HIWORD(w) == BN_CLICKED || HIWORD(w) == BN_DOUBLECLICKED) {
+                g_bbs_sim_state = !g_bbs_sim_state;
+                InvalidateRect(GetDlgItem(h, IDC_BBS_SIM), NULL, FALSE);
+            }
+            return TRUE;
+        case IDOK:
+            if (!suite_config_set_bbs_modem_sim(g_bbs_sim_state)) {
+                MessageBoxW(h, L"Cannot write the configuration file.",
+                            L"BBS", MB_OK | MB_ICONEXCLAMATION);
+                return TRUE;
+            }
+            EndDialog(h, 1);
+            return TRUE;
+        case IDCANCEL:
+            EndDialog(h, 0);
+            return TRUE;
+        }
+        return FALSE;
+    case WM_CLOSE:
+        EndDialog(h, 0);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+void suite_config_bbs_dialog(HWND owner)
+{
+    INT_PTR rc;
+    g_cfg_owner = owner;
+    rc = DialogBoxIndirectParamW(GetModuleHandleW(NULL), build_bbs_template(),
+                                 owner, bbs_cfg_proc, 0);
+    g_cfg_owner = NULL;
+    if (rc == 1)
+        suite_set_status(suite_config_bbs_modem_sim()
+                         ? "BBS: modem handshake simulation on."
+                         : "BBS: modem handshake simulation off.");
 }
