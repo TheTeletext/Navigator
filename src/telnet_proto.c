@@ -11,15 +11,20 @@
  * touch WSAStartup/WSACleanup here.
  *
  * IAC handling matrix:
- *   WILL ECHO        -> reply DO  ECHO
- *   WILL SGA         -> reply DO  SGA
+ *   WILL ECHO        -> reply DO  ECHO   (only if not already on)
+ *   WILL SGA         -> reply DO  SGA    (only if not already on)
  *   WILL <other>     -> reply DONT <other>
  *   DO TTYPE         -> reply WILL TTYPE; on SB TTYPE SEND reply IS "vt220"
  *   DO NAWS          -> reply WILL NAWS; immediately reply IAC SB NAWS 0 80 0 24 IAC SE
- *   DO SGA           -> reply WILL SGA
+ *   DO SGA           -> reply WILL SGA   (only if not already on)
  *   DO <other>       -> reply WONT <other>
+ *   WONT ECHO / SGA  -> reply DONT       (only if it was on)
+ *   DONT SGA         -> reply WONT SGA   (only if it was on)
  *   WONT <opt>       -> reply DONT <opt>
  *   DONT <opt>       -> reply WONT <opt>
+ * ECHO and SGA are answered only on a change of state since 2026-11-22,
+ * as BINARY below (RFC 854's loop rule; an earlier client answered every
+ * WILL and looped against a server that answered every DO).
  *   SB ... IAC SE    -> parse; reply only to TTYPE SEND
  *   IAC IAC          -> literal 0xFF byte in user data
  *
@@ -96,6 +101,11 @@ struct TelnetProto {
      * WONT ECHO. Written on the rx thread, read on the UI thread; a plain
      * int is fine for this one-bit hint. */
     int           server_echo;
+    /* SGA, both directions (2026-11-22): the server suppresses go-ahead
+     * (we said DO), we suppress it (we said WILL). Kept so each is answered
+     * only on a change of state, as BINARY below. Same thread rules. */
+    int           remote_sga;
+    int           local_sga;
 
     /* BINARY (RFC 856): accepted only when the owner opted in. The two
      * directions are separate options. Written on the rx thread, read on
@@ -229,10 +239,28 @@ static int parse_chunk(TelnetProto *t,
                 t->is_state = IS_NORMAL;
                 break;
             }
+            /* ECHO and SGA: answered only on a change of state, as BINARY
+             * above (RFC 854: a request for a mode already in force is not
+             * acknowledged). Answering every WILL looped forever against a
+             * server that answers every DO, about nine packets a second, and
+             * kept the server's idle clock from ever running (2026-11-22,
+             * found on The Teletext's own Telnet server). */
+            if (opt == OPT_ECHO && (t->verb == WILL_ || t->verb == WONT_)) {
+                if (t->verb == WILL_ && !t->server_echo)      { t->server_echo = 1; send_iac_2(t, DO_,   OPT_ECHO); }
+                else if (t->verb == WONT_ && t->server_echo)  { t->server_echo = 0; send_iac_2(t, DONT_, OPT_ECHO); }
+                t->is_state = IS_NORMAL;
+                break;
+            }
+            if (opt == OPT_SGA) {
+                if (t->verb == WILL_ && !t->remote_sga)       { t->remote_sga = 1; send_iac_2(t, DO_,   OPT_SGA); }
+                else if (t->verb == DO_ && !t->local_sga)     { t->local_sga = 1;  send_iac_2(t, WILL_, OPT_SGA); }
+                else if (t->verb == WONT_ && t->remote_sga)   { t->remote_sga = 0; send_iac_2(t, DONT_, OPT_SGA); }
+                else if (t->verb == DONT_ && t->local_sga)    { t->local_sga = 0;  send_iac_2(t, WONT_, OPT_SGA); }
+                t->is_state = IS_NORMAL;
+                break;
+            }
             if (t->verb == WILL_) {
-                if (opt == OPT_ECHO)      { send_iac_2(t, DO_, OPT_ECHO); t->server_echo = 1; }
-                else if (opt == OPT_SGA)  send_iac_2(t, DO_,   OPT_SGA);
-                else                      send_iac_2(t, DONT_, opt);
+                send_iac_2(t, DONT_, opt);
             } else if (t->verb == DO_) {
                 if (opt == OPT_TTYPE) {
                     send_iac_2(t, WILL_, OPT_TTYPE);
@@ -240,13 +268,10 @@ static int parse_chunk(TelnetProto *t,
                 } else if (opt == OPT_NAWS) {
                     send_iac_2(t, WILL_, OPT_NAWS);
                     send_iac_naws_80x24(t);
-                } else if (opt == OPT_SGA) {
-                    send_iac_2(t, WILL_, OPT_SGA);
                 } else {
                     send_iac_2(t, WONT_, opt);
                 }
             } else if (t->verb == WONT_) {
-                if (opt == OPT_ECHO) t->server_echo = 0;
                 send_iac_2(t, DONT_, opt);
             } else if (t->verb == DONT_) {
                 send_iac_2(t, WONT_, opt);

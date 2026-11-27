@@ -24,7 +24,7 @@
  * ANSI query ESC [ ! (1.54, "ANSI SEQUENCES (AUTO-SENSING)"). A RIPscrip
  * terminal answers RIPSCRIPxxyyvs with no terminator, where xx is the
  * major version, yy the minor, v the vendor code and s the vendor's
- * sub-revision. We are not RIPterm (vendor 1) or Qmodem Pro (vendor 2),
+ * sub-revision. We are not RIPterm (vendor 1) or the terminal registered as vendor 2,
  * so we answer as vendor 0, "Generic RIPscrip terminal", at version
  * 1.54: RIPSCRIP015400. Verified against the live service on
  * 2026-08-01: the query arrives and this answer gets the GUI.
@@ -416,11 +416,16 @@ static void rip_canvas_paint(HWND hwnd, HDC hdc)
             ? "Connected. Waiting for the host to send the RIPscrip scene..."
             : "Not connected. Enter a host and press Connect.";
         /* Typing reaches the host once a scene is up; see the header. */
+        RECT tr = rc;
+        int  tt = g_connected ? -1 : w31_power_watermark_text_top(&rc);
+        if (!g_connected) w31_draw_power_watermark(mem, &rc);   /* R1.2 */
         SetBkMode(mem, TRANSPARENT);
         SetTextColor(mem, RGB(160, 160, 160));
         if (g_hFontUI) SelectObject(mem, g_hFontUI);
-        DrawTextA(mem, hint, -1, &rc,
-                  DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        /* A1 (2026-11-23): below the button, never over it */
+        if (tt >= 0) tr.top = tt;
+        DrawTextA(mem, hint, -1, &tr,
+                  DT_CENTER | (tt >= 0 ? DT_TOP : DT_VCENTER) | DT_SINGLELINE);
     }
 
     /* Notice, painted over the scene and never into it. */
@@ -1398,7 +1403,11 @@ static LRESULT CALLBACK RipCanvasProc(HWND hwnd, UINT msg,
     case WM_LBUTTONDOWN: {
         int sx, sy, idx;
         SetFocus(hwnd);                 /* keep typing working */
-        if (!g_connected || g_zmodem_active) return 0;
+        if (!g_connected || g_zmodem_active) {
+            /* Navigator 2.0 part 7: a click on the idle screen connects */
+            if (!g_connected && !g_zmodem_active) w31_connect_click(g_hConnBtn);
+            return 0;
+        }
         rip_press_cancel_for_redraw();  /* clears any hot-key flash */
         if (rip_client_to_surface(hwnd,
                                   (int)(short)LOWORD(lParam),
@@ -1718,6 +1727,8 @@ void ripscrip_module_activate(HWND content)
         0, 0, W31_TOGGLE_W, W31_TOGGLE_H, g_hPanel,
         (HMENU)(INT_PTR)IDC_RIP_CONNECT_BTN, hInst, NULL);
     g_hDiscBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+    w31_connect_on_enter(g_hHostEdit, g_hConnBtn);   /* Navigator 2.0 part 7 */
+    w31_connect_on_enter(g_hPortEdit, g_hConnBtn);
 
     g_hCanvas = CreateWindowExA(WS_EX_CLIENTEDGE, RIP_CANVAS_CLASS, "",
         WS_CHILD | WS_VISIBLE,

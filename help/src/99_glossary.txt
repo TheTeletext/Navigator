@@ -42,6 +42,9 @@ Electronic mail sent with the MAIL command of the File Transfer Protocol, as on 
 @popup gl_gopher | Gopher
 A menu-based way of publishing documents on the Internet, created at the University of Minnesota in 1991 (RFC 1436). Each menu item leads to another menu, a document, a search or a file.
 
+@popup gl_gopherplus | Gopher+
+Extensions to Gopher written at the University of Minnesota in 1993. A Gopher+ server marks its items in its menus and can send their attributes (administrator, date, abstract), alternative formats called views, and forms that ask the reader questions.
+
 @popup gl_host | host
 A computer on the network that offers a service. In Navigator you type the host's DNS name, such as wais.teletext.ca.
 
@@ -79,13 +82,16 @@ A CU-SeeMe server that receives a sender's video and sound and passes them on to
 The Remote Imaging Protocol, developed by TeleGrafix Communications in the early 1990s. A RIPscrip bulletin board sends short text commands that the terminal draws as lines, shapes, text and buttons, so graphical screens could travel over a modem.
 
 @popup gl_selector | selector
-In Gopher, the string that names one item on a server. Navigator shows the full address of an item, as gopher://host/selector, in its Selector box.
+In Gopher, the string that names one item on a server. Navigator shows it, with the item's full address (gopher://host/type/selector), in the Item Info dialog box.
 
 @popup gl_telnet | Telnet
 The original Internet protocol for using a remote computer from a terminal (RFC 854). Telnet servers usually listen on port 23.
 
 @popup gl_vt220 | VT220
 A text terminal made by Digital Equipment Corporation in 1983. Its control sequences, which move the cursor and erase the screen, became a standard that most terminal programs understand.
+
+@popup gl_view | view
+In Gopher+, one of the formats in which an item can be sent, such as plain text, PostScript or a picture, sometimes in more than one language. The server lists its views, its preferred one first.
 
 @popup gl_wais | WAIS
 Wide Area Information Servers, developed from 1989 by Thinking Machines, Apple Computer and Dow Jones. You send words to a WAIS server and it returns the documents of a database ranked by how well they match.

@@ -505,6 +505,12 @@ static void canvas_paint(HWND hwnd, HDC hdc)
         GetTextExtentPoint32A(mem, "Wg", 2, &ext);
         lh = ext.cy + 2;
         y = (ch - n * lh) / 2;
+        if (!g_connected) {
+            /* A1 (2026-11-23): the block starts below the button */
+            int tt = w31_power_watermark_text_top(&rc);
+            w31_draw_power_watermark(mem, &rc);   /* R1.2 */
+            if (tt >= 0) y = tt;
+        }
         for (k = 0; k < n; k++) {
             RECT lr;
             lr.left = 0; lr.right = cw; lr.top = y + k * lh; lr.bottom = lr.top + lh;
@@ -540,6 +546,9 @@ static LRESULT CALLBACK MtlCanvasProc(HWND hwnd, UINT msg, WPARAM wParam,
         break;
     case WM_LBUTTONDOWN:
         SetFocus(hwnd);
+        /* Navigator 2.0 part 7: a click while "Press CONNEXION/FIN (F9) to
+         * connect" shows is that key */
+        if (!g_connected && !(g_dec && minitel_ever_drew(g_dec))) press_key(K_CNX);
         return 0;
     /* A custom-painted child must claim the keys, Tab and the arrows
      * included, or IsDialogMessage eats them first. */

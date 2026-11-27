@@ -40,19 +40,27 @@
 
 /* Navigator 1.7.2: the BBS tab's modem handshake, "The Sound of dial-up
  * Internet" by wtermini (freesound.org 546450, CC0 1.0), trimmed and made
- * 22,050 Hz 16-bit mono PCM by tools/make_dialup_sound.py. */
-403 RCDATA "../assets/sound/dialup.wav"
+ * 22,050 Hz 16-bit mono PCM by tools/make_dialup_sound.py; then two
+ * North American ringback rings (440 + 480 Hz, 2 s on, 4 s off) spliced
+ * in after the dialing by tools/make_ringback_sounds.sh, in place of 1.2 s
+ * of silent line before the answer; the rest kept sample for sample
+ * (docs/NAVIGATOR_BBS_RINGBACK_2026-11-19.md). */
+403 RCDATA "../assets/sound/dialup_ring.wav"
 
 /* Navigator 1.7.2: the BBS tab's failed dial, the telephone intercept
  * (dial tone, DTMF, SIT, the "cannot be completed" announcement, SIT,
  * hang-up click), 24 kHz 16-bit mono PCM; the approved cut's fmt and data
  * chunks only, editor metadata left out by tools/wav_strip_chunks.py
- * (docs/NAVIGATOR_INTERCEPT_WIRING_2026-11-17.md). */
-404 RCDATA "../assets/sound/intercept.wav"
+ * (docs/NAVIGATOR_INTERCEPT_WIRING_2026-11-17.md); then one ringback ring,
+ * cut off at 1.5 s by the SIT, spliced in after the dialing by
+ * tools/make_ringback_sounds.sh (the cut's 0.4 s of silence before the SIT
+ * left out); the rest kept sample for sample
+ * (docs/NAVIGATOR_BBS_RINGBACK_2026-11-19.md). */
+404 RCDATA "../assets/sound/intercept_ring.wav"
 
 /* Navigator 1.5: the Windows 3.1 ribbon and launcher icons, 32x32 in
  * the 16-colour VGA palette, drawn by tools/make_w31_icons.py. */
-500 BITMAP "../assets/w31icons/home.bmp"
+500 BITMAP "../assets/w31icons/start.bmp"   /* START (Navigator 1.8); home.bmp kept */
 501 BITMAP "../assets/w31icons/ripscrip.bmp"
 502 BITMAP "../assets/w31icons/nabu.bmp"
 503 BITMAP "../assets/w31icons/videotex.bmp"
@@ -79,6 +87,14 @@
 537 BITMAP "../assets/w31icons/gt_sound.bmp"
 538 BITMAP "../assets/w31icons/gt_unknown.bmp"
 539 BITMAP "../assets/w31icons/gt_link.bmp"
+// Navigator 2.0 Part B (2026-11-23): the Gopher+ column icons (refshots/ref52)
+540 BITMAP "../assets/w31icons/gp_plus.bmp"
+541 BITMAP "../assets/w31icons/gp_form.bmp"
+542 BITMAP "../assets/w31icons/gp_views.bmp"
+543 BITMAP "../assets/w31icons/gp_langs.bmp"
+544 BITMAP "../assets/w31icons/gp_error.bmp"
+// 2026-11-25 (design A): the Gopher web-link globe, type h only
+545 BITMAP "../assets/w31icons/gt_web.bmp"
 
 1 VERSIONINFO
 FILEVERSION    SUITE_VERSION_MAJOR, SUITE_VERSION_MINOR, SUITE_VERSION_PATCH, SUITE_VERSION_BUILD

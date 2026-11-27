@@ -1,7 +1,7 @@
 /*
  * ftp_module.c - the FTP tab: a two-pane anonymous, download-only client.
  *
- * WS_FTP's layout in Navigator's Windows 3.1 dress (2026-11-12,
+ * The classic two-pane FTP layout in Navigator's Windows 3.1 dress (2026-11-12,
  * docs/2026-11-12_FTP_TAB.md): a strip with Host and Port (bold labels),
  * a grayed Username field reading Anonymous, a Passive checkbox and the
  * one Connect/Disconnect toggle at its right end; the local pane on the
@@ -17,8 +17,10 @@
  *
  * Rules (operator, 2026-11-12):
  *   - ANONYMOUS ONLY: USER anonymous, PASS FTPC_ANON_PASSWORD on 331.
- *     A server that refuses says so in the status and the log and the
- *     session ends; there is no credential prompt anywhere.
+ *     Navigator 2.0 (2026-11-25): if "anonymous" is refused, the other
+ *     conventional anonymous name "ftp" is tried once (ftp_ctrl.c); never
+ *     a real account. A server that refuses both says so in the status and
+ *     the log and the session ends; there is no credential prompt anywhere.
  *   - NEVER WRITE: the session uses the core's download allowlist, which
  *     has no STOR, STOU, APPE, DELE, MKD, RMD, RNFR, RNTO or SITE; the core
  *     refuses anything off the list before a byte is sent.
@@ -59,6 +61,7 @@
 #include "suite_w31.h"
 #include "ftp_ctrl.h"
 #include "ftp_list.h"
+#include "suite_sites.h"
 
 #define FTP_PANEL_CLASS   "TeletextNavigatorFtpPanel"
 #define FTP_DEFAULT_HOST  "ftp.teletext.ca"
@@ -91,10 +94,13 @@
 #define IDC_FTP_VIEW       7420
 #define IDC_FTP_USER_LBL   7421
 #define IDC_FTP_USER       7422
+#define IDC_FTP_SITE_LBL   7423   /* Navigator 2.0: the Site list (2026-11-25) */
+#define IDC_FTP_SITE       7424
 #define FTP_IDLE_POLL_MS   250    /* how often an idle session's socket is looked at */
 
 #define WM_FTP_LOG   (WM_APP + 60)   /* wParam gen, lParam heap "k" + line */
 #define WM_FTP_DONE  (WM_APP + 61)   /* wParam gen, lParam ftp_result_t*   */
+#define WM_FTP_PASTED (WM_APP + 62)  /* something was pasted into Host     */
 
 enum { JOB_NONE, JOB_CONNECT, JOB_CD, JOB_LIST, JOB_GET, JOB_QUIT,
        JOB_IDLE };   /* JOB_IDLE: never submitted; the worker's report of a dropped idle session */
@@ -116,6 +122,7 @@ typedef struct ftp_result {
     int          ok;
     int          alive;       /* the session is still connected */
     int          login_refused;
+    int          login_ftp;   /* Navigator 2.0: logged in as "ftp" ("anonymous" refused) */
     char         msg[600];
     char         pwd[1024];
     int          have_list;
@@ -153,6 +160,8 @@ static HWND g_panel, g_host_lbl, g_host, g_port_lbl, g_port, g_passive, g_toggle
 static HWND g_lpath_lbl, g_lpath, g_rpath_lbl, g_rpath, g_llist, g_rlist;
 static HWND g_down, g_view, g_mode_lbl, g_ascii, g_binary, g_auto, g_log;
 static HWND g_user_lbl, g_user;
+static HWND g_site_lbl, g_site;          /* Navigator 2.0: the Site list */
+static BOOL g_site_filling = FALSE;      /* a pick is writing Host and Port */
 static BOOL g_created = FALSE, g_class_reg = FALSE;
 static HFONT g_list_font = NULL;
 static WNDPROC g_orig_list_proc = NULL, g_orig_host_proc = NULL;
@@ -346,7 +355,14 @@ static void w_connect(ftp_sess_t *s, ftp_job_t *j, ftp_result_t *r)
         ftpc_disconnect(s->c);
         return;
     }
-    code = ftpc_login_anonymous(s->c, line, sizeof line);
+    /* Navigator 2.0 (2026-11-25): "anonymous", and if a server refuses it,
+     * the other anonymous name "ftp" (ftp_ctrl.c); never a real account */
+    code = ftpc_login_anonymous_or_ftp(s->c, s->host, s->port, FTP_CONNECT_MS, line, sizeof line, &r->login_ftp);
+    if (r->login_ftp) {
+        _snprintf(note, sizeof note, "The server refused \"anonymous\"; logged in with the other anonymous name, \"ftp\".");
+        note[sizeof note - 1] = '\0';
+        post_note(s, note);
+    }
     if (code < 0 || code / 100 != 2) {
         r->login_refused = code > 0;
         if (code > 0)
@@ -650,6 +666,7 @@ static void update_controls(void)
     BOOL disc = (g_state == ST_DISC), view = FALSE;
     EnableWindow(g_host, disc);
     EnableWindow(g_port, disc);
+    if (g_site) EnableWindow(g_site, disc);   /* locked while a session runs */
     w31_toggle_set(g_toggle, !disc);
     EnableWindow(g_down, g_state == ST_IDLE && re && (re->kind == FTPL_FILE || re->kind == FTPL_LINK));
     if (te && te->kind == FTPL_FILE && view_class_for(te->name))
@@ -913,6 +930,75 @@ static void drop_session(void)
     if (IsWindowVisible(g_panel)) suite_set_progress(SUITE_ID_BTN_FTP, -1);
 }
 
+/* ---------------------------------------------------------------- */
+/* Navigator 2.0 Site list (2026-11-25, docs/2026-11-25_NAVIGATOR_   */
+/* SITELISTS_2A_FTP_WEB_BUILD.md): a pick fills Host and Port only;  */
+/* Connect stays the user's act.                                     */
+
+/* The list shows the entry Host and Port name now, or nothing. */
+static void ftp_site_sync(void)
+{
+    char host[256], port[16];
+    int sel;
+    if (!g_site || g_site_filling) return;
+    GetWindowTextA(g_host, host, sizeof host);
+    GetWindowTextA(g_port, port, sizeof port);
+    sel = suite_sites_find(SITES_TAB_FTP, host, atoi(port));
+    if ((int)SendMessageA(g_site, CB_GETCURSEL, 0, 0) != sel)
+        SendMessageA(g_site, CB_SETCURSEL, (WPARAM)sel, 0);
+}
+
+static void ftp_pick_site(int idx)
+{
+    int n;
+    const suite_site_t *t = suite_sites_table(SITES_TAB_FTP, &n);
+    suite_site_addr_t a;
+    char port[16], m[400];
+    if (!t || idx < 0 || idx >= n || g_state != ST_DISC) return;
+    if (suite_sites_parse(t[idx].address, &a) != SITES_OK) return;
+    g_site_filling = TRUE;
+    SetWindowTextA(g_host, a.host);
+    _snprintf(port, sizeof port, "%d", a.port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_port, port);
+    g_site_filling = FALSE;
+    SendMessageA(g_site, CB_SETCURSEL, (WPARAM)idx, 0);
+    _snprintf(m, sizeof m, "%s: %s port %d. Press Connect to open it.", t[idx].label, a.host, a.port);
+    m[sizeof m - 1] = '\0';
+    ftp_status(m);
+}
+
+/* A full ftp:// address in Host (pasted, typed, or there at Connect)
+ * fills Host and Port through the strict host-field parser: a user name
+ * is refused (this client logs in anonymously only). Plain host text is
+ * left alone. Returns FALSE when the text is an address that cannot be
+ * used, after saying why. */
+static BOOL ftp_apply_address(void)
+{
+    char text[SITES_HOST_MAX + SITES_PATH_MAX + 32], port[16], m[600];
+    suite_site_addr_t a;
+    GetWindowTextA(g_host, text, sizeof text);
+    if (!strstr(text, "://")) return TRUE;
+    if (suite_sites_parse_hostport(text, SITES_SCHEME_FTP, &a) != SITES_OK) {
+        if (strchr(text, '@'))
+            ftp_status("This client logs in anonymously only: an address with a user name is not used.");
+        else
+            ftp_status("The Host box takes a host name or an ftp:// address.");
+        return FALSE;
+    }
+    SetWindowTextA(g_host, a.host);
+    _snprintf(port, sizeof port, "%d", a.port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_port, port);
+    if (a.path[0] && strcmp(a.path, "/") != 0)
+        _snprintf(m, sizeof m, "Address filled in: %s port %d. After connecting, browse to %s.", a.host, a.port, a.path);
+    else
+        _snprintf(m, sizeof m, "Address filled in: %s port %d.", a.host, a.port);
+    m[sizeof m - 1] = '\0';
+    ftp_status(m);
+    return TRUE;
+}
+
 static void ftp_connect(const char *initial_path)
 {
     char host[256], port[16];
@@ -920,6 +1006,7 @@ static void ftp_connect(const char *initial_path)
     ftp_job_t j;
     HANDLE th;
     int p;
+    if (!ftp_apply_address()) return;     /* Navigator 2.0: a full address in Host */
     GetWindowTextA(g_host, host, sizeof host);
     GetWindowTextA(g_port, port, sizeof port);
     p = atoi(port);
@@ -1217,6 +1304,10 @@ static void on_done(ftp_result_t *r)
         char host[256];
         GetWindowTextA(g_host, host, sizeof host);
         _snprintf(m, sizeof m, "Connected to %s: %s, %d entr%s", host, g_remote_pwd, r->n, r->n == 1 ? "y" : "ies");
+        if (r->login_ftp) {   /* Navigator 2.0: the fallback said, not hidden */
+            size_t ml = strlen(m);
+            _snprintf(m + ml, sizeof m - ml, " (logged in as \"ftp\"; the server refused \"anonymous\")");
+        }
         ftp_status(m);
         break;
     }
@@ -1346,14 +1437,34 @@ static LRESULT CALLBACK ListSub(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     }
     if (m == WM_GETDLGCODE) return DLGC_WANTALLKEYS | CallWindowProcA(g_orig_list_proc, h, m, w, l);
+    /* R1.2: the empty REMOTE list while not connected carries the watermark */
+    if (m == WM_PAINT && h == g_rlist && g_state == ST_DISC && g_rn == 0)
+        return w31_paint_with_watermark(h, g_orig_list_proc, w, l);     /* clipped, 2026-11-27 */
+    /* Navigator 2.0 part 7: a click in the "(not connected)" remote list
+     * connects (the local list stays usable while disconnected) */
+    if (m == WM_LBUTTONDOWN && h == g_rlist && g_state == ST_DISC) {
+        SetFocus(h);
+        w31_connect_click(g_toggle);
+        return 0;
+    }
     return CallWindowProcA(g_orig_list_proc, h, m, w, l);
 }
 
 static LRESULT CALLBACK HostSub(HWND h, UINT m, WPARAM w, LPARAM l)
 {
+    LRESULT r;
     if (m == WM_KEYDOWN && w == VK_RETURN) { if (g_state == ST_DISC) ftp_connect(NULL); return 0; }
     if (m == WM_CHAR && (w == '\r' || w == '\n')) return 0;
-    return CallWindowProcA(g_orig_host_proc, h, m, w, l);
+    r = CallWindowProcA(g_orig_host_proc, h, m, w, l);
+    /* Navigator 2.0: after a paste (the context menu's WM_PASTE, Ctrl+V,
+     * Shift+Insert) ask the panel to look for a full ftp:// address.
+     * Posted, so the field already holds the pasted text (the Minitel
+     * Host field's pattern). */
+    if (m == WM_PASTE
+        || (m == WM_CHAR && w == 0x16)
+        || (m == WM_KEYDOWN && w == VK_INSERT && (GetKeyState(VK_SHIFT) & 0x8000)))
+        PostMessageA(g_panel, WM_FTP_PASTED, 0, 0);
+    return r;
 }
 
 static LRESULT CALLBACK FtpPanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1410,6 +1521,9 @@ static LRESULT CALLBACK FtpPanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
         if (r) { free(r->ent); free(r); }
         return 0;
     }
+    case WM_FTP_PASTED:
+        if (g_state == ST_DISC) ftp_apply_address();
+        return 0;
     case WM_COMMAND:
         if (ftp_module_on_command(hwnd, wParam, lParam)) return 0;
         break;
@@ -1427,6 +1541,20 @@ BOOL ftp_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     switch (id) {
     case IDC_FTP_TOGGLE:
         if (code == BN_CLICKED) { if (g_state == ST_DISC) ftp_connect(NULL); else ftp_disconnect(); return TRUE; }
+        break;
+    case IDC_FTP_SITE:
+        /* act once the list is closed, as the BBS Site list does */
+        if ((code == CBN_SELCHANGE && !SendMessageA((HWND)lParam, CB_GETDROPPEDSTATE, 0, 0))
+            || code == CBN_CLOSEUP) {
+            int sel = (int)SendMessageA((HWND)lParam, CB_GETCURSEL, 0, 0);
+            if (sel >= 0 && g_state == ST_DISC) ftp_pick_site(sel);
+            else ftp_site_sync();          /* closed with nothing picked */
+        }
+        return TRUE;
+    case IDC_FTP_HOST:
+    case IDC_FTP_PORT:
+        if (code == EN_CHANGE) { ftp_site_sync(); return TRUE; }
+        if (id == IDC_FTP_HOST && code == EN_KILLFOCUS && g_state == ST_DISC) { ftp_apply_address(); return TRUE; }
         break;
     case IDC_FTP_DOWN:
         if (code == BN_CLICKED) { start_get(sel_entry(g_rlist, g_rent, g_rn)); return TRUE; }
@@ -1501,6 +1629,13 @@ void ftp_module_resize(HWND content, int w, int h)
     MoveWindow(g_user_lbl, ux, 18, 68, 20, TRUE);
     MoveWindow(g_user, ux + 70, 14, 86, row_h, TRUE);
     MoveWindow(g_passive, ux + 70 + 86 + 14, 18, 72, 20, TRUE);
+    {   /* Navigator 2.0: Site label + list after Passive, kept clear of the toggle */
+        int sx = ux + 70 + 86 + 14 + 72 + 14, cw = 150;
+        int room = (w - margin - W31_TOGGLE_W - 14) - (sx + 32);
+        if (cw > room) cw = room < 80 ? 80 : room;
+        MoveWindow(g_site_lbl, sx, 18, 30, 20, TRUE);
+        MoveWindow(g_site, sx + 32, 14, cw, 200, TRUE);   /* height includes the list */
+    }
     MoveWindow(g_toggle, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2, W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
 
     /* the panes */
@@ -1590,7 +1725,13 @@ void ftp_module_activate(HWND content)
     g_user     = mk_ex(WS_EX_CLIENTEDGE, "EDIT", "Anonymous", ES_READONLY | WS_DISABLED, IDC_FTP_USER, hi);
     g_passive  = mk("BUTTON", "Passive", WS_TABSTOP | BS_AUTOCHECKBOX, IDC_FTP_PASSIVE, hi);
     SendMessageA(g_passive, BM_SETCHECK, BST_CHECKED, 0);
+    /* Navigator 2.0: the Site list, a drop-down LIST after Passive (the
+     * BBS pattern; the Windows 3.1 look comes from suite_w31 by itself) */
+    g_site_lbl = mk("STATIC", "Site:", SS_LEFTNOWORDWRAP, IDC_FTP_SITE_LBL, hi);
+    g_site     = mk("COMBOBOX", "", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_FTP_SITE, hi);
+    suite_sites_fill_combo(g_site, SITES_TAB_FTP);
     g_toggle   = mk("BUTTON", "Connect", WS_TABSTOP | BS_PUSHBUTTON, IDC_FTP_TOGGLE, hi);
+    w31_connect_on_enter(g_port, g_toggle);   /* Navigator 2.0 part 7 (Host has HostSub) */
     g_lpath_lbl = mk("STATIC", " Local:", SS_LEFTNOWORDWRAP, IDC_FTP_LPATH_LBL, hi);
     g_lpath     = mk("STATIC", "", SS_LEFTNOWORDWRAP | SS_PATHELLIPSIS | SS_NOPREFIX, IDC_FTP_LPATH, hi);
     g_rpath_lbl = mk("STATIC", " Remote:", SS_LEFTNOWORDWRAP, IDC_FTP_RPATH_LBL, hi);
@@ -1619,6 +1760,7 @@ void ftp_module_activate(HWND content)
     load_local(NULL);
     clear_remote();
     update_controls();
+    ftp_site_sync();                 /* the default host is the first entry */
     log_add(FTPC_LOG_NOTE, "Anonymous FTP, downloads only. Choose a host and press Connect.");
     GetClientRect(content, &rc);
     ftp_module_resize(content, rc.right, rc.bottom);

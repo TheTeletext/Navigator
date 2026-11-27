@@ -101,24 +101,33 @@ Videotex also has a strong Canadian and Montreal history. Canada's Telidon resea
 = Videotex in Navigator
 The Videotex service is a terminal for both kinds of service: the Minitel (40 columns by 25 rows, with its own function keys), which it starts with, and NAPLPS.
 
-The Teletext publishes both editions at videotex.teletext.ca: daily news, markets and numbers, traffic, weather, maps and public alerts. Pages are sent at about 1200 bits per second, some 120 characters a second, so screens build as they did on a period terminal.
+The Teletext publishes both editions, the Minitel edition at minitel.teletext.ca and the NAPLPS edition at naplps.teletext.ca: daily news, markets and numbers, traffic, weather, maps and public alerts. Pages are sent at about 1200 bits per second, some 120 characters a second, so screens build as they did on a period terminal.
 
 - [[vtx_connect|Connecting to a Videotex Service]]
 - [[vtx_settings|Videotex Settings]]
 - [[vtx_usage|Using Minitel and NAPLPS]]
 - [[vtx_trouble|Videotex Troubleshooting]]
 
-@topic vtx_connect | Connecting to a Videotex Service | Videotex;Minitel;NAPLPS;connecting;CONNEXION/FIN;Connect button | vtx
+@topic vtx_connect | Connecting to a Videotex Service | Videotex;Minitel;NAPLPS;connecting;CONNEXION/FIN;Connect button;WebSocket;Site | vtx
 = Minitel
 1. In the **Format** list, choose **Minitel**. The Port box changes to 516.
-2. Check the **Host** box (videotex.teletext.ca).
+2. Check the **Host** box (minitel.teletext.ca), or choose a service in the **Site** list.
 3. Press **CONNEXION/FIN** on the screen keyboard, or F9.
 
 The status line under the screen shows "Connected to" and the host, and a C appears in the top right corner of the Minitel screen (F when it is not connected). To disconnect, press CONNEXION/FIN twice: the first press is sent to the service, the second hangs up.
 
+= Minitel over WebSocket
+Some Minitel services are reached through a WebSocket gateway instead of Telnet. In the **Protocol** list, choose **WebSocket (ws)**: the Port box changes to 80, and the **Path** box holds the rest of the address, for example /?url= followed by the address of the service. The **Site** list fills all of this in for the services it names.
+
+You can also paste a whole address that begins with ws:// or telnet:// into the **Host** box: Navigator fills in Protocol, Host, Port and Path from it. If the path begins with /url=, Navigator changes it to /?url=, the form the gateways answer, and says so on the status line.
+
+Choosing a site or pasting an address never connects by itself: press CONNEXION/FIN when you are ready.
+
+Secure WebSocket (wss://) connections are not supported in this version.
+
 = NAPLPS
 1. In the **Format** list, choose **NAPLPS**. The Port box changes to 1983.
-2. Check the **Host** box (videotex.teletext.ca).
+2. Check the **Host** box (naplps.teletext.ca).
 3. Choose **Connect**.
 
 To disconnect, choose **Disconnect** or press F10.
@@ -126,9 +135,12 @@ To disconnect, choose **Disconnect** or press F10.
 = After disconnecting
 The screen shows "Disconnected from" and the host, then, five seconds later, the format's opening screen. The format can be changed only while you are disconnected. The session and the screen are kept if you choose another service.
 
-@topic vtx_settings | Videotex Settings | Videotex;settings;Monochrome;Scanlines;CAPITALS only;capital letters | vtx
-- **Format**: Minitel or NAPLPS. Changing it sets the usual port: 516 for Minitel, 1983 for NAPLPS.
+@topic vtx_settings | Videotex Settings | Videotex;settings;Monochrome;Scanlines;CAPITALS only;capital letters;Site;Protocol;Path;WebSocket | vtx
+- **Format**: Minitel or NAPLPS. Changing it sets the usual port, 516 for Minitel and 1983 for NAPLPS, and the usual host, minitel.teletext.ca or naplps.teletext.ca, if the Host box still holds the other format's.
 - **Host** and **Port**: where the service is. They are locked while connected.
+- **Site** (Minitel only): The Teletext, MiniPavi (a Minitel gateway with its own directory of services) and CVCFED Minitel. Choosing one fills in Protocol, Host, Port and Path; it does not connect.
+- **Protocol** (Minitel only): **Telnet** or **WebSocket (ws)**.
+- **Path** (Minitel only, over WebSocket): the part of the address after the host and port. It is sent exactly as you type it, capitals included.
 - **Monochrome**: shows the screen in grey levels, as on a monochrome terminal (for Minitel, the grey levels of the Minitel 1B tube). Clear it for colour.
 - **Scanlines** (Minitel only): draws the dark lines between the rows of a television tube.
 - **CAPITALS only (Ctrl+C, M)** (Minitel only): see below.
@@ -170,7 +182,13 @@ Correct the Host or Port box.
 The host name could not be found. Check its spelling.
 
 = "Connection failed: Connection refused" or "Connection timed out"
-Check the port: 516 for The Teletext's Minitel service, 1983 for NAPLPS.
+Check the port: 516 for The Teletext's Minitel service over Telnet, 80 over WebSocket, 1983 for NAPLPS.
+
+= "The host did not accept a WebSocket connection"
+The host answered, but not as a WebSocket service. Check the Port and the Path, or choose Telnet in the **Protocol** list.
+
+= "Secure WebSocket (wss://) connections are not supported in this version"
+Navigator connects to Minitel services by Telnet or by plain WebSocket (ws://). An address that begins with wss:// cannot be used in this version; if the service also offers ws://, use that.
 
 = "Host closed the connection"
 The service ended the session. Connect again.

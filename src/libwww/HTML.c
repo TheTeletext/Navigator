@@ -479,8 +479,14 @@ PRIVATE void HTML_put_entity (HTStructured * me, int entity_number)
 	HTextImp_build(me->text, HTEXT_BEGIN);
 	me->started = YES;
     }
-    if (entity_number>=0 && entity_number<HTML_ENTITIES)
+    if (entity_number>=0 && entity_number<HTML_ENTITIES) {
+	/* TELETEXT NAVIGATOR MODIFICATION 2026-11-26: the value is
+	** ISO-8859-1 whatever the page's charset (SGML.c SGML_emit_kind) */
+	extern int SGML_emit_kind;
+	SGML_emit_kind = 2;
 	HTML_put_string(me, *(CurrentEntityValues+entity_number));
+	SGML_emit_kind = 0;
+    }
 }
 
 PUBLIC int HTML_flush (HTStructured * me)

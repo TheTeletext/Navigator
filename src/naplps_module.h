@@ -46,11 +46,19 @@
  * The service has been PUBLIC on port 1983 since 2026-09-26 (Unicorn
  * Phase 3). Opening a local .nap file needs no host at all.
  */
-/* 2026-10-29: videotex.teletext.ca for both formats (1983 and 516). The
- * greektimes.ca name above still answers if typed. */
-#define NAPLPS_DEFAULT_HOST      "videotex.teletext.ca"
+/* Navigator 2.0 (operator, 2026-11-24): one default host PER FORMAT,
+ * naplps.teletext.ca for NAPLPS (1983) and minitel.teletext.ca for Minitel
+ * (516 over Telnet). The older umbrella name that served both is no longer
+ * shown anywhere, but it still answers on both ports if typed, because the
+ * server picks the service by port, not by name (discovery report,
+ * docs/2026-11-24_NAVIGATOR_SITE_LISTS_WSS_DISCOVERY.md section 4.2). */
+#define NAPLPS_DEFAULT_HOST      "naplps.teletext.ca"
 #define NAPLPS_DEFAULT_PORT      1983
 #define NAPLPS_DEFAULT_PORT_STR  "1983"
+#define MINITEL_DEFAULT_HOST     "minitel.teletext.ca"
+/* Minitel over WebSocket (plain ws only in 2.0): its default port. */
+#define MINITEL_WS_DEFAULT_PORT      80
+#define MINITEL_WS_DEFAULT_PORT_STR  "80"
 
 /* Standard module entry points (see suite_shell.h). */
 void naplps_module_activate(HWND content);

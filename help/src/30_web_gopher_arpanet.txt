@@ -3,11 +3,13 @@
 %map web_settings 502
 %map web_usage 503
 %map web_trouble 504
+%map web_forms 505
 %map gopher_overview 600
 %map gopher_connect 601
 %map gopher_settings 602
 %map gopher_usage 603
 %map gopher_trouble 604
+%map gopher_plus 605
 %map arpa_overview 700
 %map arpa_connect 701
 %map arpa_settings 702
@@ -18,22 +20,25 @@
 = About the World Wide Web of the 1990s
 The World Wide Web joined documents on servers all over the Internet with links. Its early pages were written in simple HTML, for browsers such as NCSA Mosaic and Netscape Navigator: headings, paragraphs, lists, tables and pictures, without scripts or style sheets.
 
-In the late 1990s, Internet Explorer 4.0 added Active Channels, a "push" model in which a site's Channel Definition Format (CDF) file listed its contents for the browser to collect, an early ancestor of RSS feeds. To our knowledge, only three Internet Explorer Active Channels remain in operation in the world, The Teletext's among them.
+In the late 1990s, Active Channels brought a "push" model to the Web: a site's Channel Definition Format (CDF) file listed its contents for the browser to collect, an early ancestor of RSS feeds. To our knowledge, only three Active Channels remain in operation in the world, The Teletext's among them.
 
 The Teletext also broadcasts Teletext Radio as a RealAudio 3.0 live stream, over the original PNA protocol of mid-1990s Internet radio. To our knowledge, it is the only RealAudio live server using the original PNA protocol in public operation in the world today.
 
-The Teletext's web site, http://www.teletext.ca/, is written for those early browsers: current news, weather, traffic, markets and numbers, Teletext Radio and public alerts, in a classic layout.
+The Teletext's web site, http://www.teletext.ca/, is written for those early browsers: current Canadian and world news, weather, traffic, markets and numbers, Teletext Radio and public alerts, in a classic layout.
 
 = The Web in Navigator
-The Web service is a browser of that period. It is built on libwww, the W3C's reference library, and draws pages with its own HTML 3.2 renderer: headings, paragraphs, lists, tables, fonts and colours, and GIF, JPEG and PNG pictures, animated GIFs included. Flash movies (.swf) play through the Ruffle player.
+The Web service is a browser of that period. It is built on libwww, the W3C's reference library, and draws pages with its own HTML 3.2 renderer: headings, paragraphs, lists, tables, fonts and colours, and GIF, JPEG and PNG pictures, animated GIFs and background pictures included. It shows pages in other languages and scripts, such as Japanese, Chinese, Greek and French. Flash movies (.swf) play through the Ruffle player.
 
 - [[web_connect|Opening a Web Page]]
 - [[web_settings|Web Settings]]
 - [[web_usage|Browsing the Web]]
+- [[web_forms|Filling In a Form]]
 - [[web_trouble|Web Troubleshooting]]
 
-@topic web_connect | Opening a Web Page | Web;URL;opening a page;Go;Home;connecting | web
+@topic web_connect | Opening a Web Page | Web;URL;opening a page;Go;Home;Reload;toolbar;connecting | web
 The Web service has no connection to open: each page is fetched when you ask for it.
+
+The toolbar across the top holds Back, Forward, Reload, Stop and Home, the URL box with its Go button, and The Teletext's emblem at the right.
 
 To open a page:
 
@@ -43,17 +48,17 @@ To open a page:
 The status bar shows "Connecting to" and the host, then how much of the page has arrived, then "Document: Done".
 
 - **Home** opens http://www.teletext.ca/.
-- **Refresh** fetches the current page again.
+- **Reload** fetches the current page again.
 - **Back** and **Forward** move through the pages you have seen.
 
-While a page is being fetched, the buttons and the URL box are dimmed except Stop. **Stop** discards the page when it arrives and shows "Stopped."; the transfer itself runs to its end.
+While a page is being fetched, The Teletext's emblem at the right of the toolbar turns like a globe, with a moon in orbit round it and meteors passing behind, and the buttons and the URL box are dimmed except Stop. **Stop** discards the page when it arrives and shows "Stopped."; the transfer itself runs to its end. When the page is done or stopped, the emblem finishes its turn and comes to rest. Click the emblem to open http://www.teletext.ca/.
 
 Addresses beginning gopher:// open in the [[gopher_overview|Gopher]] service, and addresses beginning ftp:// in the [[ftp_overview|FTP]] service.
 
 @topic web_settings | Web Settings | Web;settings;history | web
 The Web service has no settings. It remembers the last 64 pages for Back and Forward while Navigator runs, and nothing after it closes.
 
-@topic web_usage | Browsing the Web | Web;links;copying text;scrolling;sound;Flash;Active Channel | web
+@topic web_usage | Browsing the Web | Web;links;copying text;scrolling;sound;Flash;Active Channel;languages;Japanese;Chinese;Greek;character set;background;animation | web
 = Links
 Point to a link and the pointer becomes a hand, and the status bar shows its address. Click to follow it.
 
@@ -76,21 +81,50 @@ An address of a .cdf Active Channel file is read, and the status bar reports how
 
 The Web service cannot save pages or files to disk.
 
+= Pages in other languages
+A page tells the browser which character set it is written in, and the Web service reads it in that set: Japanese (Shift_JIS and EUC-JP), Traditional Chinese (Big5), Simplified Chinese, Korean, Greek (ISO-8859-7, also called ELOT 928, and Windows-1253), the Western European sets used for French and other languages (ISO-8859-1 and Windows-1252), Central European and Cyrillic sets, and UTF-8. A page that does not say is read as Western European. A page opened from an Active Channel that does not say is read in the channel's own character set. The fonts for these scripts come with Windows; nothing needs to be installed.
+
+= Pictures, backgrounds and animations
+Pages show their background pictures, tiled behind the text, and their colours for text and links. Animated GIFs play at the speed they were made for. A very long animation plays only its first part, so that one page cannot use up the computer's memory. A picture that cannot be loaded, such as one on a secure (https://) address, is shown as an empty box with a small broken-picture symbol and its description, in the space the page gave it.
+
+@topic web_forms | Filling In a Form | Web;forms;search;text box;option buttons;Submit;Reset;Archie | web
+Many pages ask you something before they answer: a search, a choice, a few words. Navigator shows these forms with Windows controls on the page: text boxes to type in, option buttons to choose one of a set, and buttons to send the form or to clear it.
+
+To use a form, take the Archie search at http://archie.teletext.ca/:
+
+1. Click the box under "Search for:" and type what you are looking for, for example gwbasic.
+2. Choose the options you want. In each set of option buttons one is always chosen; clicking another chooses it instead.
+3. Choose **Search**, or press ENTER in the text box.
+
+The answer opens as a new page. On Archie's answer page the box under "Modify Search" holds your words: change them and press ENTER to search again.
+
+- TAB moves to the next box or button and SHIFT+TAB to the one before; past the last one TAB goes on to the URL box.
+- In a set of option buttons the arrow keys choose the next or the previous option; SPACE chooses the one that has the focus or presses the button that has it.
+- ESC leaves a text box.
+- **Reset** puts every box and option of the form back as the page first showed it.
+
+The status bar names the computer your answers are sent to. If you go back or forward to a page that was the answer to a form, or reload it, Navigator asks before it sends the form again.
+
+Navigator does not send some forms. It says why and sends nothing when a form asks for a file on your computer, sends to an address that is not an ordinary http address, or uses a kind of box this version cannot show yet: check boxes, password boxes, lists and larger text areas.
+
 @topic web_trouble | Web Troubleshooting | Web;troubleshooting;errors;forms;HTTPS;Flash | web
 = "Could not load" and the address
 The page could not be fetched. Check the address, and that the server is reachable.
 
 = A page looks wrong or empty
-Like the browsers of its time, the Web service does not run JavaScript, apply style sheets, use cookies or show frames, and it cannot fill in forms. Pages written for modern browsers may not work. The Teletext's site at http://www.teletext.ca/ is written for it.
+Like the browsers of its time, the Web service does not run JavaScript, apply style sheets, use cookies or show frames. Pages written for modern browsers may not work. The Teletext's site at http://www.teletext.ca/ is written for it.
 
 = Secure (https://) pages do not open
-The Web service fetches pages by plain HTTP, as browsers did before secure pages were common. It cannot open https:// addresses.
+The Web service fetches pages by plain HTTP, as browsers did before secure pages were common. It cannot open https:// addresses. Secure WebSocket (wss://) connections, which some Minitel services offer, are likewise not supported in this version.
 
-= A picture shows as [image: ...]
-The picture could not be loaded or read.
+= A picture shows as a box with a broken-picture symbol
+The picture could not be loaded or read. Pictures on secure (https://) addresses cannot be loaded; neither can a picture the server refuses to send. The box keeps the picture's place on the page and shows its description, if the page gives one.
 
 = "Flash movie cannot play"
 The status bar gives the reason, such as "not a Flash movie", "the movie is larger than 32 MB" or "the movie could not be downloaded".
+
+= "This form cannot be sent"
+The form asks for something Navigator does not do: a file from your computer, an address that is not plain http, a kind of box it cannot show yet, or a character the page's character set cannot carry. Nothing was sent.
 
 @topic gopher_overview | Gopher | Gopher;Gopherspace;menus;overview | gopher
 = About Gopher
@@ -101,69 +135,136 @@ Before the Web took over, Gopher was one of the Internet's first public news rac
 The Teletext uses Gopher in the same tradition, as a menu-based news rack. Today roughly 200 Gopher servers are estimated to remain active in the world, and The Teletext operates one of them as part of a live publishing system.
 
 = Gopher in Navigator
-The Gopher service is a Gopher client (RFC 1436). It opens menus and text documents, shows pictures, runs Gopher searches, plays sounds and saves files. It is set up for The Teletext's Gopher server, gopher.teletext.ca: daily news, weather, traffic, markets and numbers, public alerts, articles, archives and the print replica edition in PDF.
+The Gopher service is a Gopher client (RFC 1436), with the {{gl_gopherplus|Gopher+}} extensions of 1993 for the servers that offer them. It opens menus and text documents, shows pictures, runs Gopher searches, plays sounds and saves files. It is set up for The Teletext's Gopher server, gopher.teletext.ca: daily news, weather, traffic, markets and numbers, public alerts, articles, archives and the print replica edition in PDF.
 
 - [[gopher_connect|Opening a Gopher Menu]]
 - [[gopher_settings|Gopher Settings]]
 - [[gopher_usage|Using Gopher Menus]]
+- [[gopher_plus|Gopher+ Attributes, Views and Forms]]
 - [[gopher_trouble|Gopher Troubleshooting]]
 
-@topic gopher_connect | Opening a Gopher Menu | Gopher;Selector;opening a menu;Go;Home;connecting | gopher
+@topic gopher_connect | Opening a Gopher Menu | Gopher;Gopher to;Home;address;opening a menu;connecting | gopher
 Gopher has no connection to keep open: each menu or document is fetched when you ask for it.
 
-To open a menu:
+To open The Teletext's Gopher server, choose **Home**, or press M while the menu has the focus.
 
-1. Type its address in the **Selector** box, for example gopher://gopher.teletext.ca/. You may leave out gopher://, and add a port after the host, as in gopher.teletext.ca:70.
-2. Press ENTER or choose **Go**.
+To open another Gopher server or menu:
 
-The status bar shows "Connecting...", then how many bytes have arrived, then "Menu: Done" or "Document: Done".
+1. Choose **Gopher to...**, or press O or CTRL+G. The Gopher to dialog box shows the address of what you are reading.
+2. Choose a server in the **Sites** list (The Teletext (Gopher+), Floodgap, Gopherpedia, or quux.org (Gopher+)), or type the address, for example gopher://gopher.teletext.ca. You may leave out gopher://, and add a port after the host, as in gopher.teletext.ca:70.
+3. Choose OK.
 
-- **Home** opens gopher://gopher.teletext.ca/.
-- **Refresh** fetches the current menu or document again.
-- **Back** and **Forward** move through what you have seen.
+The status bar shows "Connecting...", then how many bytes have arrived, then "Menu: Done" or "Document: Done". The name of the menu or document you are reading is shown above it.
 
-Nothing is fetched until you choose Go or Home.
+Nothing is fetched until you choose Home or Gopher to.
 
-@topic gopher_settings | Gopher Settings | Gopher;settings;history | gopher
-The Gopher service has no settings. It remembers the last 64 menus and documents for Back and Forward while Navigator runs, and nothing after it closes. The usual Gopher {{gl_port|port}}, 70, is used unless the address names another.
+@topic gopher_settings | Gopher Settings | Gopher;settings;history;Back | gopher
+The Gopher service has no settings. While Navigator runs, it remembers the last 64 menus and documents for Back, each with the item you had chosen and how far you had scrolled; nothing is kept after it closes. The usual Gopher {{gl_port|port}}, 70, is used unless the address names another.
 
-@topic gopher_usage | Using Gopher Menus | Gopher;menu items;searching;pictures;sound;saving files;copying text | gopher
-Each menu item has an icon for its kind. Items you can open are shown in blue; point to one and the pointer becomes a hand. Click to open it:
+@topic gopher_usage | Using Gopher Menus | Gopher;menu items;current item;Up;Back;Item Info;searching;pictures;sound;saving files;copying text;keys;Gopher+ | gopher
+A Gopher menu is a list, shown one menu at a time, as the Gopher programs of the early 1990s showed it. Each item has an icon for its kind; lines without an icon are information from the server and cannot be chosen.
 
-- **Menus** and **text documents** open in the window.
+One item is the current item, shown highlighted. Click an item to make it current, or move with the UP ARROW and DOWN ARROW keys, PAGE UP, PAGE DOWN, HOME and END. To open the current item, press ENTER, or double-click the item:
+
+- **Menus** and **text documents** open in place of the menu you are reading.
+- **Searches** open the Gopher Search dialog box. Type the words to find and choose OK; the results are shown as a menu, titled with your words.
 - **Pictures** (GIF and other images) open in a window of their own. Close it with its Control-menu box.
-- **Searches** open the Gopher Search dialog box. Type the words to find and choose OK; the results are shown as a menu.
 - **Sounds** play through your speakers.
-- **Files** open a Save As dialog box, so you can choose where to save them. Files whose names end in .mp3 or .au are played instead.
+- **Files** and **archives** open a Save As dialog box, so you can choose where to save them. Files whose names end in .mp3 or .au are played instead.
+- **Web links** whose address is given open in the [[web_overview|Web]] service.
 
-Telnet, video and archive items are shown with their icons, but cannot be opened.
+Telnet sessions, video and other kinds of item are shown with their icons, but cannot be opened. The status bar names the kind of the current item, and the server it comes from when that is another one.
+
+Items from a Gopher+ server can tell more about themselves, come in more than one format, or ask questions before they answer: see [[gopher_plus|Gopher+ Attributes, Views and Forms]].
+
+= Going back
+- **Up** (or BACKSPACE, or U) returns to the menu you opened this one from, with the same item chosen.
+- **Back** (or ALT+LEFT ARROW) returns to what you were reading before, whatever it was.
+- **Home** (or M) opens The Teletext's Gopher server.
+
+Menus you return to are shown again at once, as you left them. To fetch the current menu or document again, press F5, or click with the right mouse button and choose Refresh.
+
+= Item Info
+Choose **Item Info** (or press CTRL+I, or =) to see the current item's name, kind, server, port, selector and Gopher address, and the address of what you are reading.
 
 = Copying text
-Drag across text to select it (a click without dragging opens the item under the pointer). Press CTRL+C to copy, CTRL+A to select everything, or click with the right mouse button for the same commands.
+In a menu, CTRL+C copies the name of the current item. In a text document, drag across text to select it, then press CTRL+C to copy, or CTRL+A to select everything. Click with the right mouse button for the same commands.
 
 = Scrolling
-Use the scroll bar, the mouse wheel, or the arrow keys, PAGE UP, PAGE DOWN, HOME and END.
+Use the scroll bar or the mouse wheel. In a menu, the arrow keys move from item to item, and scroll through the information lines when no item is near; in a text document they scroll the text.
 
 Gopher links followed in the [[web_overview|Web]] service open here.
 
-@topic gopher_trouble | Gopher Troubleshooting | Gopher;troubleshooting;errors;Stop | gopher
-= Stop does not stop at once
-Stop asks the transfer to end; the Gopher service waits until the server stops sending, at most 15 seconds.
+@topic gopher_plus | Gopher+ Attributes, Views and Forms | Gopher+;attributes;views;forms;abstract;Open View;Gopher+ Attributes;Gopher+ Form;Choose a View;Gopher+ lamp;lamp | gopher
+= About Gopher+
+{{gl_gopherplus|Gopher+}} is the set of extensions that the University of Minnesota added to Gopher in 1993. A Gopher+ server can say more about each item: who looks after it, when it last changed, a short abstract, and the formats, or {{gl_view|views}}, in which it can be sent. It can also ask the reader questions in a form before it answers.
 
-= "a fetch is already in flight; press Stop first."
-Only one menu or document is fetched at a time. Wait for it, or choose Stop.
+Navigator uses Gopher+ only for items that the server marks as Gopher+ in its menu. Every other item is fetched in plain Gopher, exactly as before. Opening a Gopher+ item fetches it the Gopher+ way; if the server answers in plain Gopher instead, the item is shown all the same and the status bar says so.
 
-= "malformed URL."
-The address in the Selector box is not a Gopher address. It should look like gopher://host/ or gopher://host/1/path.
+= Abstracts
+When a menu comes from a Gopher+ server, Navigator asks that server once for the attributes of the whole menu, after the menu is on the screen. Where an item has an abstract, it appears when you point at the item, and on the status bar when the item is current.
 
-= An item does nothing when clicked
-Some kinds of item (Telnet sessions, video, archives and Web links) cannot be opened by the Gopher service.
+= The Gopher+ lamp
+At the right end of the status bar, the Gopher tab shows a small green display marked GOPHER+. It lights when the server of the menu or document on the screen is a Gopher+ server, and stays dark for a plain Gopher server or when nothing is open. Navigator knows a Gopher+ server from what that server has already sent: a menu that marks its own items as Gopher+, or an item that came back the Gopher+ way. The lamp never makes Navigator ask a server anything. It is a light only; clicking it does nothing.
+
+= Gopher+ Attributes
+Click a Gopher+ item with the right mouse button and choose **Gopher+ Attributes...** The window lists the item's administrator, when it was last changed, its views, its abstract and anything else the server tells about it. The command is grayed for items that are not Gopher+.
+
+= Views
+Some Gopher+ items can be sent in more than one format or language. Click the item with the right mouse button and choose **Open View...** The Choose a View dialog box lists the views, the one the server prefers first, each with its language and approximate size. Choose **Open** to read the view, or **Save As...** to save it to a file. A server may send its preferred view instead of the one you asked for.
+
+Gopher+ pictures, movies and sounds open in the view the server prefers. Refresh fetches the same view again.
+
+= Forms
+Some Gopher+ items ask questions before they answer. Opening one shows the Gopher+ Form dialog box, with the server's questions in its order: fields to type in, a field that shows asterisks for a password, a box for several lines, option buttons to choose one answer, and check boxes. Choose OK to send your answers, or Cancel to send nothing. The server's answer opens like any other menu or document.
+
+- Answers are sent in the ISO Latin-1 character set, as Gopher+ defines. If an answer holds a character outside it, such as a Greek letter, the form says so and stays open for you to change it.
+- An answer line cannot be a single period (.): Gopher+ uses that line to end the answers.
+- Navigator does not fill in a form that asks for a file on your computer, to save to or to send. It says so, and nothing is sent.
+- Refresh does not send your answers again. To answer again, open the form again.
+
+= Gopher+ addresses
+A Gopher address can end with a Gopher+ request after two encoded tabs (%09): %09%09+ fetches the item the Gopher+ way, %09%09+text/plain fetches one view, %09%09! shows the item's attributes and %09%09$ those of every item in a menu. For example, gopher://gopher.quux.org/1/Archives%09%09! shows the attributes of a menu on a Gopher+ server. Navigator sends such a request as it is written, whatever the server. A plain Gopher server takes it as words to search for, and what it sends back is shown as plain Gopher.
+
+@topic gopher_trouble | Gopher Troubleshooting | Gopher;troubleshooting;errors;Stop;Gopher+ | gopher
+= Stopping a transfer
+Choose **Stop**, or press ESC, while a menu, document or file is being fetched. The transfer ends at once and the status bar shows "Stopped"; what you were reading stays on the screen.
+
+= "a transfer is already running; press Stop first."
+Only one menu, document or file is fetched at a time. Wait for it, or choose Stop.
+
+= "that is not a Gopher address."
+The address typed in the Gopher to dialog box is not a Gopher address. It should look like gopher://host/ or gopher://host/1/path.
+
+= "... items cannot be opened in the Gopher service."
+Some kinds of item, such as Telnet sessions and video, are shown but cannot be opened.
+
+= "This Web link has no address Navigator can open."
+The server gives this Web item without an address of the form URL:http://...
 
 = "image decode failed."
 The picture could not be read.
 
 = "Audio service busy (Stop first)."
 A sound is already playing.
+
+= "Gopher+ error 1 (the item is not available)"
+The Gopher+ server reports an error. Error 1 means the item is not there, error 2 that the server asks you to try again later, and error 3 that the item has moved: the status bar shows where to. The rest of the line is the server's own message.
+
+= "(the server answered without Gopher+)"
+The item is marked as Gopher+, but the server answered in plain Gopher. What it sent is shown as usual.
+
+= "(shorter than the server announced)"
+A Gopher+ server said how long its answer would be, and less arrived. What did arrive is shown.
+
+= "the server did not answer with attributes."
+Gopher+ Attributes or Open View was chosen, but the server sent something else. The server may not support Gopher+ fully.
+
+= "This form cannot be filled in here"
+The form asks for a file on your computer, or holds a question that Gopher+ does not define. Navigator sends nothing for it.
+
+= "This page is the server's answer to a form"
+Refresh does not send a form's answers again. Open the form again to send new answers.
 
 @topic arpa_overview | ARPANET | ARPANET;FTP-Mail;mail;sending a message;overview | arpa
 = About the ARPANET and FTP-Mail

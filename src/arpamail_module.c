@@ -665,6 +665,9 @@ static LRESULT CALLBACK ToEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
 
 static LRESULT CALLBACK BodyEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
 {
+    /* R1.2: the empty body while not connected carries the watermark */
+    if (m == WM_PAINT && !g_a_connected && GetWindowTextLengthA(h) == 0)
+        return w31_paint_with_watermark(h, g_orig_body_proc, w, l);     /* clipped, 2026-11-27 */
     /* Trigger B per blueprint 4.1: a plain Enter (no Ctrl) that
      * completes a logical line whose entire content is exactly one
      * period byte (0x2E) and nothing else, including no spaces or
@@ -817,6 +820,8 @@ void arpamail_module_activate(HWND content)
         0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_ARPA_CONNECT_BTN,
         hInst, NULL);
     g_a_disconnect_btn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+    w31_connect_on_enter(g_a_server_edit, g_a_connect_btn);   /* Navigator 2.0 part 7 */
+    w31_connect_on_enter(g_a_port_edit,   g_a_connect_btn);
 
     /* Row 2: Protocol label (hardwired). */
     g_a_proto_lbl = CreateWindowA("STATIC", "Protocol: FTP-Mail (RFC 765)",
@@ -844,6 +849,10 @@ void arpamail_module_activate(HWND content)
         0, 0, 200, 200, content, (HMENU)(INT_PTR)IDC_ARPA_BODY_EDIT,
         hInst, NULL);
     SendMessageA(g_a_body_edit, EM_SETLIMITTEXT, (WPARAM)(ARPA_MAX_BODY * 2), 0);
+    /* 2026-11-24: a click on the empty body while not connected (the power
+     * watermark) connects. The body is disabled then, so its clicks reach
+     * the parent; the shared helper watches there. */
+    w31_connect_click_disabled_pane(g_a_body_edit, g_a_connect_btn);
 
     /* Bottom row: counter + Send + Clear. */
     g_a_count_lbl = CreateWindowA("STATIC", "",

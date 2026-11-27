@@ -8,7 +8,9 @@
  * See /COPYING for the full license text.
  *
  * A gophermap is CRLF-separated. Each line is of the shape:
- *   <type-char><display>\t<selector>\t<host>\t<port>
+ *   <type-char><display>\t<selector>\t<host>\t<port>[\t<gopher+ field>]
+ * The optional fifth field is the Gopher+ marker, "+" or "?" (memo s2.2 and
+ * s2.8: G+Field ::= '+' | '?'); anything else there is ignored. Lines come
  * with bare LF tolerated and a terminating ".\r\n" optionally present.
  * The parser is defensive: malformed lines (missing tabs, no type char)
  * are treated as type 'i' informational text, never dropped.
@@ -29,6 +31,8 @@ typedef struct {
     char *selector;    /* selector string for the click, malloc'd            */
     char *host;        /* host for the click, malloc'd                        */
     int   port;
+    char  gplus;       /* the Gopher+ marker after the port: '+', '?' or 0
+                          (docs/2026-11-22_GOPHER_PLUS_PHASE2.md)            */
 } GopherItem;
 
 /* Parse `buf` (len bytes) into an array of items. Returns the count;

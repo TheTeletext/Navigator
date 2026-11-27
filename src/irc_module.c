@@ -36,6 +36,7 @@
 #include "vt_term.h"
 #include "irc_client.h"
 #include "suite_clipboard.h"
+#include "suite_sites.h"   /* Navigator 2.0: the Site list (2026-11-25) */
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -80,6 +81,7 @@
 #define IDC_IRC_CHAN_EDIT      6204
 #define IDC_IRC_CONNECT_BTN    6205
 #define IDC_IRC_DISCONNECT_BTN 6206
+#define IDC_IRC_SITE_CMB       6207   /* Navigator 2.0 (2026-11-25): the Site list */
 #define IRC_RENDER_CLASS      "MGTIrcViewerV1"
 
 #define WM_IRC_NOTIFY         (WM_USER + 41)
@@ -110,6 +112,9 @@ static HWND   g_hRender         = NULL;
 static HWND   g_hServerLbl,  g_hServerEdit;
 static HWND   g_hPortLbl,    g_hPortEdit;
 static HWND   g_hChanLbl,    g_hHashLbl,   g_hChanEdit;
+static HWND   g_hSiteLbl,    g_hSiteCmb;      /* Navigator 2.0: the Site list */
+static BOOL   g_site_filling     = FALSE;     /* a pick is writing the fields */
+static WNDPROC g_server_old_proc = NULL;      /* the Server field, before the paste hook */
 static HWND   g_hConnectBtn, g_hDisconnectBtn;   /* 2026-11-11: Disconnect retired
                                                     (one toggle); stays NULL */
 static BOOL   g_controls_created = FALSE;
@@ -344,6 +349,33 @@ static void on_irc_failed(IrcMessage *m)
     if (m) irc_client_free_message(m);
 }
 
+/* Navigator 2.0 (2026-11-25): a registered session ended by the server
+ * with an ERROR line (a "Closing Link", a ban). The transport has stopped
+ * and will not reconnect; say so in the server's words and return to the
+ * disconnected state, as a failure does. */
+static void on_irc_ended(IrcMessage *m)
+{
+    const char *reason = (m && m->text[0]) ? m->text : "Closing Link";
+    char        line[1200];
+
+    _snprintf(line, sizeof(line), "* Disconnected by the server: %s\r\n", reason);
+    line[sizeof(line) - 1] = '\0';
+    feed_line(line);
+    if (g_hRender) InvalidateRect(g_hRender, NULL, FALSE);
+
+    {
+        char st[320];
+        _snprintf(st, sizeof(st), "Disconnected by the server: %s", reason);
+        st[sizeof(st) - 1] = '\0';
+        suite_set_status(st);
+    }
+
+    if (g_client) { irc_client_close(g_client); g_client = NULL; }
+    irc_set_connected_state(FALSE);
+
+    if (m) irc_client_free_message(m);
+}
+
 /* Registration reached (numeric 001). Replace the "Connecting..." status
  * with the real connected state. Guarded on g_connected so a stray event
  * arriving just after a user Disconnect cannot resurrect a stale status.
@@ -516,6 +548,9 @@ static void paint_view(HWND hwnd)
         if (old_font) SelectObject(mem_dc, old_font);
     }
 
+    /* R1.2: an empty pane, never connected or cleared: the watermark */
+    if (!g_fed_any && !g_connected) w31_draw_power_watermark(mem_dc, &rc);
+
     BitBlt(hdc,
            ps.rcPaint.left, ps.rcPaint.top,
            ps.rcPaint.right  - ps.rcPaint.left,
@@ -588,6 +623,10 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         int y = GET_Y_LPARAM(lParam);
         int vis, col, logical_row;
         SetFocus(hwnd);
+        /* 2026-11-24: a click on the empty pane while not connected (the
+         * power watermark, R1.2) connects; a previous session's scrollback
+         * keeps its click-to-select */
+        if (!g_fed_any && !g_connected && w31_connect_click(g_hConnectBtn)) return 0;
         if (!g_term_inited) return 0;
         pixel_to_cell(x, y, &vis, &col);
         logical_row = vt_term_visible_to_logical(&g_term, vis);
@@ -753,6 +792,7 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         if (wParam == IRC_EVT_MESSAGE)         on_irc_message((IrcMessage *)lParam);
         else if (wParam == IRC_EVT_SYSTEM)     on_irc_system((IrcMessage *)lParam);
         else if (wParam == IRC_EVT_FAILED)     on_irc_failed((IrcMessage *)lParam);
+        else if (wParam == IRC_EVT_ENDED)      on_irc_ended((IrcMessage *)lParam);
         else if (wParam == IRC_EVT_REGISTERED) on_irc_registered();
         else if (wParam == IRC_EVT_JOINED)     on_irc_joined();
         return 0;
@@ -782,7 +822,108 @@ static void irc_set_connected_state(BOOL connected)
     EnableWindow(g_hServerEdit,     !connected);
     EnableWindow(g_hPortEdit,       !connected);
     EnableWindow(g_hChanEdit,       !connected);
+    if (g_hSiteCmb) EnableWindow(g_hSiteCmb, !connected);   /* Navigator 2.0 */
     w31_toggle_set(g_hConnectBtn, connected);
+}
+
+/* ---------- Navigator 2.0 Site list (2026-11-25, docs/2026-11-25_
+ * NAVIGATOR_SITELISTS_2B_IRC_BUILD.md): a pick fills Server, Port and
+ * Channel as text; Connect stays the user's act. ---------- */
+
+/* The list shows the entry the three fields name now, or nothing. */
+static void irc_site_sync(void)
+{
+    char host[256], port[16], chan[64];
+    int sel;
+    if (!g_hSiteCmb || g_site_filling) return;
+    GetWindowTextA(g_hServerEdit, host, sizeof host);
+    GetWindowTextA(g_hPortEdit,   port, sizeof port);
+    GetWindowTextA(g_hChanEdit,   chan, sizeof chan);
+    sel = suite_sites_find_channel(SITES_TAB_IRC, host, atoi(port), chan);
+    if ((int)SendMessageA(g_hSiteCmb, CB_GETCURSEL, 0, 0) != sel)
+        SendMessageA(g_hSiteCmb, CB_SETCURSEL, (WPARAM)sel, 0);
+}
+
+static void irc_pick_site(int idx)
+{
+    int n;
+    const suite_site_t *t = suite_sites_table(SITES_TAB_IRC, &n);
+    suite_site_addr_t a;
+    char port[16], st[400];
+    if (!t || idx < 0 || idx >= n || g_connected) return;
+    if (suite_sites_parse(t[idx].address, &a) != SITES_OK) return;
+    g_site_filling = TRUE;
+    SetWindowTextA(g_hServerEdit, a.host);
+    _snprintf(port, sizeof port, "%d", a.port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_hPortEdit, port);
+    /* an entry with no channel clears the field, so a channel meant for
+     * another network is not carried over */
+    SetWindowTextA(g_hChanEdit, a.channel);
+    g_site_filling = FALSE;
+    SendMessageA(g_hSiteCmb, CB_SETCURSEL, (WPARAM)idx, 0);
+    if (a.channel[0])
+        _snprintf(st, sizeof st, "%s: %s port %d, #%s. Press Connect to join.",
+                  t[idx].label, a.host, a.port, a.channel);
+    else
+        _snprintf(st, sizeof st, "%s: %s port %d. No channel is set for this network: type one in Channel, then press Connect.",
+                  t[idx].label, a.host, a.port);
+    st[sizeof st - 1] = '\0';
+    suite_set_status(st);
+}
+
+/* A full address in Server (pasted, typed, or there at Connect): an
+ * irc:// address, or host:port, fills Server, Port and (when it names
+ * one) Channel through the strict host-field parser. A plain host name
+ * is left alone. Returns FALSE when the text is an address that cannot be
+ * used, after saying why. */
+static BOOL irc_apply_address(void)
+{
+    char text[SITES_HOST_MAX + SITES_PATH_MAX + 32], port[16], st[600];
+    const char *colon;
+    suite_site_addr_t a;
+    int rc;
+    GetWindowTextA(g_hServerEdit, text, sizeof text);
+    colon = strchr(text, ':');
+    /* only an address: "://", "host:port" (one colon) or "[v6]:port" */
+    if (!strstr(text, "://") && !(colon && !strchr(colon + 1, ':')) && text[0] != '[')
+        return TRUE;
+    rc = suite_sites_parse_hostport(text, SITES_SCHEME_IRC, &a);
+    if (rc == SITES_UNSUPPORTED) {
+        suite_set_status("Secure IRC (ircs://) is not supported in this version.");
+        return FALSE;
+    }
+    if (rc != SITES_OK) {
+        suite_set_status("The Server box takes a host name, host:port, or an irc:// address.");
+        return FALSE;
+    }
+    SetWindowTextA(g_hServerEdit, a.host);
+    _snprintf(port, sizeof port, "%d", a.port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_hPortEdit, port);
+    if (a.channel[0]) {
+        SetWindowTextA(g_hChanEdit, a.channel);
+        _snprintf(st, sizeof st, "Address filled in: %s port %d, #%s.", a.host, a.port, a.channel);
+    } else {
+        _snprintf(st, sizeof st, "Address filled in: %s port %d.", a.host, a.port);
+    }
+    st[sizeof st - 1] = '\0';
+    suite_set_status(st);
+    return TRUE;
+}
+
+/* The Server field: after a paste (the context menu's WM_PASTE, Ctrl+V,
+ * Shift+Insert) the field already holds the text when the original
+ * procedure returns; a full address then fills the fields. */
+static LRESULT CALLBACK IrcServerProc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    LRESULT r = CallWindowProcA(g_server_old_proc, h, m, w, l);
+    if (!g_connected
+        && (m == WM_PASTE
+            || (m == WM_CHAR && w == 0x16)
+            || (m == WM_KEYDOWN && w == VK_INSERT && (GetKeyState(VK_SHIFT) & 0x8000))))
+        irc_apply_address();
+    return r;
 }
 
 /* Connect: read host/port/channel from the fields, normalize the channel
@@ -797,6 +938,7 @@ static void irc_on_connect(HWND content)
 
     (void)content;
     if (g_connected) return;
+    if (!irc_apply_address()) return;     /* Navigator 2.0: a full address in Server */
 
     GetWindowTextA(g_hServerEdit, host,  sizeof(host));
     GetWindowTextA(g_hPortEdit,   ports, sizeof(ports));
@@ -919,6 +1061,13 @@ void irc_module_resize(HWND content, int w, int h)
     MoveWindow(g_hChanLbl,    margin + 439, 18, 58,  22,    TRUE);
     MoveWindow(g_hHashLbl,    margin + 505, 14, 12,  row_h, TRUE);
     MoveWindow(g_hChanEdit,   margin + 517, 14, 130, row_h, TRUE);
+    {   /* Navigator 2.0: Site label + list after Channel, kept clear of the toggle */
+        int sx = margin + 517 + 130 + 28, cw = 150;
+        int room = (w - margin - W31_TOGGLE_W - 14) - (sx + 32);
+        if (cw > room) cw = room < 80 ? 80 : room;
+        MoveWindow(g_hSiteLbl, sx, 18, 30, 22, TRUE);
+        MoveWindow(g_hSiteCmb, sx + 32, 14, cw, 200, TRUE);   /* height includes the list */
+    }
     /* The Connect/Disconnect toggle: right end of the strip, centred on
      * the field row (y 14, 26 high). */
     MoveWindow(g_hConnectBtn, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2,
@@ -951,6 +1100,8 @@ void irc_module_activate(HWND content)
         ShowWindow(g_hChanLbl,       SW_SHOW);
         ShowWindow(g_hHashLbl,       SW_SHOW);
         ShowWindow(g_hChanEdit,      SW_SHOW);
+        ShowWindow(g_hSiteLbl,       SW_SHOW);
+        ShowWindow(g_hSiteCmb,       SW_SHOW);
         ShowWindow(g_hConnectBtn,    SW_SHOW);
         ShowWindow(g_hDisconnectBtn, SW_SHOW);
         ShowWindow(g_hRender,        SW_SHOW);
@@ -1016,6 +1167,18 @@ void irc_module_activate(HWND content)
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
         0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_IRC_CONNECT_BTN, hInst, NULL);
     g_hDisconnectBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+    w31_connect_on_enter(g_hServerEdit, g_hConnectBtn);   /* Navigator 2.0 part 7 */
+    w31_connect_on_enter(g_hPortEdit,   g_hConnectBtn);
+    /* Navigator 2.0 (2026-11-25): the Site list, a drop-down LIST after
+     * Channel (the BBS pattern; the Windows 3.1 look comes from suite_w31
+     * by itself), and the paste hook on Server (chained after Enter's). */
+    g_hSiteLbl = CreateWindowA("STATIC", "Site:",
+        WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP, 0, 0, 30, 22, content, NULL, hInst, NULL);
+    g_hSiteCmb = CreateWindowA("COMBOBOX", "",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST,
+        0, 0, 150, 200, content, (HMENU)(INT_PTR)IDC_IRC_SITE_CMB, hInst, NULL);
+    suite_sites_fill_combo(g_hSiteCmb, SITES_TAB_IRC);
+    g_server_old_proc = (WNDPROC)SetWindowLongPtrA(g_hServerEdit, GWLP_WNDPROC, (LONG_PTR)IrcServerProc);
 
     if (g_hFontUI) {
         SendMessageA(g_hServerLbl,     WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
@@ -1025,6 +1188,8 @@ void irc_module_activate(HWND content)
         SendMessageA(g_hChanLbl,       WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         SendMessageA(g_hHashLbl,       WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         SendMessageA(g_hChanEdit,      WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
+        SendMessageA(g_hSiteLbl,       WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
+        SendMessageA(g_hSiteCmb,       WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         SendMessageA(g_hConnectBtn,    WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         SendMessageA(g_hDisconnectBtn, WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
     }
@@ -1044,6 +1209,7 @@ void irc_module_activate(HWND content)
      * reachable, Disconnect grayed -- and wait for the user to press
      * Connect. Focus the Server field like WAIS does pre-connect. */
     irc_set_connected_state(FALSE);
+    irc_site_sync();                 /* the defaults are The Teletext's entry */
     SetFocus(g_hServerEdit);
 }
 
@@ -1061,6 +1227,8 @@ void irc_module_deactivate(HWND content)
     ShowWindow(g_hChanLbl,       SW_HIDE);
     ShowWindow(g_hHashLbl,       SW_HIDE);
     ShowWindow(g_hChanEdit,      SW_HIDE);
+    ShowWindow(g_hSiteLbl,       SW_HIDE);
+    ShowWindow(g_hSiteCmb,       SW_HIDE);
     ShowWindow(g_hConnectBtn,    SW_HIDE);
     ShowWindow(g_hDisconnectBtn, SW_HIDE);
     ShowWindow(g_hRender,        SW_HIDE);
@@ -1082,6 +1250,21 @@ BOOL irc_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
         break;
     case IDC_IRC_DISCONNECT_BTN:
         if (notif == BN_CLICKED) { irc_on_disconnect(content); return TRUE; }
+        break;
+    case IDC_IRC_SITE_CMB:
+        /* act once the list is closed, as the BBS Site list does */
+        if ((notif == CBN_SELCHANGE && !SendMessageA((HWND)lParam, CB_GETDROPPEDSTATE, 0, 0))
+            || notif == CBN_CLOSEUP) {
+            int sel = (int)SendMessageA((HWND)lParam, CB_GETCURSEL, 0, 0);
+            if (sel >= 0 && !g_connected) irc_pick_site(sel);
+            else irc_site_sync();          /* closed with nothing picked */
+        }
+        return TRUE;
+    case IDC_IRC_SERVER_EDIT:
+    case IDC_IRC_PORT_EDIT:
+    case IDC_IRC_CHAN_EDIT:
+        if (notif == EN_CHANGE) { irc_site_sync(); return TRUE; }
+        if (id == IDC_IRC_SERVER_EDIT && notif == EN_KILLFOCUS && !g_connected) { irc_apply_address(); return TRUE; }
         break;
     }
     return FALSE;   /* the render child handles its own context-menu WM_COMMAND */

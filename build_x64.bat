@@ -133,7 +133,7 @@ for %%f in (sockets_win win_stubs) do (
 )
 
 echo Compiling Navigator shell and modules...
-for %%f in (suite_shell suite_w31 suite_infodlg suite_config home_module suite_help suite_fonts suite_branding suite_clipboard suite_logo http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_tty rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module ansi_term bbs_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service) do (
+for %%f in (suite_shell suite_w31 suite_infodlg suite_w98dlg channel_add suite_config home_module suite_help suite_fonts suite_branding suite_clipboard suite_logo suite_netgate cdf_model channel_store web_channels web_toolbar http_fetch suite_sha256 suite_update audio_format_detect wav_parser tsp_metafile truespeech_decoder wais_module arpamail_module archie_ardp archie_module line_conn ftp_ctrl ftp_fetch ftp_list ftp_module nntp_client news_mime newsgroups_module vt_term telnet_proto finger_proto qotd_proto telnet_module irc_client irc_module rip_ega rip_parser rip_tty rip_text rip_button rip_hershey_data rip_font8x8_data ripscrip_module ansi_term bbs_module naplps_surface naplps_decode naplps_font_data naplps_module minitel_decode minitel_screen minitel_font_data minitel_view cuseeme_proto cuseeme_video cuseeme_deltamod cuseeme_mulaw cuseeme_idvi cuseeme_mac cuseeme_module audio_meter_service suite_sites ws_proto) do (
     echo   %%f.c
     %CC% %CFLAGS_SUITE% -c -o src\%%f.o src\%%f.c
     if errorlevel 1 exit /b 1
@@ -203,6 +203,10 @@ echo   web_module_cdf.c (Active Channel parser + dialog, libwww-driven, uses CFL
 %CC% %CFLAGS_WEB% -c -o src\web_module_cdf.o src\web_module_cdf.c
 if errorlevel 1 exit /b 1
 
+echo   desktop_items.c (Teletext Desktop items: own WebRenderView, uses CFLAGS_WEB)
+%CC% %CFLAGS_WEB% -c -o src\desktop_items.o src\desktop_items.c
+if errorlevel 1 exit /b 1
+
 echo   audio_service.c (shared Sun .au + MP3 player, libwww + winmm + minimp3, uses CFLAGS_WEB)
 %CC% %CFLAGS_WEB% -c -o src\audio_service.o src\audio_service.c
 if errorlevel 1 exit /b 1
@@ -222,6 +226,12 @@ if errorlevel 1 exit /b 1
 echo   gopher_search_dialog.c (type 7 modal, in-memory DLGTEMPLATE)
 %CC% %CFLAGS_SUITE% -c -o src\gopher_search_dialog.o src\gopher_search_dialog.c
 if errorlevel 1 exit /b 1
+echo   gopher_plus.c (Gopher+ attributes, views, ASK; no I/O)
+%CC% %CFLAGS_SUITE% -c -o src\gopher_plus.o src\gopher_plus.c
+if errorlevel 1 exit /b 1
+echo   gopher_plus_dlg.c (Gopher+ Choose a View and form dialogs)
+%CC% %CFLAGS_SUITE% -c -o src\gopher_plus_dlg.o src\gopher_plus_dlg.c
+if errorlevel 1 exit /b 1
 
 echo   suite.rc (icon + embedded fonts + version resource)
 %WINDRES% -i src\suite.rc -O coff -o src\suite_res.o
@@ -235,8 +245,9 @@ echo Linking %TARGET%...
     src\wais\ustubs.o src\wais\ui_win.o ^
     %LWWW_OBJS% ^
     src\sockets_win.o src\win_stubs.o ^
-    src\suite_shell.o src\suite_w31.o src\suite_infodlg.o src\suite_config.o src\home_module.o src\suite_help.o src\suite_fonts.o src\suite_branding.o ^
+    src\suite_shell.o src\suite_w31.o src\suite_infodlg.o src\suite_w98dlg.o src\channel_add.o src\suite_config.o src\home_module.o src\suite_help.o src\suite_fonts.o src\suite_branding.o ^
     src\suite_clipboard.o src\suite_logo.o ^
+    src\suite_netgate.o src\cdf_model.o src\channel_store.o src\web_channels.o src\web_toolbar.o src\desktop_items.o ^
     src\http_fetch.o src\suite_sha256.o src\suite_update.o ^
     src\wais_module.o src\arpamail_module.o src\web_module.o ^
     src\archie_ardp.o src\archie_module.o src\line_conn.o src\ftp_ctrl.o src\ftp_fetch.o src\ftp_list.o src\ftp_module.o ^
@@ -245,7 +256,7 @@ echo Linking %TARGET%...
     src\audio_service.o src\audio_format_detect.o ^
     src\wav_parser.o src\tsp_metafile.o src\truespeech_decoder.o ^
     src\gopher_protocol.o src\gophermap.o src\gopher_module.o ^
-    src\gopher_search_dialog.o ^
+    src\gopher_search_dialog.o src\gopher_plus.o src\gopher_plus_dlg.o ^
     src\vt_term.o src\telnet_proto.o src\finger_proto.o src\qotd_proto.o ^
     src\telnet_module.o ^
     src\irc_client.o src\irc_module.o ^
@@ -272,7 +283,7 @@ echo Linking %TARGET%...
     third_party\mbzm\crc16.o third_party\mbzm\crc32.o ^
     src\cuseeme_proto.o src\cuseeme_video.o src\cuseeme_deltamod.o ^
     src\cuseeme_mulaw.o src\cuseeme_idvi.o src\cuseeme_mac.o src\cuseeme_module.o ^
-    src\audio_meter_service.o ^
+    src\audio_meter_service.o src\suite_sites.o src\ws_proto.o ^
     src\suite_res.o ^
     %LDFLAGS%
 if errorlevel 1 exit /b 1

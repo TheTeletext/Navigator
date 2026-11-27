@@ -24,6 +24,9 @@ Creators of Archie, the first Internet search engine, McGill University, 1989
 
 **Bunyip Information Systems, Inc.**
 Commercial development of Archie, through the final 3.5 release, 1996
+The Retro Web forms were built and checked against Bunyip's own Archie 3.5
+query forms as archie.teletext.ca serves them; no code of the gateway is in
+Navigator.
 
 **ICM, University of Warsaw**
 Preserved the last surviving copy of the Archie source
@@ -99,6 +102,15 @@ Authors of RFC 854, the Telnet Protocol Specification
 
 **Digital Equipment Corporation**
 The VT220 terminal this module emulates
+
+### Bulletin boards (the BBS tab's Site list)
+
+**The sysops of the boards in the BBS tab's Site list**
+CVCFED BBS, MtlGeek, Vertrauen BBS, The Keep BBS, Diamond Mine Online, The
+Crazy Terminal BBS, The Gate BBS, Slimelite BBS, Reign of Fire BBS, Nuclear
+Reactor BBS, Rolling BBS, Atari Gateway and 13th Floor BBS are independent
+boards; Navigator only names their public telnet addresses, and no code of
+theirs is in Navigator
 
 ### Finger
 
@@ -234,9 +246,11 @@ served beside the page
 
 **Jean-Arthur Silve** and **the MiniPavi project**
 Author of the MiniPavi gateway (GPL), of which the estate runs its own copy
-at ws://videotex.teletext.ca/ws (and ws://minitel.teletext.ca/ws); the web
-terminal connects to it. It
-runs on the server and no code of it is in the page
+at ws://minitel.teletext.ca/; the web terminal connects to it. It
+runs on the server and no code of it is in the page. Navigator's Minitel
+Site list also names the public MiniPavi gateway, go.minipavi.fr, which
+Navigator reaches over plain WebSocket; no code of the gateway is in
+Navigator
 
 ---
 

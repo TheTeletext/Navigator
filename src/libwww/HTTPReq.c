@@ -516,7 +516,12 @@ PRIVATE int HTTPMakeRequest (HTStream * me, HTRequest * request)
 	if (parent_anchor) {
 	    char * act = HTAnchor_address((HTAnchor *) anchor);
 	    char * parent = HTAnchor_address((HTAnchor *) parent_anchor);
-#if 1
+	    /* TELETEXT NAVIGATOR MODIFICATION 2026-11-26: the Referer is the
+	    ** page's absolute address, as period browsers sent it; servers
+	    ** that guard images by Referer match the host, and a relative
+	    ** one ("../../index.html") is refused. Only image and background
+	    ** fetches set a parent anchor (src/web_module.c). */
+#if 0
 	    char * relative = HTRelative(parent, act);
 #else
 	    char * relative = HTParse(parent, act,

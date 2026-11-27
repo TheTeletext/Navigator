@@ -23,6 +23,7 @@
 
 #include "gopher_search_dialog.h"
 #include "suite_shell.h"
+#include "suite_sites.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -39,6 +40,8 @@
 #define IDC_GSD_PROMPT   1001
 #define IDC_GSD_CONTEXT  1002
 #define IDC_GSD_EDIT     1003
+#define IDC_GSD_SITES    1004   /* Navigator 2.0: the Sites list */
+#define IDC_GSD_SITESLBL 1005
 
 /* Dialog dimensions, in dialog base units (per LOWORD(GetDialogBaseUnits)). */
 #define DLG_W      260
@@ -52,6 +55,15 @@ static char       *g_gsd_out_query   = NULL;
 static const char *g_gsd_in_display  = NULL;
 static const char *g_gsd_in_selector = NULL;
 static HWND        g_gsd_parent_top  = NULL;
+/* Gopher to (was Go To; 2026-11-20): the same box with its own caption, a context line
+ * given whole, and the edit prefilled. NULL = the search box as before. */
+static const char *g_gsd_in_caption  = NULL;
+static const char *g_gsd_in_context  = NULL;
+static const char *g_gsd_in_initial  = NULL;
+/* Navigator 2.0: the suite_sites table the Sites list shows, or -1 for a
+ * prompt without one (the search box, and every caller before 2.0). */
+static int         g_gsd_sites_tab   = -1;
+static BOOL        g_gsd_filling     = FALSE;
 
 /* ---------- DLGTEMPLATE assembly helpers ---------- */
 
@@ -131,7 +143,13 @@ static DLGTEMPLATE *build_template(WORD *out_total_size, WORD *out_item_count)
     static unsigned char buf[4096];
     unsigned char       *p = buf;
     DLGTEMPLATE         *dt;
-    WORD                 items = 5;
+    BOOL                 sites = (g_gsd_sites_tab >= 0);
+    WORD                 items = (WORD)(sites ? 7 : 5);
+    /* Navigator 2.0: with a Sites list the prompt, context line and edit
+     * move down one row; the dialog keeps its size. */
+    short                y_prompt = sites ? 28 : 8,  h_prompt = sites ? 12 : 16;
+    short                y_ctx    = sites ? 42 : 28;
+    short                y_edit   = sites ? 58 : 50;
     wchar_t              prompt_w[512];
     wchar_t              context_w[1024];
 
@@ -148,7 +166,13 @@ static DLGTEMPLATE *build_template(WORD *out_total_size, WORD *out_item_count)
     /* Menu, class, title (UTF-16, NUL-terminated). */
     p = emit_utf16(p, NULL);                       /* menu */
     p = emit_utf16(p, NULL);                       /* class (default) */
-    p = emit_utf16(p, L"Gopher Search");           /* caption */
+    {
+        wchar_t cap_w[128];
+        cap_w[0] = 0;
+        if (g_gsd_in_caption)
+            MultiByteToWideChar(CP_UTF8, 0, g_gsd_in_caption, -1, cap_w, 127);
+        p = emit_utf16(p, g_gsd_in_caption ? cap_w : L"Gopher Search");
+    }
 
     /* Font (DS_SETFONT): point size + face. */
     p = emit_word(p, 9);
@@ -164,28 +188,46 @@ static DLGTEMPLATE *build_template(WORD *out_total_size, WORD *out_item_count)
     {
         char  ctx_a[1024];
         ctx_a[0] = '\0';
-        _snprintf(ctx_a, sizeof(ctx_a), "Selector: %s",
-                  g_gsd_in_selector ? g_gsd_in_selector : "");
+        if (g_gsd_in_context)
+            _snprintf(ctx_a, sizeof(ctx_a), "%s", g_gsd_in_context);
+        else
+            _snprintf(ctx_a, sizeof(ctx_a), "Selector: %s",
+                      g_gsd_in_selector ? g_gsd_in_selector : "");
+        ctx_a[sizeof(ctx_a) - 1] = '\0';
         MultiByteToWideChar(CP_UTF8, 0, ctx_a, -1,
                             context_w, (int)(sizeof(context_w) / sizeof(wchar_t)) - 1);
+    }
+
+    /* (0) Navigator 2.0: "Sites:" and its drop-down LIST, above the
+     * address field. 0x0085 is the combo box class atom; the list height
+     * is the dropped list's. */
+    if (sites) {
+        p = emit_dlgitem(p,
+            SS_LEFT, 0,
+            10, 10, 30, 10,
+            IDC_GSD_SITESLBL, 0x0082, L"Sites:");
+        p = emit_dlgitem(p,
+            CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 0,
+            44, 8, DLG_W - 54, 80,
+            IDC_GSD_SITES, 0x0085, NULL);
     }
 
     /* (1) Prompt label: top of the dialog. */
     p = emit_dlgitem(p,
         SS_LEFT, 0,
-        10, 8, DLG_W - 20, 16,
+        10, y_prompt, DLG_W - 20, h_prompt,
         IDC_GSD_PROMPT, 0x0082, prompt_w);
 
     /* (2) Context label: muted selector line. */
     p = emit_dlgitem(p,
         SS_LEFT, 0,
-        10, 28, DLG_W - 20, 12,
+        10, y_ctx, DLG_W - 20, 12,
         IDC_GSD_CONTEXT, 0x0082, context_w);
 
     /* (3) Search EDIT: single-line, autoscroll. */
     p = emit_dlgitem(p,
         ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP, WS_EX_CLIENTEDGE,
-        10, 50, DLG_W - 20, 14,
+        10, y_edit, DLG_W - 20, 14,
         IDC_GSD_EDIT, 0x0081, NULL);
 
     /* (4) OK default pushbutton. */
@@ -205,6 +247,40 @@ static DLGTEMPLATE *build_template(WORD *out_total_size, WORD *out_item_count)
     return dt;
 }
 
+/* ---------- Navigator 2.0: the Sites list ---------- */
+
+/* The entry naming the server of an address ("gopher://host[:port]/...",
+ * or the same without the scheme, as the field also accepts), or -1. */
+static int gsd_site_of(const char *text)
+{
+    suite_site_addr_t a;
+    char buf[2100];
+    int rc;
+    if (!text || !text[0] || g_gsd_sites_tab < 0) return -1;
+    rc = suite_sites_parse(text, &a);
+    if (rc == SITES_NOT_ADDRESS) {
+        _snprintf(buf, sizeof buf - 1, "gopher://%s", text);
+        buf[sizeof buf - 1] = '\0';
+        rc = suite_sites_parse(buf, &a);
+    }
+    if (rc != SITES_OK || a.scheme != SITES_SCHEME_GOPHER) return -1;
+    return suite_sites_find(g_gsd_sites_tab, a.host, a.port);
+}
+
+/* The list shows the entry the address field names now, or nothing. */
+static void gsd_sites_sync(HWND h)
+{
+    char buf[2048];
+    HWND cb = GetDlgItem(h, IDC_GSD_SITES);
+    int sel;
+    if (!cb || g_gsd_filling) return;
+    buf[0] = '\0';
+    GetDlgItemTextA(h, IDC_GSD_EDIT, buf, (int)sizeof buf);
+    sel = gsd_site_of(buf);
+    if ((int)SendMessageA(cb, CB_GETCURSEL, 0, 0) != sel)
+        SendMessageA(cb, CB_SETCURSEL, (WPARAM)sel, 0);
+}
+
 /* ---------- dialog proc ---------- */
 
 static INT_PTR CALLBACK gsd_dialog_proc(HWND h, UINT m, WPARAM w, LPARAM l)
@@ -220,11 +296,41 @@ static INT_PTR CALLBACK gsd_dialog_proc(HWND h, UINT m, WPARAM w, LPARAM l)
                            &x, &y);
         SetWindowPos(h, NULL, x, y, 0, 0,
                      SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        if (g_gsd_sites_tab >= 0) {
+            /* fill before the address, so its EN_CHANGE can select */
+            suite_sites_fill_combo(GetDlgItem(h, IDC_GSD_SITES), g_gsd_sites_tab);
+            SendDlgItemMessageA(h, IDC_GSD_SITES, CB_SETCURSEL, (WPARAM)-1, 0);
+        }
+        if (g_gsd_in_initial && g_gsd_in_initial[0]) {
+            SetDlgItemTextA(h, IDC_GSD_EDIT, g_gsd_in_initial);
+            SendDlgItemMessageA(h, IDC_GSD_EDIT, EM_SETSEL, 0, -1);
+        }
+        gsd_sites_sync(h);
         SetFocus(GetDlgItem(h, IDC_GSD_EDIT));
         return FALSE;   /* we set focus ourselves */
     }
     case WM_COMMAND: {
         WORD id = LOWORD(w);
+        /* Navigator 2.0: a pick fills the address field; OK goes. Acted on
+         * once the list is closed, as the other lists in Navigator are. */
+        if (id == IDC_GSD_SITES) {
+            HWND cb = (HWND)l;
+            if ((HIWORD(w) == CBN_SELCHANGE && !SendMessageA(cb, CB_GETDROPPEDSTATE, 0, 0))
+                || HIWORD(w) == CBN_CLOSEUP) {
+                int n, sel = (int)SendMessageA(cb, CB_GETCURSEL, 0, 0);
+                const suite_site_t *t = suite_sites_table(g_gsd_sites_tab, &n);
+                if (t && sel >= 0 && sel < n) {
+                    g_gsd_filling = TRUE;
+                    SetDlgItemTextA(h, IDC_GSD_EDIT, t[sel].address);
+                    g_gsd_filling = FALSE;
+                }
+            }
+            return TRUE;
+        }
+        if (id == IDC_GSD_EDIT && HIWORD(w) == EN_CHANGE) {
+            gsd_sites_sync(h);
+            return TRUE;
+        }
         if (id == IDOK) {
             char buf[2048];
             UINT n;
@@ -262,6 +368,18 @@ int gopher_search_dialog_show(HWND parent_top_level,
                               const char *item_selector,
                               char **out_query)
 {
+    return gopher_prompt_dialog_show(parent_top_level, NULL, item_display,
+                                     item_selector, NULL, NULL, out_query);
+}
+
+int gopher_prompt_dialog_show(HWND parent_top_level,
+                              const char *caption,
+                              const char *item_display,
+                              const char *item_selector,
+                              const char *context_line,
+                              const char *initial_text,
+                              char **out_query)
+{
     DLGTEMPLATE *dt;
     WORD         total = 0, items = 0;
     INT_PTR      rc;
@@ -273,6 +391,9 @@ int gopher_search_dialog_show(HWND parent_top_level,
     g_gsd_in_selector = item_selector;
     g_gsd_parent_top  = parent_top_level;
     g_gsd_out_query   = NULL;
+    g_gsd_in_caption  = caption;
+    g_gsd_in_context  = context_line;
+    g_gsd_in_initial  = initial_text;
 
     dt = build_template(&total, &items);
     rc = DialogBoxIndirectParamA(
@@ -285,6 +406,9 @@ int gopher_search_dialog_show(HWND parent_top_level,
     g_gsd_in_display  = NULL;
     g_gsd_in_selector = NULL;
     g_gsd_parent_top  = NULL;
+    g_gsd_in_caption  = NULL;
+    g_gsd_in_context  = NULL;
+    g_gsd_in_initial  = NULL;
 
     if (rc == 1 && g_gsd_out_query) {
         *out_query = g_gsd_out_query;
@@ -296,4 +420,20 @@ int gopher_search_dialog_show(HWND parent_top_level,
         g_gsd_out_query = NULL;
     }
     return 0;
+}
+
+int gopher_prompt_dialog_show_sites(HWND parent_top_level,
+                                    const char *caption,
+                                    const char *item_display,
+                                    const char *context_line,
+                                    const char *initial_text,
+                                    int sites_tab,
+                                    char **out_query)
+{
+    int rc;
+    g_gsd_sites_tab = sites_tab;
+    rc = gopher_prompt_dialog_show(parent_top_level, caption, item_display,
+                                   NULL, context_line, initial_text, out_query);
+    g_gsd_sites_tab = -1;
+    return rc;
 }

@@ -675,6 +675,8 @@ static void nn_draw_two_line(HDC mem, const RECT *area,
     int   inset = 24, total, y, w;
 
     if (!head || !body) return;
+    /* R1.2: these two lines are only the idle (not connected) screens */
+    w31_draw_power_watermark(mem, area);
 
     w = (area->right - area->left) - 2 * inset;
     if (w < 80) w = area->right - area->left;
@@ -696,6 +698,11 @@ static void nn_draw_two_line(HDC mem, const RECT *area,
     total = (rh.bottom - rh.top) + 6 + (rb.bottom - rb.top);
     y = area->top + ((area->bottom - area->top) - total) / 2;
     if (y < area->top) y = area->top;
+    {
+        /* A1 (2026-11-23): the pair starts below the button */
+        int tt = w31_power_watermark_text_top(area);
+        if (tt >= 0) y = tt;
+    }
 
     out = *area;
     out.left += inset; out.right = out.left + w;
@@ -1228,6 +1235,8 @@ static LRESULT CALLBACK NnScreenProc(HWND hwnd, UINT msg,
      * terminal does. */
     case WM_LBUTTONDOWN:
         SetFocus(hwnd);
+        /* Navigator 2.0 part 7: a click on the idle screen connects */
+        if (!g_running) w31_connect_click(g_hStartBtn);
         return 0;
 
     case WM_KEYDOWN:
@@ -2329,6 +2338,8 @@ void nabu_native_module_activate(HWND content)
             0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content,
             (HMENU)(INT_PTR)IDC_NN_CONNECT, hInst, NULL);
         g_hStopBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+        w31_connect_on_enter(g_hHostEdit, g_hStartBtn);   /* Navigator 2.0 part 7 */
+        w31_connect_on_enter(g_hPortEdit, g_hStartBtn);
         /* WS_TABSTOP so the screen can take the keyboard; the guest
          * needs it and the key handling above depends on focus. */
         g_hScreen = CreateWindowExA(WS_EX_CLIENTEDGE, NN_SCREEN_CLASS, "",

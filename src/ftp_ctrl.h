@@ -100,6 +100,12 @@ int  ftpc_send_mail_text(ftp_ctrl_t *c, const char *data, int len);
 /* USER anonymous; PASS FTPC_ANON_PASSWORD only if the server answers 331.
  * Returns the final code (2xx = logged in) or an FTPC_ERR. */
 int  ftpc_login_anonymous(ftp_ctrl_t *c, char *last, int last_sz);
+/* Navigator 2.0 (2026-11-25): the same, and if "anonymous" is refused
+ * (4xx/5xx), the other conventional anonymous name "ftp" with the same
+ * password, reconnecting to host:port first if the server dropped the
+ * connection. Never a real account. *used_ftp = 1 when "ftp" logged in. */
+int  ftpc_login_anonymous_or_ftp(ftp_ctrl_t *c, const char *host, int port, int timeout_ms,
+                                 char *last, int last_sz, int *used_ftp);
 
 /* Data connections. open: passive = PASV (EPSV on IPv6 or when PASV is
  * refused) and connect; active = listen and send PORT / EPRT. Returns 0,

@@ -36,10 +36,10 @@
  *
  * TWO FORMATS, ONE TAB (operator decision, 2026-09-27). The tab is
  * labelled "Videotex" and carries a Format dropdown, NAPLPS or Minitel,
- * which can only be changed while disconnected. Both formats use the same
- * host (videotex.teletext.ca), the same single telnet_proto session and
- * the same status line; the port follows the format (1983 NAPLPS, 516
- * Minitel). Minitel mode is a complete terminal, screen and keyboard,
+ * which can only be changed while disconnected. Both formats use one
+ * session and the same status line; the host and the port follow the
+ * format (naplps.teletext.ca 1983, minitel.teletext.ca 516; one host per
+ * format since Navigator 2.0). Minitel mode is a complete terminal, screen and keyboard,
  * built by minitel_view.[ch] over the clean-room minitel_decode.[ch] and
  * minitel_screen.[ch]. The NAPLPS paths below are the Phase 2a code,
  * unchanged: the Minitel paths branch off before they reach them.
@@ -51,6 +51,19 @@
  * from WM_CHAR, because WM_CHAR is layout-translated and a non-Latin
  * keyboard layout would otherwise produce something other than ASCII.
  * That lesson is recorded in the F6 Telnet work and applies unchanged.
+ *
+ * SITES AND WEBSOCKET (Navigator 2.0, operator 2026-11-24,
+ * docs/2026-11-24_NAVIGATOR_SITE_LISTS_WS_BUILD.md). The Minitel format
+ * has a second strip row: Site (the built-in list of suite_sites),
+ * Protocol (Telnet or WebSocket (ws)) and Path. Picking a site only fills
+ * the fields; it never connects. A full telnet:// or ws:// address pasted
+ * into Host fills Protocol, Host, Port and Path; a gateway path written
+ * "/url=" is rewritten to the working "/?url=" form, with a note. wss://
+ * is refused: there are no secure connections in this version. Over
+ * WebSocket the session runs on ws_proto, which posts the same events as
+ * telnet_proto, so everything below the connect is shared and the
+ * Minitel decoder never knows which transport fed it. NAPLPS keeps one
+ * row and Telnet only.
  */
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -65,6 +78,8 @@
 #include "naplps_decode.h"
 #include "naplps_surface.h"
 #include "minitel_view.h"
+#include "ws_proto.h"
+#include "suite_sites.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,10 +97,21 @@
 #define IDC_NAP_CANVAS      6607
 #define IDC_NAP_FORMAT_CMB  6608
 #define IDC_NAP_SCAN_CHK    6609
+/* Navigator 2.0: the Minitel second row (6620 up is the Minitel view's). */
+#define IDC_NAP_SITE_CMB    6610
+#define IDC_NAP_PROTO_CMB   6611
+#define IDC_NAP_PATH_EDIT   6612
 
 /* The two formats of the Format dropdown, in its order. */
 #define FMT_NAPLPS   0
 #define FMT_MINITEL  1
+
+/* The two protocols of the Protocol dropdown (Minitel only), in its order. */
+#define PROTO_TELNET 0
+#define PROTO_WS     1
+
+/* Posted to the panel by the Host field after a paste (Navigator 2.0). */
+#define WM_NAP_PASTED  (WM_USER + 44)
 
 #define NAP_PANEL_CLASS   "MGTNapPanel"
 #define NAP_CANVAS_CLASS  "MGTNapCanvasV1"
@@ -110,6 +136,15 @@ static HWND g_hMonoChk  = NULL;
 static HWND g_hStatus   = NULL;
 static HWND g_hFmtLbl   = NULL, g_hFmtCmb   = NULL;
 static HWND g_hScanChk  = NULL;
+/* Navigator 2.0: the Minitel second row. */
+static HWND g_hSiteLbl  = NULL, g_hSiteCmb  = NULL;
+static HWND g_hProtoLbl = NULL, g_hProtoCmb = NULL;
+static HWND g_hPathLbl  = NULL, g_hPathEdit = NULL;
+static int  g_proto     = PROTO_TELNET;  /* the dropdown (Minitel only) */
+static BOOL g_filling   = FALSE;         /* the tab is writing the fields:
+                                            not the user, so the Site
+                                            list keeps its choice */
+static WNDPROC g_host_old_proc = NULL;   /* the Host field, for paste */
 
 /* MINITEL IS THE DEFAULT FORMAT (operator, 2026-09-27); NAPLPS stays one
  * click away in the dropdown. */
@@ -130,9 +165,16 @@ static BOOL g_panel_class_reg  = FALSE;
 static BOOL g_canvas_class_reg = FALSE;
 
 static TelnetProto *g_telnet    = NULL;
+static WsProto     *g_ws        = NULL;   /* Minitel over ws (2.0); at most
+                                             one of g_telnet / g_ws is set */
 static BOOL         g_connected = FALSE;
-static char         g_active_host[256] = NAPLPS_DEFAULT_HOST;
-static int          g_active_port      = NAPLPS_DEFAULT_PORT;
+static char         g_active_host[256] = MINITEL_DEFAULT_HOST;
+static int          g_active_port      = MINITEL_DEFAULT_PORT;
+
+/* A session exists, live or still connecting, on either transport. */
+#define NAP_LINK_BUSY() (g_telnet != NULL || g_ws != NULL)
+
+static BOOL nap_apply_address(void);
 
 static naplps_decoder_t *g_dec = NULL;
 static BOOL              g_mono = FALSE;
@@ -278,6 +320,11 @@ static void nap_set_session_ui(BOOL connected)
     EnableWindow(g_hPortEdit, !connected);
     /* The format can only change while disconnected. */
     EnableWindow(g_hFmtCmb, !connected);
+    /* Navigator 2.0: the second row likewise; Path only means something
+     * over WebSocket, so under Telnet it stays grayed. */
+    EnableWindow(g_hSiteCmb,  !connected);
+    EnableWindow(g_hProtoCmb, !connected);
+    EnableWindow(g_hPathEdit, !connected && g_proto == PROTO_WS);
     if (g_session_format == FMT_MINITEL) minitel_view_set_connected(connected);
 
     /*
@@ -319,6 +366,13 @@ static void nap_close_session(void)
         g_telnet = NULL;
         nap_drain_events();
     }
+    if (g_ws) {
+        /* ws_proto posts the same events and allocates its chunks as
+         * telnet_proto does, so the same drain frees them. */
+        ws_proto_close(g_ws);
+        g_ws = NULL;
+        nap_drain_events();
+    }
     if (g_connected) {
         /* A PDI sequence is terminated by the next opcode or by a
          * non-numeric byte (5.3.1.1), so the last command of a session
@@ -340,8 +394,10 @@ static BOOL  g_rx_since_tx  = FALSE;
 
 static void nap_send(const void *buf, int len)
 {
-    if (g_telnet && g_connected && len > 0) {
-        telnet_proto_send(g_telnet, buf, (size_t)len);
+    if (g_connected && len > 0) {
+        if (g_telnet)  telnet_proto_send(g_telnet, buf, (size_t)len);
+        else if (g_ws) ws_proto_send(g_ws, buf, (size_t)len);   /* a text frame */
+        else return;
         g_rx_since_tx = FALSE;
     }
 }
@@ -573,7 +629,8 @@ static void nap_on_connected(void)
      * report, and 6.1.4 of the standard, which reserves the transmission
      * control characters to lower layers). The host talks first.
      */
-    nap_status("Connected to %s:%d", g_active_host, g_active_port);
+    if (g_ws) nap_status("Connected to ws://%s:%d", g_active_host, g_active_port);
+    else      nap_status("Connected to %s:%d", g_active_host, g_active_port);
     if (g_session_format == FMT_MINITEL) minitel_view_focus();
     else SetFocus(g_hCanvas);
 }
@@ -767,6 +824,12 @@ static void nap_canvas_paint(HWND hwnd, HDC hdc)
         GetTextExtentPoint32A(mem, "Wg", 2, &ext);
         lh = ext.cy + 2;
         y  = (ch - nlines * lh) / 2;
+        if (!g_connected) {
+            /* A1 (2026-11-23): the block starts below the button */
+            int tt = w31_power_watermark_text_top(&rc);
+            w31_draw_power_watermark(mem, &rc);   /* R1.2 */
+            if (tt >= 0) y = tt;
+        }
         for (k = 0; k < nlines; k++) {
             RECT lr;
             lr.left = 0; lr.right = cw;
@@ -804,6 +867,10 @@ static LRESULT CALLBACK NapCanvasProc(HWND hwnd, UINT msg,
 
     case WM_LBUTTONDOWN:
         SetFocus(hwnd);
+        /* Navigator 2.0 part 7: a click connects while the "Connect to a
+         * host" legend shows (nothing drawn yet: a local frame opened with
+         * Ctrl+O keeps its clicks) */
+        if (!(g_dec && naplps_ever_drew(g_dec))) w31_connect_click(g_hConnBtn);
         return 0;
 
     /* A custom-painted child must claim the keys or IsDialogMessage eats
@@ -869,6 +936,17 @@ static LRESULT CALLBACK NapPanelProc(HWND hwnd, UINT msg,
         if (naplps_module_on_command(hwnd, wParam, lParam)) return 0;
         break;
 
+    /* Navigator 2.0: something was pasted into Host; a full address
+     * fills the fields (D12). */
+    case WM_NAP_PASTED: {
+        char t[SITES_HOST_MAX + SITES_PATH_MAX + 32];
+        if (g_hHostEdit && !NAP_LINK_BUSY()) {
+            GetWindowTextA(g_hHostEdit, t, sizeof t);
+            if (strstr(t, "://")) nap_apply_address();
+        }
+        return 0;
+    }
+
     /* The Minitel function keys are owner-drawn buttons of this panel. */
     case WM_DRAWITEM:
         if (minitel_view_on_drawitem((const DRAWITEMSTRUCT *)lParam)) return TRUE;
@@ -880,7 +958,7 @@ static LRESULT CALLBACK NapPanelProc(HWND hwnd, UINT msg,
     case WM_TIMER:
         if (wParam == IDT_NAP_LOGOFF) {
             KillTimer(hwnd, IDT_NAP_LOGOFF);
-            if (!g_telnet && !g_connected) {
+            if (!NAP_LINK_BUSY() && !g_connected) {
                 nap_default_screen(g_format);
                 nap_status("Back to the %s default screen",
                            g_format == FMT_MINITEL ? "Minitel" : "NAPLPS");
@@ -939,26 +1017,209 @@ static void nap_register_classes(HINSTANCE hInst)
 }
 
 /* ------------------------------------------------------------------ */
+/* Navigator 2.0: the Minitel second row (Site, Protocol, Path)        */
+/* ------------------------------------------------------------------ */
+
+/* Write a field for the user: the Site list must not read it as a typed
+ * change. Nested calls keep the outer guard. */
+static void nap_set_text(HWND h, const char *s)
+{
+    BOOL was = g_filling;
+    if (!h) return;
+    g_filling = TRUE;
+    SetWindowTextA(h, s);
+    g_filling = was;
+}
+
+/* The Protocol dropdown and what follows from it. With rewrite_port, a
+ * Port field still holding the other protocol's default takes this
+ * one's (516 Telnet, 80 WebSocket), so a typed port is never lost. */
+static void nap_set_proto(int proto, BOOL rewrite_port)
+{
+    char port[16];
+    g_proto = proto;
+    if (g_hProtoCmb) SendMessageA(g_hProtoCmb, CB_SETCURSEL, (WPARAM)proto, 0);
+    if (rewrite_port && g_hPortEdit) {
+        GetWindowTextA(g_hPortEdit, port, sizeof port);
+        if (proto == PROTO_WS && strcmp(port, MINITEL_DEFAULT_PORT_STR) == 0)
+            nap_set_text(g_hPortEdit, MINITEL_WS_DEFAULT_PORT_STR);
+        else if (proto == PROTO_TELNET && strcmp(port, MINITEL_WS_DEFAULT_PORT_STR) == 0)
+            nap_set_text(g_hPortEdit, MINITEL_DEFAULT_PORT_STR);
+    }
+    if (proto == PROTO_WS && g_hPathEdit && GetWindowTextLengthA(g_hPathEdit) == 0)
+        nap_set_text(g_hPathEdit, "/");
+    if (g_hPathEdit)
+        EnableWindow(g_hPathEdit, !g_connected && !NAP_LINK_BUSY() && proto == PROTO_WS);
+}
+
+/* The Site list shows the entry the fields name now, or nothing: an
+ * edited host, port, path or protocol is no longer that site. */
+static void nap_site_sync(void)
+{
+    char host[256], port[16], path[SITES_PATH_MAX];
+    int n, i, sel = -1;
+    const suite_site_t *t;
+
+    if (!g_hSiteCmb || g_filling) return;
+    GetWindowTextA(g_hHostEdit, host, sizeof host);
+    GetWindowTextA(g_hPortEdit, port, sizeof port);
+    GetWindowTextA(g_hPathEdit, path, sizeof path);
+    t = suite_sites_table(SITES_TAB_MINITEL, &n);
+    for (i = 0; t && i < n; i++) {
+        suite_site_addr_t a;
+        int proto;
+        if (suite_sites_parse(t[i].address, &a) != SITES_OK) continue;
+        proto = (a.scheme == SITES_SCHEME_WS) ? PROTO_WS : PROTO_TELNET;
+        if (proto != g_proto) continue;
+        if (_stricmp(a.host, host) != 0 || a.port != atoi(port)) continue;
+        if (proto == PROTO_WS
+            && strcmp(a.path[0] ? a.path : "/", path[0] ? path : "/") != 0) continue;
+        sel = i;
+        break;
+    }
+    if ((int)SendMessageA(g_hSiteCmb, CB_GETCURSEL, 0, 0) != sel)
+        SendMessageA(g_hSiteCmb, CB_SETCURSEL, (WPARAM)sel, 0);
+}
+
+/* Fill Protocol, Host, Port and Path from a telnet:// or ws:// address. */
+static void nap_fill_from_addr(const suite_site_addr_t *a)
+{
+    char port[16];
+    BOOL was = g_filling;
+    g_filling = TRUE;
+    nap_set_proto(a->scheme == SITES_SCHEME_WS ? PROTO_WS : PROTO_TELNET, FALSE);
+    SetWindowTextA(g_hHostEdit, a->host);
+    _snprintf(port, sizeof port - 1, "%d", a->port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_hPortEdit, port);
+    SetWindowTextA(g_hPathEdit, a->scheme == SITES_SCHEME_WS
+                                ? (a->path[0] ? a->path : "/") : "");
+    g_filling = was;
+    nap_set_proto(g_proto, FALSE);       /* Path's enabled state */
+    nap_site_sync();
+}
+
+/*
+ * The Host field holds a full address, pasted or typed (D12): act on it.
+ * TRUE when the fields can be used to connect (a plain host name, or an
+ * address that has filled them); FALSE when it is refused, in which case
+ * nothing is filled, nothing connects and the status line says why.
+ */
+static BOOL nap_apply_address(void)
+{
+    char text[SITES_HOST_MAX + SITES_PATH_MAX + 32];
+    suite_site_addr_t a;
+    int rc;
+
+    GetWindowTextA(g_hHostEdit, text, sizeof text);
+    rc = suite_sites_parse(text, &a);
+    if (rc == SITES_NOT_ADDRESS) return TRUE;
+    /* wss only: since 2026-11-25 ircs and snews are also UNSUPPORTED, and
+     * they fall to the general "takes a host name" text below, as before. */
+    if (rc == SITES_UNSUPPORTED && a.scheme == SITES_SCHEME_WSS) {
+        nap_status("Secure WebSocket (wss://) connections are not supported "
+                   "in this version of Teletext Navigator.");
+        return FALSE;
+    }
+    if (rc != SITES_OK
+        || (a.scheme != SITES_SCHEME_TELNET && a.scheme != SITES_SCHEME_WS)) {
+        nap_status("The Host box takes a host name, or a telnet:// or ws:// address.");
+        return FALSE;
+    }
+    if (g_format == FMT_NAPLPS) {
+        char port[16];
+        if (a.scheme == SITES_SCHEME_WS) {
+            nap_status("WebSocket is for the Minitel format; NAPLPS connects by Telnet.");
+            return FALSE;
+        }
+        nap_set_text(g_hHostEdit, a.host);
+        _snprintf(port, sizeof port - 1, "%d", a.port);
+        port[sizeof port - 1] = '\0';
+        nap_set_text(g_hPortEdit, port);
+        nap_status("Address filled in: Telnet, %s port %d.", a.host, a.port);
+        return TRUE;
+    }
+    nap_fill_from_addr(&a);
+    if (a.path_rewritten)
+        nap_status("Address filled in. The path /url= was changed to /?url=, "
+                   "the form the gateway answers.");
+    else if (a.scheme == SITES_SCHEME_WS)
+        nap_status("Address filled in: WebSocket (ws), %s port %d, path %s.",
+                   a.host, a.port, a.path[0] ? a.path : "/");
+    else
+        nap_status("Address filled in: Telnet, %s port %d.", a.host, a.port);
+    return TRUE;
+}
+
+/* A site picked from the list: fill the fields, never connect (D5). */
+static void nap_pick_site(int idx)
+{
+    int n;
+    const suite_site_t *t = suite_sites_table(SITES_TAB_MINITEL, &n);
+    suite_site_addr_t a;
+
+    if (!t || idx < 0 || idx >= n) return;
+    if (suite_sites_parse(t[idx].address, &a) != SITES_OK) return;
+    nap_fill_from_addr(&a);
+    SendMessageA(g_hSiteCmb, CB_SETCURSEL, (WPARAM)idx, 0);
+    nap_status("%s: %s. CONNEXION/FIN (F9) connects.", t[idx].label, t[idx].address);
+}
+
+/* The Host field: after a paste (the context menu's WM_PASTE, Ctrl+V,
+ * Shift+Insert), ask the panel to look for a full address. Posted, so
+ * the field already holds the pasted text when the panel reads it. */
+static LRESULT CALLBACK NapHostProc(HWND h, UINT m, WPARAM wp, LPARAM lp)
+{
+    LRESULT r = CallWindowProcA(g_host_old_proc, h, m, wp, lp);
+    if (m == WM_PASTE
+        || (m == WM_CHAR && wp == 0x16)
+        || (m == WM_KEYDOWN && wp == VK_INSERT && (GetKeyState(VK_SHIFT) & 0x8000)))
+        PostMessageA(g_hPanel, WM_NAP_PASTED, 0, 0);
+    return r;
+}
+
+/* ------------------------------------------------------------------ */
 /* Connecting, and the format                                          */
 /* ------------------------------------------------------------------ */
 
 /*
  * One connect path for both formats and for both ways in: the Connect
  * button, and Minitel's CONNEXION/FIN pressed while disconnected. The
- * NAPLPS branch is the Phase 2a code as it was.
+ * NAPLPS branch is the Phase 2a code as it was. Navigator 2.0: a full
+ * address in Host is applied first, and Minitel over WebSocket opens
+ * ws_proto instead of telnet_proto; everything after the open is shared.
  */
 static void nap_connect(void)
 {
-    char host[256], port[16];
+    char host[256], port[16], path[SITES_PATH_MAX];
     int  p;
+    BOOL use_ws, rewrote = FALSE;
 
-    if (g_telnet) return;          /* already connecting or connected */
+    if (NAP_LINK_BUSY()) return;   /* already connecting or connected */
+    if (!nap_apply_address()) return;
 
     GetWindowTextA(g_hHostEdit, host, sizeof host);
     GetWindowTextA(g_hPortEdit, port, sizeof port);
     if (host[0] == '\0') { nap_status("Enter a host name"); return; }
     p = atoi(port);
     if (p <= 0 || p > 65535) { nap_status("Enter a port from 1 to 65535"); return; }
+
+    use_ws = (g_format == FMT_MINITEL && g_proto == PROTO_WS);
+    path[0] = '\0';
+    if (use_ws) {
+        /* The path goes exactly as entered (a service URL inside it is
+         * case-sensitive), with a leading '/' if it lacks one, and the
+         * gateway's "/url=" form rewritten as a pasted address is. */
+        GetWindowTextA(g_hPathEdit, path + 1, sizeof path - 1);
+        if (path[1] == '/') memmove(path, path + 1, strlen(path + 1) + 1);
+        else path[0] = '/';
+        if (strncmp(path, "/url=", 5) == 0 && strlen(path) + 1 < sizeof path) {
+            memmove(path + 2, path + 1, strlen(path + 1) + 1);
+            path[1] = '?';
+            rewrote = TRUE;
+        }
+        nap_set_text(g_hPathEdit, path);
+    }
 
     _snprintf(g_active_host, sizeof g_active_host - 1, "%s", host);
     g_active_host[sizeof g_active_host - 1] = '\0';
@@ -980,15 +1241,32 @@ static void nap_connect(void)
         if (g_hCanvas) InvalidateRect(g_hCanvas, NULL, FALSE);
     }
 
-    nap_status("Connecting to %s:%d ...", g_active_host, g_active_port);
-    if (telnet_proto_open(g_active_host, g_active_port,
-                          g_hPanel, WM_NAP_NOTIFY, &g_telnet) != 0
-        || !g_telnet) {
-        nap_status("Cannot start a connection to %s:%d",
-                   g_active_host, g_active_port);
-        nap_set_session_ui(FALSE);
-        return;
+    if (use_ws) {
+        nap_status("Connecting to ws://%s:%d%s ...%s", g_active_host, g_active_port,
+                   path, rewrote ? " (the path /url= was changed to /?url=)" : "");
+        if (ws_proto_open(g_active_host, g_active_port, path,
+                          g_hPanel, WM_NAP_NOTIFY, &g_ws) != 0 || !g_ws) {
+            g_ws = NULL;
+            nap_status("Cannot start a connection to ws://%s:%d",
+                       g_active_host, g_active_port);
+            nap_set_session_ui(FALSE);
+            return;
+        }
+    } else {
+        nap_status("Connecting to %s:%d ...", g_active_host, g_active_port);
+        if (telnet_proto_open(g_active_host, g_active_port,
+                              g_hPanel, WM_NAP_NOTIFY, &g_telnet) != 0
+            || !g_telnet) {
+            nap_status("Cannot start a connection to %s:%d",
+                       g_active_host, g_active_port);
+            nap_set_session_ui(FALSE);
+            return;
+        }
     }
+    /* The second row stays put while a session is starting. */
+    EnableWindow(g_hSiteCmb,  FALSE);
+    EnableWindow(g_hProtoCmb, FALSE);
+    EnableWindow(g_hPathEdit, FALSE);
     /* Until TELNET_EVT_CONNECTED the toggle reads Disconnect, grayed: the
      * EXCEPTION to cancel-while-connecting (2026-11-11), the same
      * telnet_proto handshake hazard as RIPscrip
@@ -1001,6 +1279,7 @@ static void nap_connect(void)
 static void nap_apply_format(void)
 {
     BOOL mtl = (g_format == FMT_MINITEL);
+    int  sw  = mtl ? SW_SHOW : SW_HIDE;
 
     ShowWindow(g_hCanvas, mtl ? SW_HIDE : SW_SHOW);
     minitel_view_show(mtl);
@@ -1009,6 +1288,13 @@ static void nap_apply_format(void)
     ShowWindow(g_hConnBtn, mtl ? SW_HIDE : SW_SHOW);
     ShowWindow(g_hDiscBtn, mtl ? SW_HIDE : SW_SHOW);
     ShowWindow(g_hScanChk, mtl ? SW_SHOW : SW_HIDE);
+    /* Navigator 2.0: the second row is Minitel's only. */
+    ShowWindow(g_hSiteLbl,  sw);
+    ShowWindow(g_hSiteCmb,  sw);
+    ShowWindow(g_hProtoLbl, sw);
+    ShowWindow(g_hProtoCmb, sw);
+    ShowWindow(g_hPathLbl,  sw);
+    ShowWindow(g_hPathEdit, sw);
     SendMessageA(g_hMonoChk, BM_SETCHECK,
                  (mtl ? g_mono_mtl : g_mono) ? BST_CHECKED : BST_UNCHECKED, 0);
     SendMessageA(g_hScanChk, BM_SETCHECK, g_scan_mtl ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -1179,6 +1465,22 @@ void naplps_module_resize(HWND content, int w, int h)
         MoveWindow(g_hMonoChk, mono_x, 16, mono_w, 22, TRUE);
         MoveWindow(g_hScanChk, scan_x, 16, scan_w, 22, TRUE);
         minitel_view_place_cnx(cnx_x, 12, cnx_w, btn_h);
+
+        /* Navigator 2.0: the second row, on row one's columns: Site under
+         * Format, Protocol ending where Host ends, Path starting under
+         * Port and running to CONNEXION/FIN's right edge. */
+        {
+            const int r2 = 48;
+            const int path_x = margin + 455;
+            int path_w = cnx_x + cnx_w - path_x;
+            if (path_w < 120) path_w = 120;
+            MoveWindow(g_hSiteLbl,  margin,       r2 + 4, 40,  22,  TRUE);
+            MoveWindow(g_hSiteCmb,  margin + 58,  r2,     140, 200, TRUE);
+            MoveWindow(g_hProtoLbl, margin + 207, r2 + 4, 62,  22,  TRUE);
+            MoveWindow(g_hProtoCmb, margin + 272, r2,     135, 200, TRUE);
+            MoveWindow(g_hPathLbl,  margin + 417, r2 + 4, 35,  22,  TRUE);
+            MoveWindow(g_hPathEdit, path_x,       r2,     path_w, row_h, TRUE);
+        }
     } else {
         /* NAPLPS: the Phase 2a row, with the checkbox label shortened to
          * "Monochrome" so it is never clipped. */
@@ -1200,8 +1502,10 @@ void naplps_module_resize(HWND content, int w, int h)
          * keyboard, and takes 12 pixels less chrome than NAPLPS (a tighter
          * top and bottom): at Navigator's default 980 x 770 window that is
          * the difference between the 320 x 250 screen at 2x and at 1x.
+         * Navigator 2.0: the second strip row (Site, Protocol, Path, at
+         * y 48) moves the screen down to 82.
          */
-        const int m_y = 48, m_bottom = 8;
+        const int m_y = 82, m_bottom = 8;
         MoveWindow(g_hStatus, margin, h - m_bottom - status_h,
                    w - 2 * margin, status_h, TRUE);
         minitel_view_layout(margin, m_y, w - 2 * margin,
@@ -1279,7 +1583,7 @@ void naplps_module_activate(HWND content)
         WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP,
         0, 0, 40, 22, g_hPanel, NULL, hInst, NULL);
     g_hHostEdit = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT",
-        NAPLPS_DEFAULT_HOST,
+        g_format == FMT_MINITEL ? MINITEL_DEFAULT_HOST : NAPLPS_DEFAULT_HOST,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
         0, 0, 200, 26, g_hPanel,
         (HMENU)(INT_PTR)IDC_NAP_HOST_EDIT, hInst, NULL);
@@ -1304,6 +1608,44 @@ void naplps_module_activate(HWND content)
         0, 0, W31_TOGGLE_W, W31_TOGGLE_H, g_hPanel,
         (HMENU)(INT_PTR)IDC_NAP_CONNECT_BTN, hInst, NULL);
     g_hDiscBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+    /* Navigator 2.0 part 7 (also in Minitel format: the hidden toggle's
+     * command is the same nap_connect the CONNEXION key reaches) */
+    w31_connect_on_enter(g_hHostEdit, g_hConnBtn);
+    w31_connect_on_enter(g_hPortEdit, g_hConnBtn);
+
+    /* Navigator 2.0: the Minitel second row (shown by nap_apply_format in
+     * Minitel format only). Site and Protocol are drop-down LISTS, which
+     * take the Windows 3.1 look from suite_w31 by themselves. */
+    g_hSiteLbl = CreateWindowA("STATIC", "Site:",
+        WS_CHILD | SS_LEFTNOWORDWRAP,
+        0, 0, 40, 22, g_hPanel, NULL, hInst, NULL);
+    g_hSiteCmb = CreateWindowA("COMBOBOX", "",
+        WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+        0, 0, 140, 200, g_hPanel,
+        (HMENU)(INT_PTR)IDC_NAP_SITE_CMB, hInst, NULL);
+    suite_sites_fill_combo(g_hSiteCmb, SITES_TAB_MINITEL);
+    g_hProtoLbl = CreateWindowA("STATIC", "Protocol:",
+        WS_CHILD | SS_LEFTNOWORDWRAP,
+        0, 0, 62, 22, g_hPanel, NULL, hInst, NULL);
+    g_hProtoCmb = CreateWindowA("COMBOBOX", "",
+        WS_CHILD | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+        0, 0, 135, 200, g_hPanel,
+        (HMENU)(INT_PTR)IDC_NAP_PROTO_CMB, hInst, NULL);
+    SendMessageA(g_hProtoCmb, CB_ADDSTRING, 0, (LPARAM)"Telnet");          /* PROTO_TELNET */
+    SendMessageA(g_hProtoCmb, CB_ADDSTRING, 0, (LPARAM)"WebSocket (ws)");  /* PROTO_WS */
+    SendMessageA(g_hProtoCmb, CB_SETCURSEL, (WPARAM)g_proto, 0);
+    g_hPathLbl = CreateWindowA("STATIC", "Path:",
+        WS_CHILD | SS_LEFTNOWORDWRAP,
+        0, 0, 35, 22, g_hPanel, NULL, hInst, NULL);
+    /* No ES_UPPERCASE / ES_LOWERCASE: the path goes exactly as entered. */
+    g_hPathEdit = CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", "",
+        WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL,
+        0, 0, 200, 26, g_hPanel,
+        (HMENU)(INT_PTR)IDC_NAP_PATH_EDIT, hInst, NULL);
+    w31_connect_on_enter(g_hPathEdit, g_hConnBtn);
+    /* Host: a paste of a full address fills the fields (D12). */
+    g_host_old_proc = (WNDPROC)SetWindowLongPtrA(g_hHostEdit, GWLP_WNDPROC,
+                                                 (LONG_PTR)NapHostProc);
 
     g_hCanvas = CreateWindowExA(WS_EX_CLIENTEDGE, NAP_CANVAS_CLASS, "",
         WS_CHILD | WS_VISIBLE,
@@ -1317,7 +1659,9 @@ void naplps_module_activate(HWND content)
     if (g_hFontUI) {
         HWND all[] = { g_hHostLbl, g_hHostEdit, g_hPortLbl, g_hPortEdit,
                        g_hMonoChk, g_hConnBtn, g_hDiscBtn,
-                       g_hStatus, g_hFmtLbl, g_hFmtCmb, g_hScanChk };
+                       g_hStatus, g_hFmtLbl, g_hFmtCmb, g_hScanChk,
+                       g_hSiteLbl, g_hSiteCmb, g_hProtoLbl, g_hProtoCmb,
+                       g_hPathLbl, g_hPathEdit };
         int k;
         for (k = 0; k < (int)(sizeof all / sizeof all[0]); k++)
             SendMessageA(all[k], WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
@@ -1340,6 +1684,8 @@ void naplps_module_activate(HWND content)
     g_controls_created = TRUE;
     nap_set_session_ui(FALSE);
     nap_apply_format();
+    nap_set_proto(g_proto, FALSE);
+    nap_site_sync();                 /* the defaults are "The Teletext" */
     suite_set_status("");            /* the tab's own line is the one */
 
     GetClientRect(content, &rc);
@@ -1371,7 +1717,7 @@ BOOL naplps_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
         if (g_connected) {
             nap_end_session(WHY_LOCAL);
             nap_status("Disconnected");
-        } else if (!g_telnet) {
+        } else if (!NAP_LINK_BUSY()) {
             nap_connect();               /* mid-handshake it is grayed */
         }
         return TRUE;
@@ -1390,17 +1736,30 @@ BOOL naplps_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
             || HIWORD(wParam) == CBN_CLOSEUP) {
             int sel = (int)SendMessageA(g_hFmtCmb, CB_GETCURSEL, 0, 0);
             if (sel == g_format) return TRUE;      /* nothing changed */
-            if (g_connected || g_telnet) {
+            if (g_connected || NAP_LINK_BUSY()) {
                 /* Never while a session is live; the combo is disabled
                  * then, and this is the belt to that brace. */
                 SendMessageA(g_hFmtCmb, CB_SETCURSEL, g_format, 0);
                 return TRUE;
             }
             if (sel == FMT_NAPLPS || sel == FMT_MINITEL) {
+                char hs[256];
                 g_format = sel;
-                SetWindowTextA(g_hPortEdit, sel == FMT_MINITEL
+                /* Navigator 2.0 (D9): one default host per format. Host is
+                 * rewritten only while it still holds the OTHER format's
+                 * default, so a typed host is never lost. Both formats
+                 * start on Telnet (NAPLPS has no other), on the format's
+                 * Telnet port as before. */
+                GetWindowTextA(g_hHostEdit, hs, sizeof hs);
+                if (_stricmp(hs, sel == FMT_MINITEL ? NAPLPS_DEFAULT_HOST
+                                                    : MINITEL_DEFAULT_HOST) == 0)
+                    nap_set_text(g_hHostEdit, sel == FMT_MINITEL ? MINITEL_DEFAULT_HOST
+                                                                 : NAPLPS_DEFAULT_HOST);
+                nap_set_proto(PROTO_TELNET, FALSE);
+                nap_set_text(g_hPortEdit, sel == FMT_MINITEL
                                ? MINITEL_DEFAULT_PORT_STR
                                : NAPLPS_DEFAULT_PORT_STR);
+                nap_site_sync();
                 /* The new format opens on its DEFAULT screen, at once,
                  * and any pending logoff timer is cancelled. */
                 nap_cancel_logoff();
@@ -1421,6 +1780,49 @@ BOOL naplps_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     case IDC_NAP_DISCONN_BTN:
         nap_end_session(WHY_LOCAL);
         nap_status("Disconnected");
+        return TRUE;
+
+    /* Navigator 2.0: the Minitel second row and the address fields. */
+    case IDC_NAP_HOST_EDIT:
+        if (HIWORD(wParam) == EN_CHANGE) {
+            nap_site_sync();
+        } else if (HIWORD(wParam) == EN_KILLFOCUS && !NAP_LINK_BUSY()) {
+            /* A full address typed, not pasted: act on it on leaving. */
+            char t[SITES_HOST_MAX + SITES_PATH_MAX + 32];
+            GetWindowTextA(g_hHostEdit, t, sizeof t);
+            if (strstr(t, "://")) nap_apply_address();
+        }
+        return TRUE;
+
+    case IDC_NAP_PORT_EDIT:
+    case IDC_NAP_PATH_EDIT:
+        if (HIWORD(wParam) == EN_CHANGE) nap_site_sync();
+        return TRUE;
+
+    case IDC_NAP_SITE_CMB:
+    case IDC_NAP_PROTO_CMB:
+        /* As for Format: act once the list is closed (see above). */
+        if ((HIWORD(wParam) == CBN_SELCHANGE
+             && !SendMessageA((HWND)lParam, CB_GETDROPPEDSTATE, 0, 0))
+            || HIWORD(wParam) == CBN_CLOSEUP) {
+            int sel = (int)SendMessageA((HWND)lParam, CB_GETCURSEL, 0, 0);
+            if (NAP_LINK_BUSY() || g_connected) return TRUE;
+            if (id == IDC_NAP_SITE_CMB) {
+                /* Fill only; CONNEXION/FIN connects (D5). The keyboard
+                 * goes back to the screen so F9 works at once. */
+                if (sel >= 0) { nap_pick_site(sel); minitel_view_focus(); }
+            } else if (sel == PROTO_TELNET || sel == PROTO_WS) {
+                if (sel != g_proto) {
+                    char port[16];
+                    nap_set_proto(sel, TRUE);
+                    nap_site_sync();
+                    GetWindowTextA(g_hPortEdit, port, sizeof port);
+                    nap_status(sel == PROTO_WS
+                        ? "Protocol: WebSocket (ws), port %s. Secure WebSocket (wss) is not supported in this version."
+                        : "Protocol: Telnet, port %s.", port);
+                }
+            }
+        }
         return TRUE;
 
     case IDC_NAP_SCAN_CHK:
@@ -1484,6 +1886,7 @@ BOOL naplps_module_has_unsaved(void)
 void naplps_module_shutdown(void)
 {
     if (g_telnet) { telnet_proto_close(g_telnet); g_telnet = NULL; }
+    if (g_ws)     { ws_proto_close(g_ws);         g_ws = NULL; }
     g_connected = FALSE;
     minitel_view_destroy();
     if (g_dec) { naplps_destroy(g_dec); g_dec = NULL; }

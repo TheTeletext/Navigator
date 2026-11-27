@@ -39,6 +39,32 @@ int gopher_search_dialog_show(HWND parent_top_level,
                               const char *item_selector,
                               char **out_query);
 
+/* The same box for any one-line prompt (Go To, 2026-11-20): caption (NULL =
+ * "Gopher Search"), the prompt label, the muted context line given whole
+ * (NULL = "Selector: <item_selector>"), and the edit's initial text (NULL =
+ * empty; selected when given). Same return contract as above. */
+int gopher_prompt_dialog_show(HWND parent_top_level,
+                              const char *caption,
+                              const char *item_display,
+                              const char *item_selector,
+                              const char *context_line,
+                              const char *initial_text,
+                              char **out_query);
+
+/* Navigator 2.0 (operator, 2026-11-24, D15): the same prompt with a
+ * "Sites:" drop-down LIST above the address field, holding suite_sites'
+ * table sites_tab (SITES_TAB_*). It opens on the entry naming the server
+ * of initial_text, or on none; a pick fills the address field and the
+ * user's OK goes; the field stays a plain editable field, so typing works
+ * exactly as before. Same return contract as above. */
+int gopher_prompt_dialog_show_sites(HWND parent_top_level,
+                                    const char *caption,
+                                    const char *item_display,
+                                    const char *context_line,
+                                    const char *initial_text,
+                                    int sites_tab,
+                                    char **out_query);
+
 #ifdef __cplusplus
 }
 #endif

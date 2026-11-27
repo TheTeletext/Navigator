@@ -12,8 +12,11 @@
 
 #define W31_NO_SCROLL_MACROS   /* this unit calls the real Windows scroll API */
 #include "suite_w31.h"
+#include "suite_clipboard.h"
+#include <commctrl.h>   /* 2026-11-24: SetWindowSubclass (connect from a disabled pane) */
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* The shell's chrome font (src/suite_fonts.c), MS Sans Serif 8: one of the
  * two fonts the field rule below turns bold. Declared here rather than by
@@ -276,6 +279,82 @@ void w31_draw_checkbox(HDC hdc, const RECT *rc, const char *label, BOOL checked,
     SelectObject(hdc, of);
 }
 
+/* The Windows 3.1 option button (2026-11-22, docs/2026-11-22_GOPHER_PLUS_
+ * PHASE2.md). The ring and dot follow the 12 x 12 radio images of Windows
+ * 3.1's check-box bitmap (OBM_CHECKBOXES): a pixel circle, white inside,
+ * black ring, a 4 x 4 rounded dot when chosen. The label, focus and
+ * disabled look are the check box's, so the two sit together in a form. */
+void w31_draw_radio(HDC hdc, const RECT *rc, const char *label, BOOL checked,
+                    BOOL focused, BOOL disabled, HFONT font)
+{
+    static const char *ring[12] = {
+        "....####....",
+        "..##....##..",
+        ".#........#.",
+        ".#........#.",
+        "#..........#",
+        "#..........#",
+        "#..........#",
+        "#..........#",
+        ".#........#.",
+        ".#........#.",
+        "..##....##..",
+        "....####....",
+    };
+    static const char *dot[4] = { ".##.", "####", "####", ".##." };
+    RECT tr, mr;
+    HGDIOBJ of;
+    int bx, by, x, y, th, inside;
+    COLORREF ink = disabled ? W31_SHADOW : RGB(0, 0, 0);
+
+    FillRect(hdc, rc, g_w31_br_face);
+    of = SelectObject(hdc, font ? font : g_w31_font_bold);
+    {
+        TEXTMETRICA tm;
+        GetTextMetricsA(hdc, &tm);
+        th = tm.tmHeight;
+    }
+    bx = rc->left;
+    by = rc->top + ((rc->bottom - rc->top) - 12) / 2;
+    for (y = 0; y < 12; y++) {
+        int first = -1, last = -1;
+        for (x = 0; x < 12; x++)
+            if (ring[y][x] == '#') { if (first < 0) first = x; last = x; }
+        for (x = 0; x < 12; x++) {
+            inside = (x > first && x < last);
+            if (ring[y][x] == '#')
+                SetPixelV(hdc, bx + x, by + y, ink);
+            else if (inside)
+                SetPixelV(hdc, bx + x, by + y, W31_HILITE);
+        }
+    }
+    if (checked)
+        for (y = 0; y < 4; y++)
+            for (x = 0; x < 4; x++)
+                if (dot[y][x] == '#') SetPixelV(hdc, bx + 4 + x, by + 4 + y, ink);
+
+    SetRect(&tr, bx + 13 + 6, rc->top + ((rc->bottom - rc->top) - th) / 2, rc->right, 0);
+    tr.bottom = tr.top + th;
+    mr = tr;
+    DrawTextA(hdc, label, -1, &mr, DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
+    SetBkMode(hdc, TRANSPARENT);
+    if (disabled) {
+        w31_draw_text_disabled(hdc, label, -1, &tr, DT_LEFT | DT_SINGLELINE | DT_TOP);
+    } else {
+        SetTextColor(hdc, RGB(0, 0, 0));
+        DrawTextA(hdc, label, -1, &tr, DT_LEFT | DT_SINGLELINE | DT_TOP);
+    }
+    if (focused) {
+        RECT f = mr;
+        InflateRect(&f, 1, 1);
+        f.bottom += 1;
+        SetTextColor(hdc, RGB(0, 0, 0));
+        SetBkColor(hdc, W31_FACE);
+        DrawFocusRect(hdc, &f);
+    }
+    SelectObject(hdc, of);
+}
+
 /* Blit a 16-colour icon with its #C0C0C0 pixels left out. TransparentBlt
  * (msimg32, already linked) does exactly that. A disabled icon takes the
  * same stipple as disabled text: every other non-face pixel black. */
@@ -304,6 +383,123 @@ static void draw_icon(HDC hdc, HBITMAP bmp, int x, int y, BOOL disabled)
 void w31_draw_icon(HDC hdc, HBITMAP bmp, int x, int y)
 {
     draw_icon(hdc, bmp, x, y, FALSE);
+}
+
+/* R1.2 (2026-11-23): the power symbol of the old START icon
+ * (make_w31_icons.py icon_start_power) in its own units: a ring between
+ * radii 6.0 and 8.3 broken at the top where |dx| < 4.2, and a stem 2 units
+ * wide from 12 units above the ring's centre to 1 below the gap. Rendered
+ * once per size, 4 x 4 samples a pixel, as a premultiplied 32-bit DIB:
+ * mid gray at 22 % opacity, so it reads faintly on a black pane and on a
+ * white one alike. */
+#define WM_ALPHA 0.22f
+/* A2 (2026-11-23, docs/2026-11-23_NAVIGATOR_2.0_ICON_COLUMN_AND_CONNECT.md):
+ * plus an outer ring, concentric, between radii 14.4 and 15.4 (thinner at
+ * Dimitri's request, was 13.4), so the
+ * symbol reads as a round power button; the gap to the stem's top (12) is
+ * 2.4 units. The whole button, ring included, is the 96 px of R1.2. */
+#define WM_RING_IN   14.4f
+#define WM_RING_OUT  15.4f
+#define WM_UNITS     31.6f                         /* outer diameter + AA margin */
+static int power_glyph_at(float x, float y)        /* glyph units, centre 0,0 */
+{
+    float d = (float)sqrt((double)(x * x + y * y));
+    if (d >= 6.0f && d <= 8.3f && !(y < 0 && x > -4.2f && x < 4.2f)) return 1;
+    if (x > -1.0f && x < 1.0f && y > -12.0f && y < -1.0f) return 1;
+    if (d >= WM_RING_IN && d <= WM_RING_OUT) return 1;
+    return 0;
+}
+
+/* The button's size for a pane: 96 px, never more than a fifth of a small
+ * pane; 0 = the pane is too small, nothing is drawn. */
+static int power_watermark_size(const RECT *pane)
+{
+    int w = pane->right - pane->left, h = pane->bottom - pane->top;
+    int s = 96;
+    if (s > (w < h ? w : h) / 5) s = (w < h ? w : h) / 5;
+    return s < 32 ? 0 : s;
+}
+
+int w31_power_watermark_text_top(const RECT *pane)
+{
+    int s;
+    if (!pane || (s = power_watermark_size(pane)) == 0) return -1;
+    return pane->top + ((pane->bottom - pane->top) - s) / 2 + s + W31_WM_TEXT_GAP;
+}
+
+void w31_draw_power_watermark(HDC hdc, const RECT *pane)
+{
+    static HBITMAP g_wm = NULL;
+    static int     g_wm_s = 0;
+    int w, h, s;
+    HDC mem;
+    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    if (!pane) return;
+    w = pane->right - pane->left;
+    h = pane->bottom - pane->top;
+    /* 96 px (Dimitri, 2026-11-23: 45 % of the pane was "insanely huge"),
+     * never more than a fifth of a small pane */
+    s = power_watermark_size(pane);
+    if (s == 0) return;
+    if (s != g_wm_s || !g_wm) {
+        BITMAPINFO bi;
+        DWORD *bits = NULL;
+        /* A1/A2: the ring's centre is the button's centre, which is the
+         * pane's centre (the text goes below, w31_power_watermark_text_top) */
+        float unit = s / WM_UNITS;
+        float ox = s / 2.0f, oy = s / 2.0f;
+        int x, y, i, j;
+        if (g_wm) { DeleteObject(g_wm); g_wm = NULL; }
+        memset(&bi, 0, sizeof bi);
+        bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+        bi.bmiHeader.biWidth = s;
+        bi.bmiHeader.biHeight = -s;
+        bi.bmiHeader.biPlanes = 1;
+        bi.bmiHeader.biBitCount = 32;
+        g_wm = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, (void **)&bits, NULL, 0);
+        if (!g_wm || !bits) { g_wm = NULL; return; }
+        for (y = 0; y < s; y++)
+            for (x = 0; x < s; x++) {
+                int hit = 0;
+                for (j = 0; j < 4; j++)
+                    for (i = 0; i < 4; i++)
+                        hit += power_glyph_at((x + (i + 0.5f) / 4 - ox) / unit,
+                                              (y + (j + 0.5f) / 4 - oy) / unit);
+                {
+                    float a = WM_ALPHA * hit / 16.0f;
+                    DWORD A = (DWORD)(a * 255 + 0.5f), C = (DWORD)(a * 128 + 0.5f);
+                    bits[y * s + x] = (A << 24) | (C << 16) | (C << 8) | C;
+                }
+            }
+        g_wm_s = s;
+    }
+    mem = CreateCompatibleDC(hdc);
+    SelectObject(mem, g_wm);
+    AlphaBlend(hdc, pane->left + (w - s) / 2, pane->top + (h - s) / 2, s, s,
+               mem, 0, 0, s, s, bf);
+    DeleteDC(mem);
+}
+
+/* See suite_w31.h. The update region is taken BEFORE the control paints
+ * (BeginPaint inside its WM_PAINT validates it); the watermark is then
+ * blended only where the control has just put fresh background. */
+LRESULT w31_paint_with_watermark(HWND h, WNDPROC orig, WPARAM w, LPARAM l)
+{
+    HRGN rgn = CreateRectRgn(0, 0, 0, 0);
+    int kind = rgn ? GetUpdateRgn(h, rgn, FALSE) : ERROR;
+    LRESULT r = orig ? CallWindowProcA(orig, h, WM_PAINT, w, l) : DefWindowProcA(h, WM_PAINT, w, l);
+    if (kind == SIMPLEREGION || kind == COMPLEXREGION) {
+        HDC dc = GetDC(h);
+        RECT rc;
+        if (dc) {
+            GetClientRect(h, &rc);
+            SelectClipRgn(dc, rgn);
+            w31_draw_power_watermark(dc, &rc);
+            ReleaseDC(h, dc);
+        }
+    }
+    if (rgn) DeleteObject(rgn);
+    return r;
 }
 
 /* The Windows 3.1 push-button frame, measured on refshots/31-Task-List.png:
@@ -462,6 +658,84 @@ void w31_toggle_busy(HWND btn)
     SetWindowTextA(btn, "Disconnect");
     EnableWindow(btn, FALSE);
     InvalidateRect(btn, NULL, FALSE);
+}
+
+/* Navigator 2.0 (2026-11-23, docs/2026-11-23_NAVIGATOR_2.0_UI.md part 7):
+ * click and Enter to connect. A tab's toggle reads "Connect" and is
+ * enabled exactly when a Connect is possible (w31_toggle_set); anything
+ * else (connected, a handshake under way, the BBS dial show) leaves it
+ * alone. The tab's own command runs, as if the toggle had been clicked,
+ * so every guard the tab already has still applies. */
+BOOL w31_connect_click(HWND toggle)
+{
+    char t[16];
+    if (!toggle || !IsWindowEnabled(toggle)) return FALSE;
+    if (!GetWindowTextA(toggle, t, sizeof t) || lstrcmpA(t, "Connect") != 0) return FALSE;
+    SendMessageA(GetParent(toggle), WM_COMMAND,
+                 MAKEWPARAM(GetDlgCtrlID(toggle), BN_CLICKED), (LPARAM)toggle);
+    return TRUE;
+}
+
+#define PROP_CONN_TOGGLE "NavW31.ConnToggle"
+#define PROP_CONN_PROC   "NavW31.ConnProc"
+
+static LRESULT CALLBACK ConnFieldProc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    WNDPROC old = (WNDPROC)GetPropA(h, PROP_CONN_PROC);
+    switch (m) {
+    case WM_KEYDOWN:
+        if (w == VK_RETURN) {
+            w31_connect_click((HWND)GetPropA(h, PROP_CONN_TOGGLE));
+            return 0;
+        }
+        break;
+    case WM_CHAR:
+        if (w == '\r' || w == '\n') return 0;      /* no beep */
+        break;
+    case WM_GETDLGCODE:
+        return (old ? CallWindowProcA(old, h, m, w, l) : 0) | DLGC_WANTALLKEYS;
+    case WM_NCDESTROY:
+        RemovePropA(h, PROP_CONN_TOGGLE);
+        RemovePropA(h, PROP_CONN_PROC);
+        SetWindowLongPtrA(h, GWLP_WNDPROC, (LONG_PTR)old);
+        break;
+    }
+    return old ? CallWindowProcA(old, h, m, w, l) : DefWindowProcA(h, m, w, l);
+}
+
+void w31_connect_on_enter(HWND field, HWND toggle)
+{
+    if (!field || !toggle || GetPropA(field, PROP_CONN_PROC)) return;
+    SetPropA(field, PROP_CONN_TOGGLE, (HANDLE)toggle);
+    SetPropA(field, PROP_CONN_PROC, (HANDLE)GetWindowLongPtrA(field, GWLP_WNDPROC));
+    SetWindowLongPtrA(field, GWLP_WNDPROC, (LONG_PTR)ConnFieldProc);
+}
+
+/* 2026-11-24: see suite_w31.h. uIdSubclass = the pane, dwRefData = the
+ * toggle, so several panes may share one parent. */
+static LRESULT CALLBACK ConnPaneParentProc(HWND h, UINT m, WPARAM w, LPARAM l,
+                                           UINT_PTR id, DWORD_PTR ref)
+{
+    HWND pane = (HWND)id;
+    if (m == WM_LBUTTONDOWN && IsWindow(pane) && IsWindowVisible(pane) &&
+        !IsWindowEnabled(pane) && GetWindowTextLengthA(pane) == 0) {
+        RECT rc;
+        POINT pt;
+        pt.x = (short)LOWORD(l);
+        pt.y = (short)HIWORD(l);
+        GetWindowRect(pane, &rc);
+        MapWindowPoints(NULL, h, (POINT *)&rc, 2);
+        if (PtInRect(&rc, pt) && w31_connect_click((HWND)ref)) return 0;
+    }
+    if (m == WM_NCDESTROY) RemoveWindowSubclass(h, ConnPaneParentProc, id);
+    return DefSubclassProc(h, m, w, l);
+}
+
+void w31_connect_click_disabled_pane(HWND pane, HWND toggle)
+{
+    HWND parent = pane ? GetParent(pane) : NULL;
+    if (!parent || !toggle) return;
+    SetWindowSubclass(parent, ConnPaneParentProc, (UINT_PTR)pane, (DWORD_PTR)toggle);
 }
 
 HBRUSH w31_ctlcolor(UINT msg, HDC hdc, HWND ctl)
@@ -1169,9 +1443,17 @@ static void md_convert(HMENU m, int kind_default)
     }
 }
 
+/* A window whose system menu was converted once and for all (the main
+ * window, w31_caption_attach): Windows shows it, already owner-drawn.
+ * Every other Win 3.1 caption (dialogs, the image viewer) converts its
+ * system menu each time it is shown (cap_sysmenu), so nothing is kept
+ * per window. Navigator 2.0, docs/2026-11-23_NAVIGATOR_2.0_UI.md part 4. */
+#define PROP_SYSKEPT "NavW31.SysKept"
+
 static void cap_menubar_ownerdraw(HWND h)
 {
     HMENU m = GetMenu(h), sys = GetSystemMenu(h, FALSE);
+    if (sys) SetPropA(h, PROP_SYSKEPT, (HANDLE)1);
     /* The window's own copy of the system menu too (2026-11-11, ref13):
      * the same panel, font, navy bar, stipple and mnemonics as Help, no
      * glyph column. Windows still sets its items' states (Restore grayed
@@ -1245,6 +1527,8 @@ static void md_frame_after_item(HDC dc)
          * frame. A timer and a posted repaint were tried and do not stick. */
     }
 }
+
+void w31_menu_frame_after_item(HDC dc) { md_frame_after_item(dc); }
 
 static void cap_menubar_draw(const DRAWITEMSTRUCT *di)
 {
@@ -1356,14 +1640,18 @@ static LRESULT md_menuchar(WPARAM w, LPARAM l)
  * loaded at run time; ignored by Windows 10), its non-client area painted
  * here. The system menu and anything else stay as Windows draws them. */
 #define PROP_MENUOURS "NavW31.MenuOurs"
+#define PROP_MENUW98  "NavW31.MenuW98"   /* R2.2: a Windows 98 popup */
+static HMENU g_w98_menu = NULL;          /* R2.2: the one being tracked */
+void w31_menu_set_w98(HMENU m) { g_w98_menu = m; }
 static void menuwnd_style(HWND h)
 {
     typedef HRESULT (WINAPI *PFN_DWMSA)(HWND, DWORD, LPCVOID, DWORD);
     static PFN_DWMSA dsa = NULL;
     static BOOL tried = FALSE;
     HMENU m = (HMENU)SendMessageA(h, 0x01E1 /* MN_GETHMENU */, 0, 0);
-    if (!m || !is_our_popup(m)) return;
+    if (!m || !(is_our_popup(m) || (g_w98_menu && m == g_w98_menu))) return;
     SetPropA(h, PROP_MENUOURS, (HANDLE)1);
+    if (g_w98_menu && m == g_w98_menu) SetPropA(h, PROP_MENUW98, (HANDLE)1);
     if (!tried) {
         HMODULE dwm = LoadLibraryA("dwmapi.dll");
         tried = TRUE;
@@ -1393,6 +1681,31 @@ static void menuwnd_ncpaint(HWND h)
     ClientToScreen(h, &o);
     OffsetRect(&cr, o.x - wr.left, o.y - wr.top);
     OffsetRect(&wr, -wr.left, -wr.top);
+    if (GetPropA(h, PROP_MENUW98)) {
+        /* R2.2: the Windows 98 popup frame, 3 px: the raised 3D edge
+         * (light gray and white on the top and left, black and dark gray
+         * on the bottom and right), then a row of face gray */
+        HBRUSH face = CreateSolidBrush(RGB(192, 192, 192));
+        clip = CreateRectRgnIndirect(&wr);
+        {
+            HRGN c2 = CreateRectRgnIndirect(&cr);
+            CombineRgn(clip, clip, c2, RGN_DIFF);
+            DeleteObject(c2);
+        }
+        FillRgn(dc, clip, face);
+        DeleteObject(clip);
+        DeleteObject(face);
+        hline(dc, wr.left, wr.right - 1, wr.top, RGB(192, 192, 192));
+        vline(dc, wr.left, wr.top, wr.bottom - 1, RGB(192, 192, 192));
+        hline(dc, wr.left, wr.right, wr.bottom - 1, RGB(0, 0, 0));
+        vline(dc, wr.right - 1, wr.top, wr.bottom, RGB(0, 0, 0));
+        hline(dc, wr.left + 1, wr.right - 2, wr.top + 1, RGB(255, 255, 255));
+        vline(dc, wr.left + 1, wr.top + 1, wr.bottom - 2, RGB(255, 255, 255));
+        hline(dc, wr.left + 1, wr.right - 1, wr.bottom - 2, RGB(128, 128, 128));
+        vline(dc, wr.right - 2, wr.top + 1, wr.bottom - 1, RGB(128, 128, 128));
+        ReleaseDC(h, dc);
+        return;
+    }
     /* white everywhere outside the client area, then the black frame */
     clip = CreateRectRgnIndirect(&wr);
     {
@@ -1542,10 +1855,146 @@ static void cap_track(HWND h, int which)
                      which == CAP_MIN ? SC_MINIMIZE : (IsZoomed(h) ? SC_RESTORE : SC_MAXIMIZE), 0);
 }
 
+/* The Windows 3.1 system menu of a dialog or other captioned popup
+ * (Navigator 2.0, part 4). Windows would show such a window's menu in the
+ * Windows 11 style, and for a dialog (no icon) a single click on the box
+ * showed nothing at all. Here the window's menu is shown through
+ * w31_track_popup, the same panel as the main window's: below the box
+ * (at_box) or at the pointer (a right-click on the title bar). Only the
+ * items the window can use are listed (a dialog: Move and Close, as in
+ * Windows 3.1), with Windows' enabled states. The converted copy is
+ * discarded afterwards (GetSystemMenu TRUE). A second click on the box
+ * within the double-click time closes the window, the Windows 3.1
+ * double-click on the control-menu box. */
+static HWND  g_sys_shut_hwnd = NULL;   /* a click on the box just closed the menu */
+static DWORD g_sys_shut_tick = 0;
+
+static void cap_sysmenu(HWND h, int x, int y, BOOL at_box, BOOL by_mouse)
+{
+    RECT bar, sys, mn, mx, wr;
+    HMENU m;
+    LONG st;
+    BOOL zoomed, iconic;
+    DWORD t0;
+    int cmd, i;
+    if (!cap_rects(h, &bar, &sys, &mn, &mx)) return;
+    GetWindowRect(h, &wr);
+    OffsetRect(&sys, wr.left, wr.top);                       /* to screen */
+    if (at_box) { x = sys.left; y = sys.bottom; }
+    /* from Windows' default menu every time: a dialog's first copy comes
+     * pre-trimmed (Move, Close) and later ones not, so reset first and
+     * trim here (Move, a separator, Close: the main window's shape) */
+    GetSystemMenu(h, TRUE);
+    m = GetSystemMenu(h, FALSE);
+    if (!m) return;
+    st = GetWindowLongA(h, GWL_STYLE);
+    zoomed = IsZoomed(h);
+    iconic = IsIconic(h);
+    if (!(st & WS_THICKFRAME))  DeleteMenu(m, SC_SIZE,     MF_BYCOMMAND);
+    if (!(st & WS_MINIMIZEBOX)) DeleteMenu(m, SC_MINIMIZE, MF_BYCOMMAND);
+    if (!(st & WS_MAXIMIZEBOX)) DeleteMenu(m, SC_MAXIMIZE, MF_BYCOMMAND);
+    if (!(st & (WS_MINIMIZEBOX | WS_MAXIMIZEBOX))) DeleteMenu(m, SC_RESTORE, MF_BYCOMMAND);
+    /* no separator first, last or twice */
+    for (i = GetMenuItemCount(m) - 1; i >= 0; i--) {
+        MENUITEMINFOA mi;
+        BOOL sep, prev_sep = FALSE;
+        ZeroMemory(&mi, sizeof mi);
+        mi.cbSize = sizeof mi;
+        mi.fMask = MIIM_FTYPE;
+        if (!GetMenuItemInfoA(m, (UINT)i, TRUE, &mi)) continue;
+        sep = (mi.fType & MFT_SEPARATOR) != 0;
+        if (sep && i > 0) {
+            MENUITEMINFOA pv;
+            ZeroMemory(&pv, sizeof pv);
+            pv.cbSize = sizeof pv;
+            pv.fMask = MIIM_FTYPE;
+            if (GetMenuItemInfoA(m, (UINT)(i - 1), TRUE, &pv)) prev_sep = (pv.fType & MFT_SEPARATOR) != 0;
+        }
+        if (sep && (i == 0 || i == GetMenuItemCount(m) - 1 || prev_sep)) DeleteMenu(m, (UINT)i, MF_BYPOSITION);
+    }
+    /* and always a separator just before Close (refshots/ref13) */
+    for (i = 1; i < GetMenuItemCount(m); i++) {
+        if (GetMenuItemID(m, i) == SC_CLOSE) {
+            MENUITEMINFOA pv;
+            ZeroMemory(&pv, sizeof pv);
+            pv.cbSize = sizeof pv;
+            pv.fMask = MIIM_FTYPE;
+            if (GetMenuItemInfoA(m, (UINT)(i - 1), TRUE, &pv) && !(pv.fType & MFT_SEPARATOR))
+                InsertMenuA(m, (UINT)i, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            break;
+        }
+    }
+    EnableMenuItem(m, SC_RESTORE,  MF_BYCOMMAND | ((zoomed || iconic) ? MF_ENABLED : MF_GRAYED));
+    EnableMenuItem(m, SC_MOVE,     MF_BYCOMMAND | (!zoomed ? MF_ENABLED : MF_GRAYED));
+    EnableMenuItem(m, SC_SIZE,     MF_BYCOMMAND | ((!zoomed && !iconic) ? MF_ENABLED : MF_GRAYED));
+    EnableMenuItem(m, SC_MINIMIZE, MF_BYCOMMAND | (!iconic ? MF_ENABLED : MF_GRAYED));
+    EnableMenuItem(m, SC_MAXIMIZE, MF_BYCOMMAND | (!zoomed ? MF_ENABLED : MF_GRAYED));
+    EnableMenuItem(m, SC_CLOSE,    MF_BYCOMMAND | MF_ENABLED);
+    t0 = GetTickCount();
+    cmd = w31_track_popup(m, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON,
+                          x, y, h);
+    GetSystemMenu(h, TRUE);                 /* the converted copy goes */
+    if (cmd) {
+        SendMessageA(h, WM_SYSCOMMAND, (WPARAM)cmd, 0);
+        return;
+    }
+    if (at_box && by_mouse) {
+        POINT pt;
+        GetCursorPos(&pt);
+        if (PtInRect(&sys, pt) && (GetAsyncKeyState(VK_LBUTTON) & 0x8000)) {
+            if (GetTickCount() - t0 <= GetDoubleClickTime()) {
+                SendMessageA(h, WM_SYSCOMMAND, SC_CLOSE, 0);
+                return;
+            }
+            g_sys_shut_hwnd = h;            /* this press only closed the menu */
+            g_sys_shut_tick = GetTickCount();
+        }
+    }
+}
+
 /* The caption's messages; returns TRUE if handled (*res set). */
 static BOOL cap_proc(HWND h, UINT m, WPARAM w, LPARAM l, LRESULT *res)
 {
     RECT bar, sys, mn, mx;
+    /* part 4: every Win 3.1 caption but the main window's shows its system
+     * menu itself (cap_sysmenu) */
+    BOOL own_sys = GetPropA(h, PROP_SYSKEPT) == NULL;
+    if (own_sys) {
+        switch (m) {
+        case WM_NCLBUTTONDOWN:
+            if (w != HTSYSMENU) break;
+            if (g_sys_shut_hwnd == h && GetTickCount() - g_sys_shut_tick < 500) {
+                g_sys_shut_hwnd = NULL;     /* the press that closed the menu */
+                *res = 0;
+                return TRUE;
+            }
+            cap_sysmenu(h, 0, 0, TRUE, TRUE);
+            *res = 0;
+            return TRUE;
+        case WM_NCLBUTTONDBLCLK:
+            if (w != HTSYSMENU) break;
+            SendMessageA(h, WM_SYSCOMMAND, SC_CLOSE, 0);
+            *res = 0;
+            return TRUE;
+        case WM_CONTEXTMENU: {
+            LRESULT hit;
+            if ((HWND)w != h || l == (LPARAM)-1) break;
+            hit = SendMessageA(h, WM_NCHITTEST, 0, l);
+            if (hit != HTCAPTION && hit != HTSYSMENU) break;
+            cap_sysmenu(h, (short)LOWORD(l), (short)HIWORD(l), FALSE, TRUE);
+            *res = 0;
+            return TRUE;
+        }
+        case WM_SYSCOMMAND:
+            /* Alt+Space, and the mouse path Windows itself would take */
+            if (((w & 0xFFF0) == SC_KEYMENU && l == ' ') || (w & 0xFFF0) == SC_MOUSEMENU) {
+                cap_sysmenu(h, 0, 0, TRUE, FALSE);
+                *res = 0;
+                return TRUE;
+            }
+            break;
+        }
+    }
     switch (m) {
     case WM_NCPAINT: {
         /* Let Windows draw the frame and menu bar, clipped out of the
@@ -2619,9 +3068,77 @@ static LRESULT CALLBACK W31Proc(HWND h, UINT m, WPARAM w, LPARAM l)
     return W31ProcInner(h, m, w, l);
 }
 
+/* The right-click menu of an EDIT control (Navigator 2.0, part 4): the
+ * Windows 3.1 popup instead of the Windows 11 edit menu, app-wide (every
+ * child edit passes here; a tab that subclasses its own edit, as WAIS's
+ * output does, answers first). A read-only edit gets the shared text-view
+ * menu (Copy, Select All; suite_clipboard_context_menu) the tab panes use;
+ * an editable one the edit commands (Undo, Cut, Copy, Paste, Delete,
+ * Select All), each grayed when it has nothing to act on. */
+static LRESULT edit_context_menu(HWND h, LPARAM l)
+{
+    LONG  st  = GetWindowLongA(h, GWL_STYLE);
+    BOOL  ro  = (st & ES_READONLY) != 0;
+    BOOL  pw  = (st & ES_PASSWORD) != 0;
+    DWORD s = 0, e = 0;
+    int   len = GetWindowTextLengthW(h);
+    BOOL  has_sel, all;
+    POINT pt;
+    int   cmd;
+    SendMessageA(h, EM_GETSEL, (WPARAM)&s, (LPARAM)&e);
+    has_sel = e > s;
+    all = (s == 0 && (int)e >= len);
+    if (GetFocus() != h) SetFocus(h);
+    pt.x = (short)LOWORD(l);
+    pt.y = (short)HIWORD(l);
+    if (l == (LPARAM)-1) {                       /* Shift+F10, the menu key */
+        RECT rc;
+        GetWindowRect(h, &rc);
+        pt.x = rc.left + 8;
+        pt.y = rc.top + 8;
+    }
+    if (ro) {
+        cmd = suite_clipboard_context_menu(h, pt.x, pt.y, has_sel && !pw, len > 0 && !all);
+        if (cmd == SUITE_CTX_COPY)            SendMessageA(h, WM_COPY, 0, 0);
+        else if (cmd == SUITE_CTX_SELECT_ALL) SendMessageA(h, EM_SETSEL, 0, (LPARAM)-1);
+        return 0;
+    }
+    {
+        HMENU m = CreatePopupMenu();
+        BOOL can_paste = IsClipboardFormatAvailable(CF_UNICODETEXT) || IsClipboardFormatAvailable(CF_TEXT);
+        if (!m) return 0;
+        AppendMenuA(m, MF_STRING | (SendMessageA(h, EM_CANUNDO, 0, 0) ? 0u : (UINT)MF_GRAYED), 1, "&Undo\tCtrl+Z");
+        AppendMenuA(m, MF_SEPARATOR, 0, NULL);
+        AppendMenuA(m, MF_STRING | ((has_sel && !pw) ? 0u : (UINT)MF_GRAYED), 2, "Cu&t\tCtrl+X");
+        AppendMenuA(m, MF_STRING | ((has_sel && !pw) ? 0u : (UINT)MF_GRAYED), 3, "&Copy\tCtrl+C");
+        AppendMenuA(m, MF_STRING | (can_paste ? 0u : (UINT)MF_GRAYED), 4, "&Paste\tCtrl+V");
+        AppendMenuA(m, MF_STRING | (has_sel ? 0u : (UINT)MF_GRAYED), 5, "&Delete\tDel");
+        AppendMenuA(m, MF_SEPARATOR, 0, NULL);
+        AppendMenuA(m, MF_STRING | ((len > 0 && !all) ? 0u : (UINT)MF_GRAYED), 6, "Select &All\tCtrl+A");
+        cmd = w31_track_popup(m, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
+                              pt.x, pt.y, h);
+        DestroyMenu(m);
+        switch (cmd) {
+        case 1: SendMessageA(h, WM_UNDO,  0, 0); break;
+        case 2: SendMessageA(h, WM_CUT,   0, 0); break;
+        case 3: SendMessageA(h, WM_COPY,  0, 0); break;
+        case 4: SendMessageA(h, WM_PASTE, 0, 0); break;
+        case 5: SendMessageA(h, WM_CLEAR, 0, 0); break;
+        case 6: SendMessageA(h, EM_SETSEL, 0, (LPARAM)-1); break;
+        }
+    }
+    return 0;
+}
+
 static LRESULT W31ProcInner(HWND h, UINT m, WPARAM w, LPARAM l)
 {
     UINT kind = (UINT)(UINT_PTR)GetPropA(h, PROP_KIND);
+
+    if (m == WM_CONTEXTMENU && (kind & KIND_RESIZE)) {
+        char cls[16];
+        if (GetClassNameA(h, cls, sizeof cls) && lstrcmpiA(cls, "Edit") == 0)
+            return edit_context_menu(h, l);
+    }
 
     /* 2026-11-12 (docs/2026-11-12_FTP_TAB.md, section 9.1): a child whose
      * SIZE changes is redrawn in full, the CS_HREDRAW | CS_VREDRAW rule
@@ -2650,8 +3167,9 @@ static LRESULT W31ProcInner(HWND h, UINT m, WPARAM w, LPARAM l)
         if (m == WM_NCCALCSIZE) {
             LRESULT r = call_old(h, m, w, l);
             RECT *rc = w ? &((NCCALCSIZE_PARAMS *)l)->rgrc[0] : (RECT *)l;
-            InflateRect(rc, -1, -1);
             if (!GetPropA(h, PROP_MENUOURS)) menuwnd_style(h);
+            /* R2.2: a Windows 98 popup keeps 3 px for its raised frame */
+            InflateRect(rc, GetPropA(h, PROP_MENUW98) ? -3 : -1, GetPropA(h, PROP_MENUW98) ? -3 : -1);
             return r;
         }
         if (m == WM_NCPAINT) {
@@ -2685,7 +3203,9 @@ static LRESULT W31ProcInner(HWND h, UINT m, WPARAM w, LPARAM l)
         RemovePropA(h, PROP_TERM);
         RemovePropA(h, PROP_TXH);
         RemovePropA(h, PROP_ACT);
+        RemovePropA(h, PROP_SYSKEPT);
         RemovePropA(h, "NavW31.MenuOurs");
+        RemovePropA(h, PROP_MENUW98);
         return old ? CallWindowProcA(old, h, m, w, l) : 0;
     }
 
@@ -3052,6 +3572,15 @@ static LRESULT CALLBACK CbtProc(int code, WPARAM w, LPARAM l)
                 if (!(cs->style & WS_CHILD) && (cs->style & WS_CAPTION) == WS_CAPTION)
                     kind |= KIND_CAPTION;
             }
+            /* Navigator 2.0 (part 4): any other top-level window of
+             * Navigator's own classes with a caption (the Gopher image
+             * viewer) gets the same Windows 3.1 caption from birth. The
+             * main window is attached by the shell (w31_caption_attach). */
+            else if (!(cs->style & WS_CHILD) && (cs->style & WS_CAPTION) == WS_CAPTION
+                     && (HMODULE)GetClassLongPtrA(h, GCLP_HMODULE) == GetModuleHandleA(NULL)
+                     && lstrcmpA(cls, "TeletextNavigatorMain") != 0
+                     && lstrcmpA(cls, W31_MENUOWNER_CLASS) != 0)
+                kind |= KIND_CAPTION;
             if (cs->hwndParent) {
                 char pcls[16];
                 if (GetClassNameA(cs->hwndParent, pcls, sizeof pcls)
@@ -3082,7 +3611,10 @@ void w31_hook_resume(void)  { if (g_suspend > 0) g_suspend--; }
 /* Icons                                                               */
 /* ------------------------------------------------------------------ */
 
-#define W31_ICON_CACHE 32
+/* 2026-11-25: was 32, which the Gopher web-link globe (545) filled exactly
+ * (16 ribbon + 11 Gopher type + 5 Gopher+ ids); an id past the end gets
+ * NULL and draws nothing, silently. */
+#define W31_ICON_CACHE 64
 static struct { int id; HBITMAP bmp; } g_icons[W31_ICON_CACHE];
 
 HBITMAP w31_icon(int resource_id)

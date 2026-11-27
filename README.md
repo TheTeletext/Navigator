@@ -4,20 +4,20 @@ The retro internet client of [The Teletext](https://www.teletext.ca): one
 Windows app with a client for each live retro service of The Teletext, each
 speaking the real protocol to a real server rather than imitating it.
 
-[![download](https://img.shields.io/badge/download-Teletext__Navigator__1.7.2.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
+[![download](https://img.shields.io/badge/download-Teletext__Navigator__2.0.0.msi-blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![release](https://img.shields.io/github/v/release/TheTeletext/Navigator?label=release&color=blue)](https://github.com/TheTeletext/Navigator/releases/latest)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](COPYING)
 
-Download: [Teletext_Navigator_1.7.2.msi](https://github.com/TheTeletext/Navigator/releases/latest)
+Download: [Teletext_Navigator_2.0.0.msi](https://github.com/TheTeletext/Navigator/releases/latest)
 (SHA-256 published beside it).
 
 ---
 
 ## Status
 
-**1.7.2**, November 2026.
+**2.0**, November 2026.
 
-New in 1.7.2: the BBS tab calls a board the way a modem did. When you choose Connect, a dialing window shows the call, the modems' handshake plays, and the modem reports CONNECT before the board's screen appears. If the board does not answer, you hear the telephone network's tones and a recorded announcement, then NO CARRIER. You can turn it off in Settings, under BBS. The RIPscrip tab now works with more boards: it answers a board's check for an ANSI terminal, shows the plain text a board sends between its pictures, such as a login prompt or a menu, and clears the screen when a button asks for it. From 1.7.1 the update installs and reopens by itself; from 1.7 the old setup wizard runs one last time.
+New in 2.0: START opens the Active Desktop: an icon for every service, the Channel Bar with four Active Channels, The Teletext's first, and the World News Ticker, a new world news story every 15 seconds from independent publishers, each credited to its source; click it to read the whole article. The Canada News Ticker and maps of Montreal's weather and traffic are ready in Customize My Desktop. A channel's logo gleams when it has new content, and it opens in the Web service beside a Channels pane. The Web service fills in and sends forms, shows pages in other languages and scripts, such as Japanese, Chinese and Greek, and draws a page's text first, then its pictures one by one. The Gopher service browses one menu at a time, as the clients of the period did, and speaks Gopher+: attributes, alternative views and forms. Site lists in the BBS, Videotex, Web, Gopher, FTP, Newsgroups and IRC services fill in well-known servers for you.
 
 ---
 
@@ -26,9 +26,9 @@ New in 1.7.2: the BBS tab calls a board the way a modem did. When you choose Con
 | tab | protocol | default server |
 | --- | --- | --- |
 | RIPscrip | RIPscrip 1.54 over telnet, with Zmodem downloads | ripscrip.teletext.ca:23 |
-| BBS | an ANSI bulletin board terminal (CP437, 80 x 25) over telnet, with Zmodem downloads | bbs.teletext.ca:2026 |
+| BBS | an ANSI bulletin board terminal (CP437, 80 x 25) over telnet, with Zmodem downloads | bbs.teletext.ca:2026, and a Site list of 13 more boards |
 | NABU | a built-in NABU PC on the NABU adapter protocol | nabu.teletext.ca:5816 |
-| Videotex | Minitel (port 516) and NAPLPS (port 1983) | videotex.teletext.ca |
+| Videotex | Minitel (Telnet port 516, or WebSocket) and NAPLPS (port 1983) | minitel.teletext.ca:516, naplps.teletext.ca:1983 |
 | Retro Web Browser | HTTP, W3C libwww 5.4.1; Flash movies through Ruffle | http://www.teletext.ca/ (plain HTTP, as the browsers of the period) |
 | Gopher | RFC 1436 | gopher.teletext.ca:70 |
 | ARPANET FTP-Mail | RFC 765 and RFC 691 | arpanet.teletext.ca:2121 |
@@ -88,7 +88,7 @@ Configuration; the FTP tab starts there too.
 The installer, with its SHA-256, is on the download page:
 https://www.teletext.ca/software
 
-Run `Teletext_Navigator_1.7.2.msi`. It installs to
+Run `Teletext_Navigator_2.0.0.msi`. It installs to
 `Program Files\Teletext Navigator` for all users.
 
 **The installer is not code-signed.** Windows SmartScreen will probably show

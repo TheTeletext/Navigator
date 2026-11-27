@@ -139,7 +139,9 @@
  * embedded '\n'); single-row labels (WAIS, Archie, Gopher, IRC, Terminal)
  * sit vertically centered so they align with the two-row tabs. */
 static const suite_module_t g_modules[ID_MODULE_COUNT] = {
-    { "Home",                      SUITE_ID_HOME,
+    /* Navigator 1.8: the first button is START (was "Home"), operator
+     * 2026-11-21; still SUITE_ID_HOME, the Active Desktop. */
+    { "START",                     SUITE_ID_HOME,
       home_module_activate, home_module_deactivate,
       home_module_resize,   home_module_on_command,
       home_module_has_unsaved },
@@ -166,7 +168,9 @@ static const suite_module_t g_modules[ID_MODULE_COUNT] = {
       web_module_activate, web_module_deactivate,
       web_module_resize, web_module_on_command,
       web_module_has_unsaved },
-    { "Gopher",                    ID_BTN_GOPHER,
+    /* Navigator 2.0 (2026-11-23): "Gopher+", the service is Gopher+ since
+     * the port 70 cutover (docs/2026-11-23_NAVIGATOR_2.0_UI.md, part 1). */
+    { "Gopher+",                   ID_BTN_GOPHER,
       gopher_module_activate, gopher_module_deactivate,
       gopher_module_resize,   gopher_module_on_command,
       gopher_module_has_unsaved },
@@ -219,13 +223,13 @@ static const suite_module_t g_modules[ID_MODULE_COUNT] = {
  * each tab carries its own, the shipped numbers kept and the BBS given
  * the next free one, 1600. */
 static const struct { int icon; const char *tip; DWORD help; } g_ribbon[ID_MODULE_COUNT] = {
-    { IDB_W31_HOME,     "Home: every destination",               100 },
+    { IDB_W31_HOME,     "START: the Active Desktop",              100 },
     { IDB_W31_RIPSCRIP, "RIPscrip graphical bulletin board",     200 },
     { IDB_W31_BBS,      "The Teletext BBS: ANSI bulletin board", 1600 },
     { IDB_W31_NABU,     "The NABU Network",                      300 },
     { IDB_W31_VIDEOTEX, "Videotex: Minitel and NAPLPS",          400 },
     { IDB_W31_WEB,      "Retro Web Browser",                     500 },
-    { IDB_W31_GOPHER,   "Gopher",                                600 },
+    { IDB_W31_GOPHER,   "Gopher+",                               600 },
     { IDB_W31_ARPANET,  "ARPANET FTP-Mail",                      700 },
     { IDB_W31_WAIS,     "WAIS full-text search",                 800 },
     { IDB_W31_ARCHIE,   "Archie FTP archive search",             900 },
@@ -248,10 +252,17 @@ static HWND g_hwndButtons[ID_MODULE_COUNT] = { NULL };
 static HWND g_hwndContent = NULL;
 static HWND g_hwndStatus  = NULL;
 static HWND g_hwndProgress = NULL;   /* the status bar's progress well */
-static int  g_progress     = -1;     /* its percentage; -1 hidden */
+static int  g_progress     = -1;     /* its percentage; -1 idle (empty) */
 #define NAV_PROGRESS_CLASS "TeletextNavigatorProgress"
 #define PROGRESS_W     88            /* refshots/ref18 at native pixels */
 #define PROGRESS_GAP   6
+/* The Gopher+ lamp (2026-11-22, docs/2026-11-22_GOPHER_PLUS_LAMP.md,
+ * refshots/ref47): a recessed VFD readout at the status bar's far right,
+ * shown only while its owner tab is active. -1 hidden, 0 dark, 1 lit. */
+static HWND g_hwndLamp = NULL;
+static int  g_lamp     = -1;
+static HFONT g_hFontLamp = NULL;
+#define NAV_LAMP_CLASS "TeletextNavigatorGopherLamp"
 static int  g_active_module = -1;
 
 static int  g_dpi = 96;
@@ -386,6 +397,17 @@ static LRESULT CALLBACK ProgressProc(HWND h, UINT m, WPARAM w, LPARAM l)
         ob = (HBITMAP)SelectObject(mdc, bm);
         w31_sunken(mdc, &rc);
         in = rc; InflateRect(&in, -1, -1);
+        /* Navigator 2.0 (part 5): idle, the well is shown empty, the
+         * bevel and the face only, no fill and no figure. */
+        if (g_progress < 0) {
+            FillRect(mdc, &in, g_w31_br_face);
+            BitBlt(dc, 0, 0, rc.right, rc.bottom, mdc, 0, 0, SRCCOPY);
+            SelectObject(mdc, ob);
+            DeleteObject(bm);
+            DeleteDC(mdc);
+            EndPaint(h, &ps);
+            return 0;
+        }
         fill = in; fill.right = in.left + (int)((long)(in.right - in.left) * pct / 100);
         rest = in; rest.left = fill.right;
         br = CreateSolidBrush(RGB(0x3F, 0x3F, 0x3F));
@@ -430,8 +452,9 @@ void suite_set_progress(int owner, int pct)
     if (pct < 0) {
         if (!was) return;
         g_progress = -1;
-        ShowWindow(g_hwndProgress, SW_HIDE);
-        layout_children(g_hwndMain);
+        SetWindowTextA(g_hwndProgress, "");     /* idle: shown, empty */
+        InvalidateRect(g_hwndProgress, NULL, FALSE);
+        UpdateWindow(g_hwndProgress);
         return;
     }
     if (was && pct == g_progress) return;
@@ -444,12 +467,110 @@ void suite_set_progress(int owner, int pct)
         t[sizeof t - 1] = 0;
         SetWindowTextA(g_hwndProgress, t);
     }
-    if (!was) {
-        layout_children(g_hwndMain);
-        ShowWindow(g_hwndProgress, SW_SHOWNA);
-    }
     InvalidateRect(g_hwndProgress, NULL, FALSE);
     UpdateWindow(g_hwndProgress);
+}
+
+/* The Gopher+ lamp's paint (refshots/ref47, colours as drawn there; the
+ * mesh and the filament lines of ref47 removed 2026-11-22 at Dimitri's
+ * request, refshots/ref48): a 1px #565656 border, a #2f2f2f shadow inside
+ * its top and left edges, a solid panel (#060b07 dark, #04120a lit), and
+ * GOPHER+ in a bold monospace face: dark etched, or green with a halo.
+ * Double-buffered; a status light only (no click). */
+static void lamp_paint(HDC dc, int w, int h, int lit)
+{
+    COLORREF bg   = lit ? RGB(0x04, 0x12, 0x0A) : RGB(0x06, 0x0B, 0x07);
+    COLORREF word = lit ? RGB(0x49, 0xFF, 0x78) : RGB(0x2F, 0x4A, 0x38);
+    RECT r, in, tr;
+    HBRUSH br;
+    HGDIOBJ of;
+    int x, y, f1, f2;
+    static const char txt[] = "GOPHER+";
+    r.left = 0; r.top = 0; r.right = w; r.bottom = h;
+    br = CreateSolidBrush(RGB(0x56, 0x56, 0x56)); FillRect(dc, &r, br); DeleteObject(br);
+    in = r; InflateRect(&in, -1, -1);
+    br = CreateSolidBrush(bg); FillRect(dc, &in, br); DeleteObject(br);
+    f1 = in.top + 2; f2 = in.bottom - 3;            /* the word's band */
+    if (!g_hFontLamp)
+        g_hFontLamp = CreateFontA(-12, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                                  ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                  ANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
+    of = SelectObject(dc, g_hFontLamp ? (HGDIOBJ)g_hFontLamp : GetStockObject(ANSI_FIXED_FONT));
+    SetBkMode(dc, TRANSPARENT);
+    SetTextCharacterExtra(dc, 1);
+    tr = in; tr.top = f1 + 1; tr.bottom = f2;
+    /* the word on the solid panel (lit: with its halo); no mesh since
+     * 2026-11-22 (Dimitri: a clean, solid background) */
+    if (lit) {
+        static const int d[8][2] = { {-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1} };
+        int k;
+        SetTextColor(dc, RGB(0x1D, 0x46, 0x2C));
+        for (k = 0; k < 8; k++) {
+            RECT g = tr; OffsetRect(&g, d[k][0], d[k][1]);
+            DrawTextA(dc, txt, -1, &g, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        }
+    }
+    SetTextColor(dc, word);
+    DrawTextA(dc, txt, -1, &tr, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    SetTextCharacterExtra(dc, 0);
+    /* the recess: shadow inside the top and left edges */
+    for (x = in.left; x < in.right; x++) SetPixelV(dc, x, in.top, RGB(0x2F, 0x2F, 0x2F));
+    for (y = in.top; y < in.bottom; y++) SetPixelV(dc, in.left, y, RGB(0x2F, 0x2F, 0x2F));
+    SelectObject(dc, of);
+}
+
+static LRESULT CALLBACK LampProc(HWND hw, UINT m, WPARAM wp, LPARAM lp)
+{
+    if (m == WM_ERASEBKGND) return 1;
+    if (m == WM_NCHITTEST) return HTTRANSPARENT;   /* a status light: no click */
+    if (m == WM_PAINT) {
+        PAINTSTRUCT ps;
+        HDC dc = BeginPaint(hw, &ps), mdc;
+        HBITMAP bm, ob;
+        RECT rc;
+        GetClientRect(hw, &rc);
+        mdc = CreateCompatibleDC(dc);
+        bm = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
+        ob = (HBITMAP)SelectObject(mdc, bm);
+        lamp_paint(mdc, rc.right, rc.bottom, g_lamp > 0);
+        BitBlt(dc, 0, 0, rc.right, rc.bottom, mdc, 0, 0, SRCCOPY);
+        SelectObject(mdc, ob);
+        DeleteObject(bm);
+        DeleteDC(mdc);
+        EndPaint(hw, &ps);
+        return 0;
+    }
+    return DefWindowProcA(hw, m, wp, lp);
+}
+
+void suite_set_gopher_lamp(int owner, int state)
+{
+    int idx = command_id_to_index(owner);
+    int was = g_lamp;
+    if (!g_hwndLamp || !g_hwndMain) return;
+    if (idx < 0 || idx != g_active_module) return;
+    if (state > 1) state = 1;
+    if (state < -1) state = -1;
+    if (state == was) return;
+    g_lamp = state;
+    /* readable by a test harness in another process, like the status line */
+    SetWindowTextA(g_hwndLamp, state < 0 ? "" : (state ? "Gopher+ lamp: lit" : "Gopher+ lamp: dark"));
+    if (state < 0) {
+        ShowWindow(g_hwndLamp, SW_HIDE);
+        return;
+    }
+    if (was < 0) ShowWindow(g_hwndLamp, SW_SHOWNA);
+    InvalidateRect(g_hwndLamp, NULL, FALSE);
+    UpdateWindow(g_hwndLamp);
+}
+
+/* Navigator 2.0 (2026-11-23, docs/2026-11-23_NAVIGATOR_2.0_UI.md, part 2):
+ * the lamp left the status bar. It is a child of the content window and
+ * its tab places it (right edge and top, content client coordinates). */
+void suite_place_gopher_lamp(int right, int top)
+{
+    if (!g_hwndLamp) return;
+    MoveWindow(g_hwndLamp, right - SUITE_LAMP_W, top, SUITE_LAMP_W, SUITE_LAMP_H, TRUE);
 }
 
 static void register_content_class(HINSTANCE hInst)
@@ -469,6 +590,13 @@ static void register_content_class(HINSTANCE hInst)
     wc.hInstance = hInst;
     wc.hCursor = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
     wc.lpszClassName = NAV_PROGRESS_CLASS;
+    RegisterClassExA(&wc);
+    ZeroMemory(&wc, sizeof(wc));
+    wc.cbSize = sizeof(wc);
+    wc.lpfnWndProc = LampProc;
+    wc.hInstance = hInst;
+    wc.hCursor = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
+    wc.lpszClassName = NAV_LAMP_CLASS;
     RegisterClassExA(&wc);
 }
 
@@ -535,11 +663,18 @@ static void switch_to_module(int idx)
      * clean "Ready". Modules may overwrite during their on_activate if
      * they want to display something specific. */
     suite_set_status("Ready");
-    /* A load's bar belongs to its tab: never carried to another. */
+    /* A load's bar belongs to its tab: never carried to another. The well
+     * itself stays, empty (Navigator 2.0, part 5). */
     if (g_progress >= 0 && g_hwndProgress) {
         g_progress = -1;
-        ShowWindow(g_hwndProgress, SW_HIDE);
-        layout_children(g_hwndMain);
+        SetWindowTextA(g_hwndProgress, "");
+        InvalidateRect(g_hwndProgress, NULL, FALSE);
+    }
+    /* So does the Gopher+ lamp: its tab shows it again on activate. */
+    if (g_lamp >= 0 && g_hwndLamp) {
+        g_lamp = -1;
+        SetWindowTextA(g_hwndLamp, "");
+        ShowWindow(g_hwndLamp, SW_HIDE);
     }
 
     if (g_modules[idx].on_activate)
@@ -685,15 +820,18 @@ static void layout_children(HWND hwnd)
     /* The status line is a STATIC inset in a sunken panel that the main
      * window paints round it (WM_PAINT). It stays a STATIC because the
      * test harnesses read it cross-process. */
-    /* With a progress well showing, the status text keeps its place and
-     * gives up only its right end to the well. */
-    if (g_progress >= 0 && g_hwndProgress) {
-        MoveWindow(g_hwndStatus, 6, h - status + 5,
-                   w - 12 - PROGRESS_W - PROGRESS_GAP, status - 8, TRUE);
-        MoveWindow(g_hwndProgress, w - 6 - PROGRESS_W, h - status + 5,
-                   PROGRESS_W, status - 8, TRUE);
-    } else {
-        MoveWindow(g_hwndStatus, 6, h - status + 5, w - 12, status - 8, TRUE);
+    /* Navigator 2.0 (part 5): the progress well is ALWAYS there, at the
+     * status bar's right end, the same place and size on every tab, empty
+     * when idle; the status text ends before it. (The Gopher+ lamp left
+     * the status bar in part 2: its tab places it above the menu.) */
+    {
+        int right = w - 6;
+        if (g_hwndProgress) {
+            MoveWindow(g_hwndProgress, right - PROGRESS_W, h - status + 5,
+                       PROGRESS_W, status - 8, TRUE);
+            right -= PROGRESS_W + PROGRESS_GAP;
+        }
+        MoveWindow(g_hwndStatus, 6, h - status + 5, right - 6, status - 8, TRUE);
     }
     InvalidateRect(hwnd, NULL, TRUE);
 
@@ -765,7 +903,9 @@ static LRESULT CALLBACK SuiteWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
         if (g_hwndStatus && g_hFontUI)
             SendMessageA(g_hwndStatus, WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
         g_hwndProgress = CreateWindowA(NAV_PROGRESS_CLASS, "",
-            WS_CHILD, 0, 0, PROGRESS_W, STATUS_H, hwnd, NULL, hInst, NULL);
+            WS_CHILD | WS_VISIBLE, 0, 0, PROGRESS_W, STATUS_H, hwnd, NULL, hInst, NULL);
+        g_hwndLamp = CreateWindowA(NAV_LAMP_CLASS, "",
+            WS_CHILD, 0, 0, SUITE_LAMP_W, SUITE_LAMP_H, g_hwndContent, NULL, hInst, NULL);
 
         layout_children(hwnd);
         SetWindowTextA(hwnd, SUITE_WINDOW_TITLE);
@@ -924,6 +1064,9 @@ static LRESULT CALLBACK SuiteWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
         break;
 
     case WM_DESTROY:
+        /* Navigator 1.8: stop the Teletext Desktop's channel store first
+         * (it never waits more than about three seconds). */
+        home_module_shutdown();
         PostQuitMessage(0);
         return 0;
 
@@ -963,9 +1106,24 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nShow)
             || strstr(lpCmdLine, "--render-copy-all") == lpCmdLine)) {
         BOOL  is_tokens    = (strstr(lpCmdLine, "--render-tokens")    == lpCmdLine);
         BOOL  is_copy_all  = (strstr(lpCmdLine, "--render-copy-all")  == lpCmdLine);
+        /* 2026-11-24: --render-tokens-desktop = the same dump through a
+         * desktop item's view (no_link_underline), for the ticker check */
+        BOOL  is_desk      = (strstr(lpCmdLine, "--render-tokens-desktop") == lpCmdLine);
+        /* 2026-11-24: --render-tokens-fills = the dump plus background fills */
+        BOOL  is_fills     = (strstr(lpCmdLine, "--render-tokens-fills") == lpCmdLine);
+        /* 2026-11-25: --render-tokens-images = the dump after the page's
+         * images were fetched against its final (post-redirect) address,
+         * with that base noted; a test aid for the redirect fix */
+        BOOL  is_images    = (strstr(lpCmdLine, "--render-tokens-images") == lpCmdLine);
         const char *flag   = is_copy_all ? "--render-copy-all"
+                           : is_desk     ? "--render-tokens-desktop"
+                           : is_fills    ? "--render-tokens-fills"
+                           : is_images   ? "--render-tokens-images"
                            : is_tokens   ? "--render-tokens"
                                          : "--render-dump";
+        web_module_render_tokens_desktop(is_desk);
+        web_module_render_tokens_fills(is_fills);
+        web_module_render_tokens_images(is_images);
         char *p = lpCmdLine + (int)strlen(flag);
         char  url[2048];
         char  outp[1024];

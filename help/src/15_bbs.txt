@@ -24,7 +24,7 @@ The BBS service is an ANSI terminal: an 80 by 25 character screen in the PC's ch
 
 @topic bbs_connect | Calling the BBS | BBS;connecting;Connect button;Disconnect;host;port;Telnet;welcome | bbs
 1. Choose **BBS** on the ribbon.
-2. Host and Port are set for The Teletext BBS: bbs.teletext.ca and 2026. To call another board, type its host and port.
+2. Host and Port are set for The Teletext BBS: bbs.teletext.ca and 2026. To call another board, choose it in the **Site** list, which fills in Host and Port, or type its host and port. Choosing a site does not call it. The list names The Teletext, CVCFED BBS, MtlGeek, Vertrauen BBS, The Keep BBS, Diamond Mine Online, The Crazy Terminal BBS, The Gate BBS, Slimelite BBS, Reign of Fire BBS, Nuclear Reactor BBS, Rolling BBS, Atari Gateway and 13th Floor BBS. These boards are run by their own sysops, not by The Teletext; most ask you to log in or to sign up as a new user.
 3. Choose **Connect**.
 
 Navigator first plays the call as a modem made it: the dialing window, the handshake and the modem's report. See [[bbs_modem|The Modem Handshake]]. The board is called when that screen clears.
@@ -33,18 +33,18 @@ The board checks your terminal, then shows its welcome screen. Press ENTER withi
 
 To end the call, press Q at the main menu, or choose **Disconnect**. The last screen stays in view until you call again.
 
-@topic bbs_modem | The Modem Handshake | BBS;modem;handshake;dialing;CONNECT 4800;CONNECTED;NO CARRIER;Modem handshake simulation;Settings menu | bbs
+@topic bbs_modem | The Modem Handshake | BBS;modem;handshake;dialing;ringing;CONNECT 4800;CONNECTED;NO CARRIER;Modem handshake simulation;Settings menu | bbs
 When callers reached a board by modem, their terminal program put a window over the screen while it dialed, and the modem's speaker played the two modems agreeing on a connection. Navigator shows the call the same way when you choose **Connect**:
 
-1. A dialing window, in the style of the Telix terminal program, shows the board being dialed, the host and port being called, the serial settings, the time the call started and a countdown. While the window is up, Navigator checks that the board answers.
-2. If it answers, the sound of a dial-up modem's handshake plays. When it ends, the modem's report appears, with a three-note chime, as terminal programs sounded the PC speaker when a call connected.
+1. A dialing window, in the style of an early-1990s DOS terminal program, shows the board being dialed, the host and port being called, the serial settings, the time the call started and a countdown. While the window is up, Navigator checks that the board answers.
+2. If it answers, the sound of a dial-up call plays: the dial tone, the number being dialed, the line ringing twice, then the board's modem answering and the two modems' handshake. When it ends, the modem's report appears, with a three-note chime, as terminal programs sounded the PC speaker when a call connected.
 3. Three seconds after the chime the screen clears and Navigator calls the board. Its welcome screen follows; on The Teletext BBS you have the full 40 seconds to press ENTER.
 
 = The Teletext BBS and other boards
 For The Teletext BBS (the host bbs.teletext.ca) the window reads "Dialing: Teletext BBS" and the modem reports CONNECT 4800: 4,800 bits per second, the speed at which the board draws its screens. For any other board the window reads "Dialing: BBS" and the modem reports CONNECTED, since its speed is that board's own.
 
 = When the board does not answer
-If the host does not exist, refuses the call or does not answer within 10 seconds, there is no handshake. Instead you hear what a caller heard when a number could not be reached: the dial tone, the number being dialed, the telephone network's three rising tones and a recorded announcement. When it ends, NO CARRIER appears and the BBS service is disconnected. The status bar gives the reason. Check the host and port, and choose **Connect** again.
+If the host does not exist, refuses the call or does not answer within 10 seconds, there is no handshake. Instead you hear what a caller heard when a number could not be reached: the dial tone, the number being dialed, a ring cut short by the telephone network's three rising tones, and a recorded announcement. When it ends, NO CARRIER appears and the BBS service is disconnected. The status bar gives the reason. Check the host and port, and choose **Connect** again.
 
 = Cancelling
 Press ESC, or choose **Disconnect**, at any time before the screen clears to cancel the call. The board is not called.
@@ -88,6 +88,9 @@ The board ended the call after four keys in a row that the screen did not name. 
 
 = The board offers plain text
 The board did not recognise an ANSI terminal. This happens only with another terminal program; Navigator answers the board's check.
+
+= Another board asks a question before its first screen
+Some boards ask a question before their first screen. If a board asks which kind of terminal you have, choose ANSI or IBM graphics. A few boards check that a person is calling: The Crazy Terminal BBS and Slimelite BBS ask you to press Esc twice, and The Crazy Terminal BBS hangs up if you do not within 20 seconds. Atari Gateway connects you onward to Atari computers' boards, some of which send Atari graphics characters that the BBS tab cannot show.
 
 = A download stopped
 The status bar gives the reason, such as "The sender stopped responding." The partial file has been deleted; choose the file and press D again. The board allows three downloads in one call.

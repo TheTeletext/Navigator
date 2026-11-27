@@ -97,7 +97,8 @@ static BOOL g_w_connected = FALSE;
 static WNDPROC g_orig_search_proc = NULL;
 static WNDPROC g_orig_doc_proc    = NULL;
 static WNDPROC g_orig_output_proc = NULL;
-static WNDPROC g_orig_field_proc  = NULL;   /* shared by server/port/db */
+/* each field's own previous WndProc, as a property (2026-11-26) */
+#define WAIS_FIELD_OLD "NavWaisFieldOld"
 
 /* True once the controls have been created. On subsequent activations we
  * just ShowWindow them back so all in-progress state (search query,
@@ -186,6 +187,9 @@ static LRESULT CALLBACK SearchEditSub(HWND h, UINT m, WPARAM w, LPARAM l)
 
 static LRESULT CALLBACK OutputSub(HWND h, UINT m, WPARAM w, LPARAM l)
 {
+    /* R1.2: the empty output while not connected carries the watermark */
+    if (m == WM_PAINT && !g_w_connected && GetWindowTextLengthA(h) == 0)
+        return w31_paint_with_watermark(h, g_orig_output_proc, w, l);   /* clipped, 2026-11-27 */
     switch (m) {
     case WM_GETDLGCODE: {
         /* Claim arrow keys so the (now-bypassed) IsDialogMessage path
@@ -200,7 +204,13 @@ static LRESULT CALLBACK OutputSub(HWND h, UINT m, WPARAM w, LPARAM l)
         return r;
     }
     case WM_LBUTTONDOWN: {
-        LRESULT r = CallWindowProcA(g_orig_output_proc, h, m, w, l);
+        LRESULT r;
+        /* 2026-11-24: a click on the empty output while not connected (the
+         * power watermark, R1.2) connects, as the other tabs' panes do */
+        if (!g_w_connected && GetWindowTextLengthA(h) == 0 &&
+            w31_connect_click(g_w_connect_btn))
+            return 0;
+        r = CallWindowProcA(g_orig_output_proc, h, m, w, l);
         HideCaret(h);
         return r;
     }
@@ -269,7 +279,7 @@ static LRESULT CALLBACK FieldScrollSub(HWND h, UINT m, WPARAM w, LPARAM l)
 {
     if (m == WM_GETDLGCODE) {
         MSG *pmsg = (MSG *)l;
-        LRESULT base = CallWindowProcA(g_orig_field_proc, h, m, w, l);
+        LRESULT base = CallWindowProcA((WNDPROC)GetPropA(h, WAIS_FIELD_OLD), h, m, w, l);
         if (pmsg && pmsg->message == WM_KEYDOWN &&
             (pmsg->wParam == VK_UP    || pmsg->wParam == VK_DOWN ||
              pmsg->wParam == VK_PRIOR || pmsg->wParam == VK_NEXT))
@@ -284,7 +294,11 @@ static LRESULT CALLBACK FieldScrollSub(HWND h, UINT m, WPARAM w, LPARAM l)
         case VK_NEXT:  if (g_w_output) SendMessageA(g_w_output, WM_VSCROLL, SB_PAGEDOWN, 0); return 0;
         }
     }
-    return CallWindowProcA(g_orig_field_proc, h, m, w, l);
+    if (m == WM_NCDESTROY) {
+        WNDPROC old = (WNDPROC)RemovePropA(h, WAIS_FIELD_OLD);
+        return old ? CallWindowProcA(old, h, m, w, l) : DefWindowProcA(h, m, w, l);
+    }
+    return CallWindowProcA((WNDPROC)GetPropA(h, WAIS_FIELD_OLD), h, m, w, l);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1440,6 +1454,8 @@ void wais_module_activate(HWND content)
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
         0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_WAIS_CONNECT_BTN, hInst, NULL);
     g_w_disconnect_btn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+    w31_connect_on_enter(g_w_server_edit, g_w_connect_btn);   /* Navigator 2.0 part 7 */
+    w31_connect_on_enter(g_w_port_edit,   g_w_connect_btn);
 
     /* Row 3 */
     g_w_proto_lbl = CreateWindowA("STATIC", "Protocol: Z39.50-1988",
@@ -1499,12 +1515,20 @@ void wais_module_activate(HWND content)
         g_w_doc_edit,    GWLP_WNDPROC, (LONG_PTR)DocEditSub);
     g_orig_output_proc = (WNDPROC)SetWindowLongPtrA(
         g_w_output,      GWLP_WNDPROC, (LONG_PTR)OutputSub);
-    /* All three field edits share the same default WndProc (Edit class),
-     * so capturing it once from the server edit covers all three. */
-    g_orig_field_proc = (WNDPROC)SetWindowLongPtrA(
-        g_w_server_edit, GWLP_WNDPROC, (LONG_PTR)FieldScrollSub);
-    SetWindowLongPtrA(g_w_port_edit, GWLP_WNDPROC, (LONG_PTR)FieldScrollSub);
-    SetWindowLongPtrA(g_w_db_edit,   GWLP_WNDPROC, (LONG_PTR)FieldScrollSub);
+    /* 2026-11-26 (docs/2026-11-26_WORLD_NEWS_TICKER_RENAMES_BAR_LOCK_WAIS.md
+     * s1.2): each field chains to ITS OWN previous WndProc. They no longer
+     * share one: since 2.0 part 7, Server and Port are already subclassed
+     * by w31_connect_on_enter (ConnFieldProc) and Database is not, so the
+     * one global taken from Server sent every Database message to
+     * ConnFieldProc, which found no Enter hook on it and fell through to
+     * DefWindowProc: the field painted gray and empty, its font ignored,
+     * although it held "teletext". */
+    SetPropA(g_w_server_edit, WAIS_FIELD_OLD, (HANDLE)SetWindowLongPtrA(
+        g_w_server_edit, GWLP_WNDPROC, (LONG_PTR)FieldScrollSub));
+    SetPropA(g_w_port_edit, WAIS_FIELD_OLD, (HANDLE)SetWindowLongPtrA(
+        g_w_port_edit, GWLP_WNDPROC, (LONG_PTR)FieldScrollSub));
+    SetPropA(g_w_db_edit, WAIS_FIELD_OLD, (HANDLE)SetWindowLongPtrA(
+        g_w_db_edit, GWLP_WNDPROC, (LONG_PTR)FieldScrollSub));
 
     GetClientRect(content, &rc);
     wais_module_resize(content, rc.right - rc.left, rc.bottom - rc.top);

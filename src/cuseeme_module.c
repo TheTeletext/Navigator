@@ -1424,6 +1424,14 @@ static LRESULT CALLBACK render_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             if (desk_click((short)LOWORD(lParam), (short)HIWORD(lParam))) {
                 if (g_drag_slider) SetCapture(hwnd);
                 InvalidateRect(hwnd, NULL, FALSE);
+            } else if (!g_connected) {
+                /* Navigator 2.0 part 7 (Dimitri): a click on the picture
+                 * (the test card while disconnected) connects; the eye,
+                 * speaker, slider and windows keep their clicks above */
+                POINT pt;
+                pt.x = (short)LOWORD(lParam);
+                pt.y = (short)HIWORD(lParam);
+                if (PtInRect(&g_lay.video, pt)) w31_connect_click(g_hConnectBtn);
             }
             return 0;
         case WM_MOUSEMOVE:
@@ -1541,6 +1549,8 @@ void cuseeme_module_activate(HWND content) {
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
             0, 0, W31_TOGGLE_W, W31_TOGGLE_H, content, (HMENU)(INT_PTR)IDC_CUSM_CONNECT_BTN, hInst, NULL);
         g_hDisconnectBtn = NULL;   /* merged into the Connect toggle, 2026-11-11 */
+        w31_connect_on_enter(g_hReflEdit, g_hConnectBtn);   /* Navigator 2.0 part 7 */
+        w31_connect_on_enter(g_hPortEdit, g_hConnectBtn);
 
         g_hRender = CreateWindowExA(0, CUSM_RENDER_CLASS, "",
             WS_CHILD | WS_VISIBLE,

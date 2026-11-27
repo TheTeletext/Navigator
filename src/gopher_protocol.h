@@ -34,6 +34,16 @@ typedef enum {
 
 #define GOPHER_TIMEOUT_SEC 15
 
+/* gopher_fetch_sync's return when Stop ended the fetch (2026-11-20). */
+#define GOPHER_ERR_CANCELLED 6
+
+/* Stop: close the socket of the fetch in progress, from any thread; the
+ * fetch returns GOPHER_ERR_CANCELLED. The flag stays set until
+ * gopher_fetch_cancel_reset(), which the caller runs before each new fetch
+ * (on its own thread, while no fetch is running). */
+void gopher_fetch_cancel(void);
+void gopher_fetch_cancel_reset(void);
+
 /* Synchronous fetch. Blocks the calling thread until the transfer is
  * complete, the timeout fires, or the connection drops.
  *
@@ -56,6 +66,44 @@ int gopher_fetch_sync(const char *host, int port,
  * start), for the status bar: RFC 1436 carries no length, so a count is
  * all there is (2026-11-11, docs/2026-11-11_STATUS_PROGRESS.md). */
 extern volatile LONG g_gopher_bytes_read;
+
+/* ---------- Gopher+ (2026-11-22, docs/2026-11-22_GOPHER_PLUS_PHASE2.md) ----------
+ *
+ * A Gopher+ reply starts with a header line (memo s2.3): '+' success or '-'
+ * failure, then a decimal token: N >= 0 = exactly N bytes follow, -1 = the
+ * data ends with a lone "." line, -2 = the data ends when the server closes
+ * (DataHead ::= Success Transfer CR-LF; Transfer ::= DigitSeq | '-1' | '-2').
+ * A reply that does not start with such a line is a plain RFC 1436 reply:
+ * the server did not take the request as Gopher+, and the caller shows the
+ * bytes as such (status GPLUS_HDR_NONE). */
+#define GPLUS_HDR_NONE   0   /* no header: a plain reply                      */
+#define GPLUS_HDR_OK     1   /* '+' header                                    */
+#define GPLUS_HDR_ERROR  2   /* '-' header: the body is the error text        */
+
+typedef struct {
+    int  status;             /* GPLUS_HDR_*                                   */
+    long length;             /* the token: >= 0 exact count, -1 or -2         */
+    int  short_body;         /* an exact count that was not reached           */
+} GopherPlusHeader;
+
+/* Send `request` (request_n bytes, already complete: the selector, TAB and
+ * the Gopher+ command, CRLF and any data block) and read the reply. The
+ * header is removed and the framing applied: an exact count is cut to that
+ * many bytes, a -1 body is un-stuffed and cut at its "." line, a -2 body is
+ * kept whole. With no header the bytes are kept whole, and when text_body is
+ * set (a menu or a document) un-stuffed as gopher_fetch_sync() does.
+ * Same return codes, Stop hook and byte counter as gopher_fetch_sync(); the
+ * buffer is NUL-terminated. The plain path never comes through here. */
+int gopher_fetch_plus(const char *host, int port,
+                      const char *request, size_t request_n,
+                      int text_body,
+                      char **out_bytes, size_t *out_size,
+                      GopherPlusHeader *hdr);
+
+/* The total of the running fetch when its header declared an exact length
+ * (header line included, so it compares with g_gopher_bytes_read); 0 when
+ * the length is not known. For a real progress percentage. */
+extern volatile LONG g_gopher_bytes_total;
 
 /* Parse a gopher:// URL. Accepted forms:
  *   gopher://host[:port]

@@ -57,7 +57,8 @@
  * beyond a sanitized base name, never over an existing file.
  *
  * THE MODEM HANDSHAKE SIMULATION (1.7.2, Settings > BBS..., on by default):
- * Connect first shows Telix's dialing window and plays the modems'
+ * Connect first shows a dialing window in the look of an early-1990s DOS
+ * terminal program's and plays the modems'
  * handshake, then CONNECT 4800; the TCP connection opens only when that
  * screen clears three seconds later. See the section below and
  * docs/2026-11-16_NAVIGATOR_172_MODEM_SIM.md.
@@ -66,6 +67,13 @@
  * screen as UTF-8 text to that file whenever it changes (at most every
  * 200 ms), so a gate can wait for a screen to name a key before pressing
  * it. Off unless the variable is set.
+ *
+ * TEST HOOK (2026-11-25, docs/2026-11-25_NAVIGATOR_BBS_FOLLOWUP.md C).
+ * NAV_BBS_RAW_LOG=<file> writes every byte the board sends to the screen,
+ * exactly as the ANSI interpreter receives it (after the Telnet layer has
+ * taken its own commands out; Zmodem frames are not included), to that
+ * file. Emptied at each Connect, appended as bytes arrive. Off unless the
+ * variable is set.
  */
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -81,6 +89,7 @@
 #include "suite_config.h"
 #include "suite_w31.h"
 #include "telnet_proto.h"
+#include "suite_sites.h"
 #include "zmodem_recv.h"
 #include "gwb_font8x16.h"
 #include "suite_res.h"
@@ -98,6 +107,7 @@
 #define IDC_BBS_PORT_EDIT   6802
 #define IDC_BBS_CONNECT_BTN 6803
 #define IDC_BBS_CANVAS      6805
+#define IDC_BBS_SITE_CMB    6806   /* Navigator 2.0: the Site list */
 
 #define BBS_PANEL_CLASS   "MGTBbsPanel"
 #define BBS_CANVAS_CLASS  "MGTBbsScreenV1"
@@ -120,6 +130,11 @@
 
 static HWND g_hContent, g_hPanel, g_hCanvas;
 static HWND g_hHostLbl, g_hHostEdit, g_hPortLbl, g_hPortEdit, g_hConnBtn;
+/* Navigator 2.0 (operator, 2026-11-24, D16): the built-in Site list. A
+ * pick writes Host AND Port as text, so sim_host_is_ours and the port
+ * check in do_connect see exactly what a typed address gives them. */
+static HWND g_hSiteLbl, g_hSiteCmb;
+static BOOL g_site_filling;
 static BOOL g_created, g_panel_reg, g_canvas_reg;
 
 static TelnetProto *g_telnet;
@@ -141,6 +156,7 @@ static unsigned long g_zdone;
 
 /* the screen dump test hook */
 static char  g_dump_path[MAX_PATH];
+static char  g_raw_path[MAX_PATH];   /* NAV_BBS_RAW_LOG (2026-11-25) */
 static BOOL  g_dump_pending;
 
 static unsigned char g_last_vk;   /* the key behind the next WM_CHAR */
@@ -172,6 +188,52 @@ static void bbs_status(const char *fmt, ...)
     va_end(ap);
     buf[sizeof buf - 1] = '\0';
     suite_set_status(buf);
+}
+
+/* D1 (operator, 2026-11-25; docs/2026-11-25_NAVIGATOR_BBS_FOLLOWUP.md A):
+ * the idle text and the "Ready." status name the board the Host and Port
+ * fields hold, not always The Teletext BBS. The Site entry whose host and
+ * port match gives its label; our own entry (index 0) keeps the wording it
+ * always had, "The Teletext BBS"; a host matching no entry is named as
+ * typed; an empty Host names no board (out is ""). The dialing screen keeps
+ * its own wording (sim_host_is_ours). */
+static void bbs_board_name(char *out, size_t n)
+{
+    char host[256], port[16], *h, *e;
+    int idx, cnt;
+    const suite_site_t *t;
+    out[0] = '\0';
+    if (!g_hHostEdit || !g_hPortEdit) return;
+    GetWindowTextA(g_hHostEdit, host, sizeof host);
+    GetWindowTextA(g_hPortEdit, port, sizeof port);
+    h = host;
+    while (*h == ' ' || *h == '\t') h++;
+    e = h + strlen(h);
+    while (e > h && (e[-1] == ' ' || e[-1] == '\t')) *--e = '\0';
+    if (!*h) return;
+    idx = suite_sites_find(SITES_TAB_BBS, h, atoi(port));
+    t = suite_sites_table(SITES_TAB_BBS, &cnt);
+    if (idx == 0)                     snprintf(out, n, "The Teletext BBS");
+    else if (idx > 0 && t && idx < cnt) snprintf(out, n, "%s", t[idx].label);
+    else                              snprintf(out, n, "%s", h);
+}
+
+/* "Not connected. Press Connect to call <board>." or "Not connected." */
+static void bbs_idle_hint(char *out, size_t n)
+{
+    char b[256];
+    bbs_board_name(b, sizeof b);
+    if (b[0]) snprintf(out, n, "Not connected. Press Connect to call %s.", b);
+    else      snprintf(out, n, "Not connected.");
+}
+
+/* "Ready. Press Connect to call <board>." or "Ready." */
+static void bbs_status_ready(void)
+{
+    char b[256];
+    bbs_board_name(b, sizeof b);
+    if (b[0]) bbs_status("Ready. Press Connect to call %s.", b);
+    else      bbs_status("Ready.");
 }
 
 /* ------------------------------------------------------------------ */
@@ -483,16 +545,23 @@ static void canvas_paint(HWND hwnd, HDC hdc)
     if (!g_ever_drew) {
         HDC mem = CreateCompatibleDC(hdc);
         HBITMAP bmp = CreateCompatibleBitmap(hdc, cw, ch), old;
-        const char *hint = g_connected
-            ? "Connected. Waiting for the BBS..."
-            : "Not connected. Press Connect to call The Teletext BBS.";
+        char idle[400];
+        const char *hint = idle;
+        if (g_connected) hint = "Connected. Waiting for the BBS...";
+        else bbs_idle_hint(idle, sizeof idle);          /* D1 */
         if (!mem || !bmp) { if (mem) DeleteDC(mem); if (bmp) DeleteObject(bmp); return; }
         old = (HBITMAP)SelectObject(mem, bmp);
         FillRect(mem, &rc, (HBRUSH)GetStockObject(BLACK_BRUSH));
+        RECT tr = rc;
+        int  tt = g_connected ? -1 : w31_power_watermark_text_top(&rc);
+        if (!g_connected) w31_draw_power_watermark(mem, &rc);   /* R1.2 */
         SetBkMode(mem, TRANSPARENT);
         SetTextColor(mem, RGB(170, 170, 170));
         if (g_hFontUI) SelectObject(mem, g_hFontUI);
-        DrawTextA(mem, hint, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        /* A1 (2026-11-23): below the button, never over it */
+        if (tt >= 0) tr.top = tt;
+        DrawTextA(mem, hint, -1, &tr,
+                  DT_CENTER | (tt >= 0 ? DT_TOP : DT_VCENTER) | DT_SINGLELINE);
         BitBlt(hdc, 0, 0, cw, ch, mem, 0, 0, SRCCOPY);
         SelectObject(mem, old);
         DeleteObject(bmp);
@@ -556,6 +625,10 @@ static void feed_screen(const unsigned char *data, int len)
     char resp[64];
     int n;
     if (len <= 0) return;
+    if (g_raw_path[0]) {                       /* test hook NAV_BBS_RAW_LOG */
+        FILE *f = fopen(g_raw_path, "ab");
+        if (f) { fwrite(data, 1, (size_t)len, f); fclose(f); }
+    }
     ansi_feed(&g_term, data, len);
     /* the cursor-position report the host asked for */
     n = ansi_take_response(&g_term, resp, sizeof resp);
@@ -877,8 +950,10 @@ static void sim_feed(const char *fmt, ...)
 
 /* ---- the screens ------------------------------------------------------
  *
- * Modelled on the period evidence (report s2): Telix 3.22's status window
- * while it dials, the figure in its own manual (TELIX.DOC, "4.8 Automatic
+ * Modelled on the period evidence (docs/2026-11-16_NAVIGATOR_172_MODEM_SIM.md
+ * s2, which names three early-1990s DOS terminal programs Program 1 to 3):
+ * Program 1's (version 3.22) status window
+ * while it dials, the figure in its own manual (its DOC file, "4.8 Automatic
  * Queue Redial"), CP437 frame and labels as printed there:
  *
  *   ╒═╡ Redial ╞═════════════════════════════════════════════════╕
@@ -891,7 +966,7 @@ static void sim_feed(const char *fmt, ...)
  *   ╘════════════════════════════════════════════════════════════╛
  *
  * "... 22" is the countdown of the current attempt. Only the key the
- * simulation honours is offered: Esc (Telix 3.51: "Pressing <Esc> ...
+ * simulation honours is offered: Esc (Program 1, 3.51: "Pressing <Esc> ...
  * will abort the current dial attempt"). The number is what a Telnet
  * modem dials, the Host and Port fields. Colours are not evidenced; the
  * window takes the BBS tab's own text-window colours (the Zmodem window:
@@ -964,7 +1039,7 @@ static void sim_compose(void)
         if (left < 0) left = 0;
         sim_feed("\x1b[1;37;44m");
         /* ╒═╡ Dialing ╞════...╕, the labels right-aligned on their colons
-         * as in Telix's figure */
+         * as in Program 1's figure */
         memset(b, 0xCD, sizeof b);
         b[0] = 0xD5; b[SIM_BOX_W - 1] = 0xB8;
         b[2] = 0xB5; memcpy(b + 3, " Dialing ", 9); b[12] = 0xC6;
@@ -1165,6 +1240,7 @@ static void sim_begin(void)
     sim_event(g_sim_ours ? "dial-start ours" : "dial-start other");
     EnableWindow(g_hHostEdit, FALSE);
     EnableWindow(g_hPortEdit, FALSE);
+    EnableWindow(g_hSiteCmb, FALSE);
     w31_toggle_set(g_hConnBtn, TRUE);      /* Disconnect hangs up the show */
     sim_compose();
     screen_changed();
@@ -1176,11 +1252,11 @@ static void sim_begin(void)
 
 /* ---- the connect chime (operator, 2026-11-17) -------------------------
  * The DOS terminal programs sounded the PC speaker when a call connected
- * (Telix "sounds an alarm", ProComm "The alarm will sound when you
- * connect"). The only tones found documented are Qmodem 3.1's: its setup
+ * (Program 1 "sounds an alarm", Program 3 "The alarm will sound when you
+ * connect"). The only tones found documented are Program 2's (3.1): its setup
  * screen reads "Connect Tones, up to 3 may be defined [1000] [1200]
- * [1400]", and a Qmodem BEEP "lasts for approximately 1/5 of a second"
- * (QMODEM.DOC). So: 1000, 1200, 1400 Hz, 200 ms each, back to back, as
+ * [1400]", and a Program 2 BEEP "lasts for approximately 1/5 of a second"
+ * (its manual). So: 1000, 1200, 1400 Hz, 200 ms each, back to back, as
  * square waves (the PC speaker's timbre), synthesized here and played
  * through the normal audio path with the result code. The 3 s pause
  * before the clear starts when the chime ends. */
@@ -1274,8 +1350,9 @@ static int sim_sit_start(void)
 
 /* ---- the intercept (operator, 2026-11-17) -------------------------------
  * A dial that fails now plays the telephone intercept, the operator's
- * approved recording (RCDATA 404, assets/sound/intercept.wav, 13.96 s):
- * dial tone, the DTMF dialing, the special information tones, the
+ * approved recording (RCDATA 404, assets/sound/intercept_ring.wav, 15.05 s):
+ * dial tone, the DTMF dialing, a ring cut off at 1.5 s by the special
+ * information tones (2026-11-19), the
  * announcement "Your call cannot be completed as dialed...", the tones
  * again, and a hang-up click. The dialing window stays up while it plays;
  * when it ends, NO CARRIER and the tab is disconnected. The synthesized
@@ -1382,6 +1459,10 @@ static void do_connect(void)
     if (port <= 0 || port > 65535) port = BBS_DEFAULT_PORT;
     snprintf(g_host, sizeof g_host, "%s", host);
     g_port = port;
+    if (g_raw_path[0]) {                       /* NAV_BBS_RAW_LOG: one call per file */
+        FILE *f = fopen(g_raw_path, "wb");
+        if (f) fclose(f);
+    }
 
     ansi_init(&g_term);
     g_ever_drew = FALSE;
@@ -1416,7 +1497,47 @@ static void bbs_set_session_ui(BOOL connected)
     if (!g_created) return;
     EnableWindow(g_hHostEdit, !connected);
     EnableWindow(g_hPortEdit, !connected);
+    EnableWindow(g_hSiteCmb, !connected);
     w31_toggle_set(g_hConnBtn, connected);
+}
+
+/* The Site list shows the entry Host and Port name now, or nothing. */
+static void bbs_site_sync(void)
+{
+    char host[256], port[16];
+    int sel;
+    if (!g_hSiteCmb || g_site_filling) return;
+    GetWindowTextA(g_hHostEdit, host, sizeof host);
+    GetWindowTextA(g_hPortEdit, port, sizeof port);
+    sel = suite_sites_find(SITES_TAB_BBS, host, atoi(port));
+    if ((int)SendMessageA(g_hSiteCmb, CB_GETCURSEL, 0, 0) != sel)
+        SendMessageA(g_hSiteCmb, CB_SETCURSEL, (WPARAM)sel, 0);
+}
+
+/* A board picked from the list: Host and Port only; Connect calls it. */
+static void bbs_pick_site(int idx)
+{
+    int n;
+    const suite_site_t *t = suite_sites_table(SITES_TAB_BBS, &n);
+    suite_site_addr_t a;
+    char port[16];
+    if (!t || idx < 0 || idx >= n) return;
+    if (suite_sites_parse(t[idx].address, &a) != SITES_OK) return;
+    g_site_filling = TRUE;
+    SetWindowTextA(g_hHostEdit, a.host);
+    snprintf(port, sizeof port, "%d", a.port);
+    SetWindowTextA(g_hPortEdit, port);
+    g_site_filling = FALSE;
+    if (!g_ever_drew && g_hCanvas) InvalidateRect(g_hCanvas, NULL, FALSE);   /* D1: idle text */
+    SendMessageA(g_hSiteCmb, CB_SETCURSEL, (WPARAM)idx, 0);
+    {
+        /* close-out D1 (2026-11-25): the same board name as the idle and
+         * Ready lines, so our own entry reads "The Teletext BBS" (its list
+         * label stays "The Teletext"); every other board: its label */
+        char b[256];
+        bbs_board_name(b, sizeof b);
+        bbs_status("%s: %s port %d. Press Connect to call it.", b[0] ? b : t[idx].label, a.host, a.port);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1461,7 +1582,7 @@ static int key_down(WPARAM vk)
     const char *seq = NULL;
 
     if (g_sim != SIM_OFF) {
-        /* the dialing show: Esc exits (Telix); every other key belongs to
+        /* the dialing show: Esc exits (as in Program 1); every other key belongs to
          * the terminal program, and there is no line to send it on */
         if (vk == VK_ESCAPE) sim_abort();
         return 1;
@@ -1533,6 +1654,9 @@ static LRESULT CALLBACK CanvasProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         return DLGC_WANTALLKEYS | DLGC_WANTCHARS | DLGC_WANTARROWS | DLGC_WANTTAB;
     case WM_LBUTTONDOWN:
         SetFocus(hwnd);
+        /* Navigator 2.0 part 7: a click on the idle screen calls the board
+         * (not during the dial show: the toggle then reads Disconnect) */
+        if (!g_connected) w31_connect_click(g_hConnBtn);
         return 0;
     case WM_KEYDOWN:
         if (key_down(wParam)) return 0;
@@ -1658,6 +1782,38 @@ static void register_classes(HINSTANCE hInst)
 /* Module entry points                                                 */
 /* ------------------------------------------------------------------ */
 
+/* 2026-11-25: the Site list is as wide as its widest label in its own font
+ * (suite_w31 draws the items with WM_GETFONT), plus the arrow button and
+ * the item padding, never under the 150 px it was. With fourteen boards
+ * "The Crazy Terminal BBS" was cut off at 150 in the field and the list. */
+static int g_site_cmb_w = 150;
+static void bbs_site_cmb_fit(void)
+{
+    HDC dc;
+    HFONT f, of = NULL;
+    int n, i, widest = 0;
+    if (!g_hSiteCmb) return;
+    dc = GetDC(g_hSiteCmb);
+    if (!dc) return;
+    f = (HFONT)SendMessageA(g_hSiteCmb, WM_GETFONT, 0, 0);
+    if (f) of = (HFONT)SelectObject(dc, f);
+    n = (int)SendMessageA(g_hSiteCmb, CB_GETCOUNT, 0, 0);
+    for (i = 0; i < n; i++) {
+        char t[128];
+        SIZE sz;
+        LRESULT len = SendMessageA(g_hSiteCmb, CB_GETLBTEXTLEN, (WPARAM)i, 0);
+        if (len <= 0 || len >= (LRESULT)sizeof t) continue;
+        SendMessageA(g_hSiteCmb, CB_GETLBTEXT, (WPARAM)i, (LPARAM)t);
+        if (GetTextExtentPoint32A(dc, t, (int)len, &sz) && sz.cx > widest) widest = sz.cx;
+    }
+    if (of) SelectObject(dc, of);
+    ReleaseDC(g_hSiteCmb, dc);
+    /* the drop-down's scroll bar is as wide as the arrow button, so the
+     * field and the list leave the same room; 12 px of item padding */
+    widest += GetSystemMetrics(SM_CXVSCROLL) + 12;
+    g_site_cmb_w = widest > 150 ? widest : 150;
+}
+
 void bbs_module_resize(HWND content, int w, int h)
 {
     const int margin = 16, row_h = 26;
@@ -1670,6 +1826,9 @@ void bbs_module_resize(HWND content, int w, int h)
     MoveWindow(g_hHostEdit, margin + 44,  14, 240, row_h, TRUE);
     MoveWindow(g_hPortLbl,  margin + 300, 18, 35,  22,    TRUE);
     MoveWindow(g_hPortEdit, margin + 338, 14, 55,  row_h, TRUE);
+    /* Navigator 2.0: Site after Port, on the same row */
+    MoveWindow(g_hSiteLbl,  margin + 409, 18, 35,  22,    TRUE);
+    MoveWindow(g_hSiteCmb,  margin + 447, 14, g_site_cmb_w, 200, TRUE);
     MoveWindow(g_hConnBtn, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2,
                W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
     RedrawWindow(g_hPanel, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
@@ -1698,7 +1857,7 @@ void bbs_module_activate(HWND content)
             bbs_status("Connected to %s:%d.", g_host, g_port);
         } else {
             SetFocus(g_hConnBtn);
-            bbs_status("Ready. Press Connect to call The Teletext BBS.");
+            bbs_status_ready();                       /* D1 */
         }
         return;
     }
@@ -1708,6 +1867,8 @@ void bbs_module_activate(HWND content)
         if (n == 0 || n >= sizeof g_dump_path) g_dump_path[0] = '\0';
         n = GetEnvironmentVariableA("NAV_BBS_EVENT_LOG", g_sim_log, sizeof g_sim_log);
         if (n == 0 || n >= sizeof g_sim_log) g_sim_log[0] = '\0';
+        n = GetEnvironmentVariableA("NAV_BBS_RAW_LOG", g_raw_path, sizeof g_raw_path);
+        if (n == 0 || n >= sizeof g_raw_path) g_raw_path[0] = '\0';
     }
     register_classes(hInst);
     GetClientRect(content, &rc);
@@ -1726,23 +1887,35 @@ void bbs_module_activate(HWND content)
     g_hConnBtn = CreateWindowA("BUTTON", "Connect", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                                0, 0, W31_TOGGLE_W, W31_TOGGLE_H, g_hPanel,
                                (HMENU)(INT_PTR)IDC_BBS_CONNECT_BTN, hInst, NULL);
+    w31_connect_on_enter(g_hHostEdit, g_hConnBtn);   /* Navigator 2.0 part 7 */
+    w31_connect_on_enter(g_hPortEdit, g_hConnBtn);
+    /* Navigator 2.0: the Site list, a drop-down LIST (the Windows 3.1 look
+     * comes from suite_w31 by itself) */
+    g_hSiteLbl = CreateWindowA("STATIC", "Site:", WS_CHILD | WS_VISIBLE | SS_LEFTNOWORDWRAP,
+                               0, 0, 35, 22, g_hPanel, NULL, hInst, NULL);
+    g_hSiteCmb = CreateWindowA("COMBOBOX", "", WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+                               0, 0, 150, 200, g_hPanel, (HMENU)(INT_PTR)IDC_BBS_SITE_CMB, hInst, NULL);
+    suite_sites_fill_combo(g_hSiteCmb, SITES_TAB_BBS);
     g_hCanvas = CreateWindowExA(WS_EX_CLIENTEDGE, BBS_CANVAS_CLASS, "", WS_CHILD | WS_VISIBLE,
                                 0, 0, 100, 100, g_hPanel, (HMENU)(INT_PTR)IDC_BBS_CANVAS, hInst, NULL);
     if (g_hFontUI) {
-        HWND all[] = { g_hHostLbl, g_hHostEdit, g_hPortLbl, g_hPortEdit, g_hConnBtn };
+        HWND all[] = { g_hHostLbl, g_hHostEdit, g_hPortLbl, g_hPortEdit, g_hConnBtn,
+                       g_hSiteLbl, g_hSiteCmb };
         int k;
         for (k = 0; k < (int)(sizeof all / sizeof all[0]); k++)
             SendMessageA(all[k], WM_SETFONT, (WPARAM)g_hFontUI, TRUE);
     }
+    bbs_site_cmb_fit();
     ansi_init(&g_term);
     g_created = TRUE;
     bbs_set_session_ui(FALSE);
+    bbs_site_sync();                 /* the defaults are "The Teletext" */
     SetTimer(g_hCanvas, ID_TIMER_BLINK, 133, NULL);
     if (g_dump_path[0]) SetTimer(g_hCanvas, ID_TIMER_DUMP, 200, NULL);
     GetClientRect(content, &rc);
     bbs_module_resize(content, rc.right - rc.left, rc.bottom - rc.top);
     SetFocus(g_hConnBtn);
-    bbs_status("Ready. Press Connect to call The Teletext BBS.");
+    bbs_status_ready();                       /* D1 */
 }
 
 void bbs_module_deactivate(HWND content)
@@ -1753,7 +1926,30 @@ void bbs_module_deactivate(HWND content)
 
 BOOL bbs_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
 {
-    (void)content; (void)lParam;
+    (void)content;
+    /* Navigator 2.0: the Site list and the fields it mirrors */
+    if (LOWORD(wParam) == IDC_BBS_SITE_CMB) {
+        /* act once the list is closed, as the Videotex Format list does */
+        if ((HIWORD(wParam) == CBN_SELCHANGE
+             && !SendMessageA((HWND)lParam, CB_GETDROPPEDSTATE, 0, 0))
+            || HIWORD(wParam) == CBN_CLOSEUP) {
+            int sel = (int)SendMessageA((HWND)lParam, CB_GETCURSEL, 0, 0);
+            if (sel >= 0 && !g_connected && !g_telnet && g_sim == SIM_OFF)
+                bbs_pick_site(sel);
+        }
+        return TRUE;
+    }
+    if ((LOWORD(wParam) == IDC_BBS_HOST_EDIT || LOWORD(wParam) == IDC_BBS_PORT_EDIT)
+        && HIWORD(wParam) == EN_CHANGE) {
+        bbs_site_sync();
+        /* D1: a hand edit while idle renames the board in the idle text
+         * and the status line (a pick says its own line, bbs_pick_site) */
+        if (!g_site_filling && !g_connected && !g_telnet && g_sim == SIM_OFF) {
+            if (!g_ever_drew && g_hCanvas) InvalidateRect(g_hCanvas, NULL, FALSE);
+            bbs_status_ready();
+        }
+        return TRUE;
+    }
     if (LOWORD(wParam) == IDC_BBS_CONNECT_BTN) {
         if (g_sim != SIM_OFF) {               /* hang up the dialing show */
             sim_abort();

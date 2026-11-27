@@ -49,6 +49,11 @@ class Icon:
         # n = 32 for the ribbon set; 16 for the Gopher item icons (2026-11-11)
         self.n = n
         self.p = [[BG] * n for _ in range(n)]
+        # 2026-11-23 (Navigator 2.0): an icon may carry its own palette,
+        # the VGA order with unused slots given exact colours (the Gopher+
+        # badge, refshots/ref52). None = the plain VGA palette, so every
+        # other bitmap is written byte for byte as before.
+        self.pal = None
 
     def px(self, x, y, c):
         if 0 <= x < self.n and 0 <= y < self.n:
@@ -160,6 +165,73 @@ def icon_home():
     return ic
 
 
+def icon_start():                                 # 2026-11-23: a checkered flag
+    """START, Navigator 2.0 review round 1 (docs/2026-11-23_NAVIGATOR_2.0_UI.md):
+    a checkered flag on a pole. The flag waves (each column drops by a
+    sine), black and white squares of 4 px, a black outline; the pole dark
+    gray with a white highlight, a yellow knob on top. The power button it
+    replaces is kept as icon_start_power() (the not-connected watermark is
+    drawn from the same glyph in suite_w31.c)."""
+    import math
+    ic = Icon()
+    x0, top, cols, rows = 9, 5, 5, 4                 # 5 x 4 squares of 4 px
+    # the wave steps by whole columns of squares, so every square stays whole
+    drops = [0, -1, -2, -1, 1]
+    for c in range(cols):
+        d = drops[c]
+        for r in range(rows):
+            col = WHT if (c + r) % 2 == 0 else K
+            ic.fill(x0 + 4 * c, top + d + 4 * r, x0 + 4 * c + 3, top + d + 4 * r + 3, col)
+        xa, xb = x0 + 4 * c, x0 + 4 * c + 3
+        ic.line(xa, top + d - 1, xb, top + d - 1, K)                 # outline, top
+        ic.line(xa, top + d + 4 * rows, xb, top + d + 4 * rows, K)   # outline, bottom
+        if c > 0 and drops[c - 1] != d:                              # join the steps
+            p = drops[c - 1]
+            ic.line(xa, top + min(p, d) - 1, xa, top + max(p, d) - 1, K)
+            ic.line(xa, top + min(p, d) + 4 * rows, xa, top + max(p, d) + 4 * rows, K)
+    xe = x0 + 4 * cols                                               # the free end
+    ic.line(xe, top + drops[-1] - 1, xe, top + drops[-1] + 4 * rows, K)
+    ic.fill(5, 4, 7, 30, DG); ic.frame(4, 3, 8, 30)  # the pole
+    ic.line(5, 4, 5, 29, WHT)
+    ic.disc(6, 2.5, 2.4, 2.4, YEL)                   # the knob, outlined
+    ic.px(5, 1, WHT)
+    return ic
+
+
+def icon_start_power():                           # 2026-11-21 .. 2026-11-23
+    """The START icon until 2026-11-23 (kept, not used by the ribbon): a
+    round green power button. Black rim, a lime crescent of light at the
+    top left, the IEC 5009 power symbol in white."""
+    import math
+    ic = Icon()
+    cx, cy, r = 15.5, 15.5, 14.6
+    for y in range(32):
+        for x in range(32):
+            d = math.hypot(x - cx, y - cy)
+            if d > r:
+                continue
+            c = GRN
+            if math.hypot(x - (cx + 2.6), y - (cy + 2.6)) > r - 0.4:
+                c = LIM                                  # the light
+            ic.px(x, y, c)
+    # the rim: every disc pixel with an outside 4-neighbour
+    for y in range(32):
+        for x in range(32):
+            if math.hypot(x - cx, y - cy) <= r and any(
+                    math.hypot(x + a - cx, y + b - cy) > r
+                    for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                ic.px(x, y, K)
+    # the power symbol: a broken ring and a stem through the gap
+    for y in range(32):
+        for x in range(32):
+            dx, dy = x - cx, y - (cy + 1)
+            d = math.hypot(dx, dy)
+            if 6.0 <= d <= 8.3 and not (dy < 0 and abs(dx) < 4.2):
+                ic.px(x, y, WHT)
+    ic.fill(15, 5, 16, 15, WHT)
+    return ic
+
+
 def icon_ripscrip():
     ic = Icon()
     crt(ic, 2, 2, 29, 25, BLU)
@@ -262,6 +334,19 @@ def icon_gopher():
     for x in range(0, 32, 3):
         ic.px(x, 27 if x < 4 or x > 27 else 31, LIM)
     ic.fill(9, 25, 23, 26, OLI); ic.line(8, 25, 24, 25, K)          # body into hole
+    # 2026-11-23 (Navigator 2.0, the tab is "Gopher+"): the Gopher+ badge of
+    # refshots/ref52 at the lower right, an 11x11 lamp panel: a 1px #565656
+    # border, the #060b07 panel and a 7x7 plus three pixels thick in the
+    # lamp's lit green #49ff78. Those three colours are exact, put in three
+    # palette slots this icon never uses (navy, purple, teal), so the
+    # bitmap stays 4 bpp and no other icon changes.
+    pal = list(PAL)
+    pal[NAV] = (0x06, 0x0B, 0x07)                                    # panel
+    pal[PUR] = (0x56, 0x56, 0x56)                                    # border
+    pal[TEA] = (0x49, 0xFF, 0x78)                                    # glyph
+    ic.pal = pal
+    ic.fill(21, 21, 31, 31, NAV); ic.frame(21, 21, 31, 31, PUR)
+    ic.fill(25, 23, 27, 29, TEA); ic.fill(23, 25, 29, 27, TEA)      # the plus
     return ic
 
 
@@ -431,7 +516,7 @@ def icon_gwbasic():
 
 
 ICONS = [
-    ("home", icon_home), ("ripscrip", icon_ripscrip), ("bbs", icon_bbs), ("nabu", icon_nabu),
+    ("home", icon_home), ("start", icon_start), ("ripscrip", icon_ripscrip), ("bbs", icon_bbs), ("nabu", icon_nabu),
     ("videotex", icon_videotex), ("web", icon_web), ("gopher", icon_gopher),
     ("arpanet", icon_arpanet), ("wais", icon_wais), ("archie", icon_archie),
     ("ftp", icon_ftp), ("newsgroups", icon_newsgroups), ("irc", icon_irc), ("cuseeme", icon_cuseeme), ("terminal", icon_terminal),
@@ -558,6 +643,40 @@ def gt_link():                                   # type h: a chain link
     return ic
 
 
+def gt_web():                                    # type h: a wire globe
+    # 2026-11-25 (operator, "design A", locked): a plain wire globe in the
+    # spirit of a modern Gopher browser's web-link glyph. ORIGINAL pixels:
+    # a 13 px circle, white fill, 1 px navy outline; inside, navy 1 px
+    # lines only: the centre meridian, a narrow upright ellipse (the
+    # curved meridians, 6 px between its sides), the equator and one
+    # parallel above and below it. No land, no arrow, no page, no shading.
+    # Only Gopher type h uses it; the chain link (gt_link) stays the FTP
+    # tab's symbolic-link icon.
+    ic = Icon(16)
+    g = ["....#####....",
+         "..##.###.##..",
+         ".#..#.#.#..#.",
+         ".###########.",
+         "#..#..#..#..#",
+         "#..#..#..#..#",
+         "#############",
+         "#..#..#..#..#",
+         "#..#..#..#..#",
+         ".###########.",
+         ".#..#.#.#..#.",
+         "..##.###.##..",
+         "....#####...."]
+    inside = [(5, 9), (3, 11), (2, 12), (2, 12), (1, 13), (1, 13), (1, 13),
+              (1, 13), (1, 13), (2, 12), (2, 12), (3, 11), (5, 9)]
+    for r, (a, b) in enumerate(inside):                         # white fill
+        ic.fill(a, r + 1, b, r + 1, WHT)
+    for r, row in enumerate(g):
+        for c, ch in enumerate(row):
+            if ch == '#':
+                ic.px(1 + c, 1 + r, NAV)
+    return ic
+
+
 def gt_unknown():                                # anything else: a page with ?
     ic = gt_text()
     ic.fill(4, 5, 11, 13, WHT)
@@ -569,11 +688,79 @@ def gt_unknown():                                # anything else: a page with ?
     return ic
 
 
+# ---------------------------------------------------------------------
+# 2026-11-23 (Navigator 2.0, Part B): the Gopher+ column icons of
+# refshots/ref52 (ref51's option C, extended): ORIGINAL art. A 16-colour
+# button tile (the face, a dark gray shadow right and below), a white info
+# card with three text lines, and at its lower right a small lamp badge
+# (a #565656 border round a #060b07 panel) whose glyph tells the item's
+# Gopher+ state, green #49ff78 except the moved/error one, amber #ffb000.
+# The four exact colours take palette slots these icons never use (navy,
+# purple, teal, olive), so each stays 4 bpp. The tile's face is the
+# Windows gray #C0C0C0: gopher_module.c blits these opaque (BitBlt), not
+# with the see-through gray of the type icons.
+# ---------------------------------------------------------------------
+
+def gp_base():
+    ic = Icon(16)
+    pal = list(PAL)
+    pal[NAV] = (0x06, 0x0B, 0x07)                    # badge panel
+    pal[PUR] = (0x56, 0x56, 0x56)                    # badge border
+    pal[TEA] = (0x49, 0xFF, 0x78)                    # glyph green
+    pal[OLI] = (0xFF, 0xB0, 0x00)                    # glyph amber
+    ic.pal = pal
+    ic.fill(0, 0, 14, 14, BG)                        # the tile's face
+    ic.line(15, 1, 15, 15, DG); ic.line(1, 15, 15, 15, DG)    # its shadow
+    ic.fill(1, 1, 9, 12, WHT); ic.frame(1, 1, 9, 12)          # the info card
+    ic.line(3, 3, 7, 3, K); ic.line(3, 5, 7, 5, K); ic.line(3, 7, 4, 7, K)
+    ic.fill(6, 6, 15, 15, NAV); ic.frame(6, 6, 15, 15, PUR)   # the badge, 10x10
+    return ic
+
+
+def gp_glyph(ic, rows, c, x0=8, y0=8):               # 6x6, 1px inside the panel
+    for r, row in enumerate(rows):
+        for k, bit in enumerate(row):
+            if bit == '#':
+                ic.px(x0 + k, y0 + r, c)
+
+
+def gp_plus():                                   # 1: a Gopher+ item ('+')
+    ic = gp_base()
+    gp_glyph(ic, ["..##..", "..##..", "######", "######", "..##..", "..##.."], TEA)
+    return ic
+
+
+def gp_form():                                   # 2: a form item ('?', +ASK)
+    ic = gp_base()
+    gp_glyph(ic, [".####.", "##..##", "...##.", "..##..", "......", "..##.."], TEA)
+    return ic
+
+
+def gp_views():                                  # 3: several views (+VIEWS > 1)
+    ic = gp_base()
+    gp_glyph(ic, ["####..", "#..#..", "#.####", "###..#", "..#..#", "..####"], TEA)
+    return ic
+
+
+def gp_langs():                                  # 4: views in several languages
+    ic = gp_base()
+    gp_glyph(ic, [".####.", "#.##.#", "######", "#.##.#", ".####.", "......"], TEA)
+    return ic
+
+
+def gp_error():                                  # 5: moved or error (codes 1-3)
+    ic = gp_base()
+    gp_glyph(ic, ["..##..", "..##..", "..##..", "..##..", "......", "..##.."], OLI)
+    return ic
+
+
 GT_ICONS = [
     ("gt_menu", gt_menu), ("gt_text", gt_text), ("gt_search", gt_search),
     ("gt_telnet", gt_telnet), ("gt_image", gt_image), ("gt_video", gt_video),
     ("gt_binary", gt_binary), ("gt_sound", gt_sound), ("gt_unknown", gt_unknown),
-    ("gt_link", gt_link),
+    ("gt_link", gt_link), ("gt_web", gt_web),
+    ("gp_plus", gp_plus), ("gp_form", gp_form), ("gp_views", gp_views),
+    ("gp_langs", gp_langs), ("gp_error", gp_error),
 ]
 
 
@@ -585,7 +772,7 @@ def write_bmp(path, ic):
         b = bytes((r[x] << 4) | r[x + 1] for x in range(0, n, 2))
         rows.append(b + b"\0" * ((4 - len(b) % 4) % 4))
     pixels = b"".join(rows)
-    pal = b"".join(struct.pack("<BBBB", b, g, r, 0) for r, g, b in PAL)
+    pal = b"".join(struct.pack("<BBBB", b, g, r, 0) for r, g, b in (ic.pal or PAL))
     off = 14 + 40 + len(pal)
     hdr = struct.pack("<2sIHHI", b"BM", off + len(pixels), 0, 0, off)
     info = struct.pack("<IiiHHIIiiII", 40, n, n, 1, 4, 0, len(pixels),
@@ -618,7 +805,7 @@ def main():
         print("  " + os.path.relpath(gprev, root))
         prev = os.path.join(out, "preview.png")
         cmd = ["magick", "montage"] + paths + [
-            "-filter", "point", "-resize", "800%", "-tile", "8x2",
+            "-filter", "point", "-resize", "800%", "-tile", "9x2",
             "-geometry", "+8+8", "-background", "#C0C0C0", prev]
         subprocess.run(cmd, check=True)
         print("  " + os.path.relpath(prev, root))

@@ -1271,6 +1271,28 @@ PRIVATE int HTTPEvent (SOCKET soc, void * pVoid, HTEventType type)
 		  if ((status != HT_ERROR) && status != HT_CLOSED) {
 		      if (pcbf) {
 		          if (http->lock == NO) {
+			      /*
+			      **	TELETEXT NAVIGATOR MODIFICATION (2026-11-25) to W3C
+			      **	libwww 5.4.1. The body of a request is held back for a
+			      **	"100 Continue", with a timer (FlushPutEvent) that sends it
+			      **	anyway after HTFirstWriteDelay. A PREEMPTIVE load never
+			      **	services that timer: it goes straight on to a blocking
+			      **	read of the answer, while the server waits for the body.
+			      **	No server answers 100 to an HTTP/1.0 request, or to one
+			      **	without "Expect: 100-continue", so a preemptive POST never
+			      **	ended (seen on the wire: headers sent, body never). On a
+			      **	preemptive load the body is now written at once, as the
+			      **	timer would have written it. Non-preemptive loads are
+			      **	unchanged. See docs/2026-11-25_RETROWEB_FORMS_PHASE2.md.
+			      */
+			      if (HTNet_preemptive(net)) {
+				  if (!http->usedTimer) {
+				      http->usedTimer = YES;
+				      HTTRACE(PROT_TRACE, "Uploading... Preemptive: writing %p now\n" _ http);
+				      (*pcbf)(request, input);
+				      HTHost_forceFlush(host);
+				  }
+			      } else {
 			      int retrys = HTRequest_retrys(request);
 			      ms_t delay = retrys > 3 ? HTSecondWriteDelay : HTFirstWriteDelay;
 			      if (!http->timer && !http->usedTimer) {
@@ -1280,6 +1302,7 @@ PRIVATE int HTTPEvent (SOCKET soc, void * pVoid, HTEventType type)
 					  http _ delay _ http->timer);
 				  HTHost_register(host, net, HTEvent_READ);
 			      }
+			      }   /* TELETEXT NAVIGATOR MODIFICATION: end of the non-preemptive path */
 			      http->lock = YES;
 			  }
 			  type = HTEvent_READ;

@@ -54,7 +54,7 @@ To learn how to use Help, press F1 in this window, or choose How to Use Help fro
 - [[nav_help|Getting Help]]
 
 = The Services
-{bmc HOME.BMP} [[home_overview|Home]]
+{bmc HOME.BMP} [[home_overview|START: the Active Desktop]]
 
 {bmc RIPSCRIP.BMP} [[rip_overview|RIPscrip]]
 
@@ -111,7 +111,7 @@ When you choose another service, the one you leave keeps its place: its screen, 
 - {{gl_nabu|NABU}} stops its machine or its serial bridge when you leave it.
 - GW-BASIC pauses its machine and its sound, and resumes them when you return, with your program still in memory.
 
-The [[home_overview|Home]] service, shown when Navigator starts, has one large button for every other service.
+The [[home_overview|Active Desktop]], shown when Navigator starts and opened by START, the first button on the ribbon, has an icon for every other service, and the Channel Bar.
 
 @topic nav_menus | Menu Commands | menus;File menu;Settings menu;Help menu;Exit;Configuration;BBS settings;About | general
 = File menu

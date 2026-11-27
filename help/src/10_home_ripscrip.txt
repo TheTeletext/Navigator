@@ -1,16 +1,49 @@
 %map home_overview 100
+%map home_customize 101
 %map rip_overview 200
 %map rip_connect 201
 %map rip_settings 202
 %map rip_usage 203
 %map rip_trouble 204
 
-@topic home_overview | Home | Home;starting Navigator;choosing a service | home
-Home is the service Navigator shows when it starts. It has one large button for each of the other services, in the order of the ribbon, with a line saying what the service is.
+@topic home_overview | START: the Active Desktop | START;Home;Active Desktop;desktop;Channel Bar;Active Channel;gleam;new channel content;Update Now;Active Desktop item;News Ticker;World News Ticker;Canada News Ticker;World News;starting Navigator;choosing a service | home
+START, the first button on the ribbon, opens the Active Desktop, the service Navigator shows when it starts. Each of the other services has an icon on the desktop, in the order of the ribbon. Point at an icon to see what the service is.
 
-To open a service, click its button. Each Home button does the same as the service's button on the [[nav_ribbon|ribbon]].
+To open a service, click its icon once, or move to it with the arrow keys and press ENTER. Each icon does the same as the service's button on the [[nav_ribbon|ribbon]].
 
-Home has nothing to connect to and no settings.
+The Channel Bar, on the right of the desktop when Navigator starts, shows the Active Channels you subscribe to. The Teletext is always first. To add a channel, click one of the dark gray spaces below it and type the channel's address, the address of its .cdf file. Click a channel to open it in the [[web_overview|Web]] service: its pages are listed in the Channels pane on the left, and the channel's own page opens on the right. The pane lists every channel you subscribe to, in the order of the Channel Bar. The open channel shows its logo with its pages below it; the others show their names. Point at a name to see that channel's logo, and click it to open that channel instead. Click the open channel's logo to go to its main page and close its list. Each page has its own small icon when the channel gives one, and a page icon when it does not. Click a page in the pane to open it; click the close box at the top of the pane to put it away. Point at a channel to read what it is about. To remove a channel you added, right-click it and choose Delete.
+
+= Moving and Arranging the Channel Bar
+Point near an edge of the Channel Bar to show its frame and the strip above it. Drag the strip to move the bar anywhere on the desktop, and drag the top or bottom edge to make it shorter or taller. When the channels do not all fit, an arrow appears at the end they run past: click it to see one more channel, or hold it down to keep going.
+
+To change the order of your channels, drag a logo up or down the bar: a line shows where it will go, and it moves there when you let go. The Teletext always stays first. The Channels pane follows the same order.
+
+The Channel Bar is always on the desktop: it cannot be closed or hidden. The arrow at the left of the strip opens [[home_customize|Customize My Desktop]].
+
+= The Gleam
+A small red corner with a white sparkle on a channel's logo is the gleam. It means the channel has new content since you last opened it. A small red sparkle appears on a page's icon in the Channels pane when that page has changed since you last read it, and on a channel's name in the pane when that channel has new content.
+
+Navigator learns this from the channel file itself: each page listed in it carries the time it last changed, and Navigator compares that time with the one it remembers from your last visit. Opening the channel clears the gleam on its logo; opening a page from the Channels pane clears that page's gleam. Until then the gleams stay lit, even after you close and restart Navigator. A page that does not say when it changed, such as a live radio stream, never gleams. When you first add a channel nothing gleams: Navigator starts remembering from that moment. If a channel file gives no change times at all, Navigator watches the file and its pages for changes instead.
+
+Navigator checks each channel on the channel's own schedule while it is running, never more often than once a minute. To check one at once, right-click it and choose Update Now.
+
+= Active Desktop Items
+An Active Desktop item is a small window of live content that sits on the desktop, under the icons. The Teletext's World News Ticker is there from the start: a new world news story every 15 seconds, from independent publishers, each credited to its source along the bottom of the ticker. Click the story to read the whole article in the [[web_overview|Web]] service.
+
+Three more items of The Teletext's are ready but not shown at first: the Canada News Ticker, with The Teletext's own Canadian news, and maps of Montreal's weather and traffic. To show one, open [[home_customize|Customize My Desktop]] and check it. Click a map to open The Teletext's Weather or Traffic page. To add an item from elsewhere, click an "Add to Active Desktop" link on a web page. An item does not add a channel to the Channel Bar.
+
+Point at an item to show its bar along the top. Drag the bar to move the item, and drag its lower-right corner to resize it if it can be resized. The menu button at the left of the bar opens the item in the Web service, refreshes it, or closes it. To show the World News Ticker again after closing it, right-click The Teletext on the Channel Bar and choose Show on Desktop, or use [[home_customize|Customize My Desktop]].
+
+The Active Desktop has nothing to connect to. [[home_customize|Customize My Desktop]] chooses what it shows.
+
+@topic home_customize | Customize My Desktop | Customize My Desktop;Active Desktop;Channel Bar;showing the Channel Bar;Active Desktop item;News Ticker;World News Ticker;Canada News Ticker;maps;Delete;Reset All | home
+Customize My Desktop lists what can appear on the Active Desktop: the Channel Bar first, then each Active Desktop item by its name, such as the World News Ticker, the Canada News Ticker or a Montreal map. The Channel Bar is always shown, so its check box is gray and cannot be cleared. To open it, right-click an empty part of the desktop and choose Customize My Desktop, or choose it from the menu at the left of the Channel Bar's strip.
+
+- Check an entry to show it on the desktop, and clear it to take it off. Choose **Apply** or **OK** for the change to take effect; **Cancel** leaves the desktop as it was.
+- **Delete** removes the selected item for good, after asking. The Channel Bar cannot be deleted. To add a deleted item again, click its "Add to Active Desktop" link.
+- **Reset All** puts the Channel Bar back in its first place and size and moves each item back to where a new item goes. Nothing is shown, hidden, added or deleted.
+
+The Customize button in the "Add item to Active Desktop" box opens Customize My Desktop as well.
 
 @topic rip_overview | RIPscrip | RIPscrip;bulletin board;BBS;graphical terminal;Telnet;overview | rip
 = About RIPscrip

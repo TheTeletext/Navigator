@@ -81,6 +81,49 @@ typedef enum {
 
 #define WEB_NOCOLOR     0xFFFFFFFFu
 
+/* ------------------------------------------------------------------ */
+/* HTML forms, first slice (2026-11-25, docs/2026-11-25_RETROWEB_FORMS_PHASE2.md). */
+/* RFC 1866 section 8, HTML 4.01 chapter 17. A control the slice draws */
+/* is an inline run (WebRun.ctl) that flows in text like an inline     */
+/* image; the document owns its forms and controls (WebDoc.forms /    */
+/* WebDoc.ctls, in document order). Pages with no FORM/INPUT are laid  */
+/* out exactly as before.                                              */
+/* ------------------------------------------------------------------ */
+
+enum {
+    WCTL_TEXT = 1,      /* INPUT TYPE=TEXT, or no TYPE (RFC 1866 8.1.2.1) */
+    WCTL_HIDDEN,        /* RFC 1866 8.1.2.6: never drawn, always sent    */
+    WCTL_RADIO,         /* RFC 1866 8.1.2.4                              */
+    WCTL_SUBMIT,        /* RFC 1866 8.1.2.7                              */
+    WCTL_RESET          /* RFC 1866 8.1.2.8                              */
+};
+
+typedef struct WebFormCtl {
+    int    type;          /* WCTL_*                                         */
+    int    form;          /* index into WebDoc.forms; -1 outside any FORM   */
+    char  *name;          /* NAME, NULL when absent                         */
+    char  *value;         /* current value, UTF-8 (text: what was typed)    */
+    char  *init_value;    /* VALUE as written, UTF-8, for Reset             */
+    int    checked;       /* radio: current state                           */
+    int    init_checked;  /* radio: CHECKED as written                      */
+    int    size;          /* text: SIZE in characters (0 = default)         */
+    int    maxlength;     /* text: MAXLENGTH (0 = unlimited)                */
+    int    pressed;       /* submit/reset: drawn held down (mouse on it)    */
+} WebFormCtl;
+
+typedef struct WebForm {
+    char  *action;        /* ACTION as written, NULL when absent            */
+    int    is_post;       /* METHOD=POST (default GET, HTML 4.01 17.3)      */
+    char  *enctype;       /* ENCTYPE as written, NULL when absent           */
+    /* What makes the submit refuse (drawn as far as the slice can):
+     * a file select (HTML 4.01 17.4.1) refuses the whole form; a control
+     * of a later slice (checkbox, password, SELECT, TEXTAREA, image,
+     * BUTTON) is named so the user is told why nothing was sent. */
+    int    has_file;
+    int    has_password;
+    char   later_kind[24];
+} WebForm;
+
 typedef struct WebRun {
     char    *text;
     size_t   len;
@@ -94,6 +137,9 @@ typedef struct WebRun {
      * can be reused unchanged; the run flows in the text line instead of
      * forcing a block break. NULL for ordinary text runs. */
     struct WebBlock *img_blk;
+    /* Form control (2026-11-25): non-NULL when this run is a drawn form
+     * control; owned by the document (WebDoc.ctls), not by the run. */
+    WebFormCtl *ctl;
 } WebRun;
 
 /* Forward decl for table cells. */
@@ -135,6 +181,17 @@ typedef struct WebBlock {
     int               img_loops_done;
     int               img_anim_done;       /* set once a finite loop has ended */
     RECT              img_last_rect;       /* last painted client rect; drives per-image InvalidateRect */
+    /* Progressive rendering, Phase A (docs/2026-11-21_PROGRESSIVE_RENDER_PHASE_A.md):
+     * 1 while the page is on screen and this image is still on its way
+     * (painted as the Netscape 3 placeholder box); 0 otherwise, including
+     * once it has arrived or failed, so a finished page is exactly as
+     * before. Only Retro Web's fetch worker ever sets it to 1. */
+    int               img_state;
+    /* 2026-11-26 (Phase 2, S2a): a BACKGROUND image, composed once over
+     * the colour beneath it, as a pattern brush for tiling (owned); and
+     * the bitmap behind the brush. NULL for an ordinary image. */
+    HBITMAP           img_tile_bmp;
+    HBRUSH            img_tile_brush;
 
     /* BLK_TABLE payload. */
     struct WebTable  *table_data;
@@ -166,6 +223,8 @@ typedef struct WebCell {
     int         width_pct;
     int         valign;
     int         rowspan;
+    int         div_base;    /* 2026-11-26: div_depth when the cell opened */
+    struct WebBlock *bg_img; /* 2026-11-26 (S2a): TD BACKGROUND, or NULL */
     int         center_base; /* <center> depth when the cell opened: a
                               * <center> opened INSIDE the cell centres a
                               * table nested in it (2026-11-11) */
@@ -200,6 +259,7 @@ typedef struct WebTable {
     int      width_pct;
     int      cellpadding;
     int      cellspacing;
+    struct WebBlock *bg_img; /* 2026-11-26 (S2a): TABLE BACKGROUND, or NULL */
 } WebTable;
 
 /* ------------------------------------------------------------------ */
@@ -227,6 +287,15 @@ typedef struct StyleState {
 
     int       indent_depth;    /* blockquote + dl + list */
     int       center_depth;
+    /* 2026-11-26 (Phase 2, S1d): open <DIV>s, innermost last. align:
+     * -1 none, 0 left, 1 center, 2 right; center_at: center_depth when
+     * it opened (a <CENTER> opened inside it wins). */
+    int       div_align[WEB_STACK];
+    int       div_center_at[WEB_STACK];
+    int       div_depth;
+    /* 2026-11-26 (Slice C): open <PRE>s. A block started inside one (a
+     * BLOCKQUOTE, a P) stays preformatted, as period browsers keep it. */
+    int       pre_depth;
 
     int       list_kind_stack[WEB_STACK];   /* 'U' or 'O' */
     int       list_counter_stack[WEB_STACK];
@@ -275,11 +344,31 @@ typedef struct WebDoc {
     COLORREF    body_text;
     COLORREF    body_link;
     COLORREF    body_vlink;
+    /* 2026-11-26 (Phase 2, S2a): BODY BACKGROUND, a heap BLK_IMG container
+     * fetched and decoded like an <img>; NULL when the page has none. */
+    struct WebBlock *body_bg_img;
 
     UINT        source_codepage;
+    /* 2026-11-26 (Phase 2, S1a): where source_codepage came from, so a
+     * later source of lower rank never overrides it: WEB_CPSRC_*. */
+    int         cp_src;
+    /* S1b: the unfinished multibyte character a text block ended in
+     * (libwww cuts text at network buffer edges), joined to the next. */
+    unsigned char cp_carry[4];
+    int         cp_carry_n;
 
     StyleState  style;
     HTextStatus status;
+
+    /* HTML forms (2026-11-25). forms[] in document order; ctls[] every
+     * control the slice knows (drawn or hidden), in document order, each
+     * heap-allocated so runs can point at it. cur_form: the FORM open
+     * while parsing, -1 outside one. */
+    WebForm     *forms;
+    size_t       forms_n, forms_cap;
+    WebFormCtl **ctls;
+    size_t       ctls_n, ctls_cap;
+    int          cur_form;
 #if NAV_FLASH
     /* Flash parse state (src/web_flash.h). */
     struct WebFlash *flash_last;          /* latest movie, for NOEMBED */
@@ -367,7 +456,32 @@ typedef struct WebRenderView {
      * the arm-active flag lives here so a consumer can ask "am I
      * currently animating?" without polling the timer manager. */
     int          anim_timer_active;
+
+    /* 2026-11-24 (TICKER_DESKTOP_CLICKTHROUGH): an Active Desktop item's
+     * view. Its body clicks follow the page's <!-- click=URL --> marker,
+     * never these link rects, so a link underline there is decoration
+     * only: web_emit_line draws no coalesced anchor underline, except
+     * under an explicit <u> run (which keeps its continuous line). Zero
+     * (Retro Web and every other view) = real link underlines, as ever. */
+    int          no_link_underline;
+
+    /* HTML forms (2026-11-25). Control rects recorded by paint, as link
+     * rects are. forms_live: only the Retro Web view sets it; there the
+     * controls take clicks, focus and keys. Every other view (the
+     * Active Desktop items, the ticker) draws them and never takes form
+     * focus. focus_ctl: the focused control (live view only), NULL for
+     * none; reset whenever the document is replaced. */
+    struct WebCtlRect *ctl_rects;
+    size_t       ctl_rects_n;
+    size_t       ctl_rects_cap;
+    int          forms_live;
+    WebFormCtl  *focus_ctl;
 } WebRenderView;
+
+typedef struct WebCtlRect {
+    RECT        rc;
+    WebFormCtl *ctl;
+} WebCtlRect;
 
 /* Initialize a heap-allocated WebRenderView (or reset an existing one
  * to a fresh empty state without freeing buffers). The selection

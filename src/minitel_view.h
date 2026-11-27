@@ -26,9 +26,10 @@
 #include <stddef.h>
 
 /*
- * Defaults. The host is the umbrella name videotex.teletext.ca, as for
- * NAPLPS; the port is 516, the IANA "videotex" port, which the Unicorn
- * service listens on publicly since 2026-09-27 (Phase 3 go-live).
+ * Defaults. The host is MINITEL_DEFAULT_HOST in naplps_module.h (one per
+ * format since Navigator 2.0); the port is 516, the IANA "videotex" port,
+ * which The Teletext's server listens on publicly since 2026-09-27 (Phase 3
+ * go-live).
  */
 #define MINITEL_DEFAULT_PORT      516
 #define MINITEL_DEFAULT_PORT_STR  "516"

@@ -106,12 +106,32 @@ void suite_set_active_module(int command_id);
 /* The status bar's progress well (2026-11-11,
  * docs/2026-11-11_STATUS_PROGRESS.md): pct 0..100 shows the Windows 3.1
  * bar (refshots/ref18: a sunken well, a dark fill, the percentage in bold)
- * at the status bar's right end; pct -1 hides it. A bar is shown ONLY for
+ * at the status bar's right end; pct -1 empties it. Since Navigator 2.0
+ * (2026-11-23, part 5) the well is always shown, on every tab, empty when
+ * idle (window text "" then, "NN%" while filled). A fill is shown ONLY for
  * a load with a real total (never an estimate). owner is the calling
  * tab's ribbon id (SUITE_ID_BTN_*): ignored unless that tab is active, and
  * a tab switch hides the bar. UI thread only; workers report through
  * their tab's own timer. */
 void suite_set_progress(int owner, int pct);
+
+/* The Gopher+ lamp (2026-11-22, docs/2026-11-22_GOPHER_PLUS_LAMP.md,
+ * refshots/ref47): a VFD readout at the status bar's far right (a progress
+ * well, when shown, sits to its left). state -1 hides it, 0 dark, 1 lit.
+ * owner is the calling tab's ribbon id: ignored unless that tab is active,
+ * and a tab switch hides it (the tab shows it again on activate). A status
+ * light only. Its window text ("Gopher+ lamp: lit" / "...: dark") is
+ * readable by a test harness. UI thread only. */
+void suite_set_gopher_lamp(int owner, int state);
+
+/* Navigator 2.0 (2026-11-23, docs/2026-11-23_NAVIGATOR_2.0_UI.md, part 2):
+ * the lamp is no longer in the status bar. It is a child of the content
+ * window, SUITE_LAMP_W x SUITE_LAMP_H, and the Gopher tab places it with
+ * its right edge at `right` and its top at `top` (content client
+ * coordinates): just above the menu, below the Stop button. */
+#define SUITE_LAMP_W 76
+#define SUITE_LAMP_H 16
+void suite_place_gopher_lamp(int right, int top);
 
 /* Shared GDI resources, owned by suite_fonts. */
 extern HFONT  g_hFontUI;

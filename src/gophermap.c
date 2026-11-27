@@ -74,7 +74,7 @@ int gophermap_parse(const char *buf, size_t len, GopherItem **out_items)
         size_t       line_len;
         const char  *line;
         GopherItem   it;
-        const char  *t1, *t2, *t3;
+        const char  *t1, *t2, *t3, *t4;
         const char  *display_start, *display_end;
         size_t       j;
 
@@ -127,12 +127,13 @@ int gophermap_parse(const char *buf, size_t len, GopherItem **out_items)
         it.type       = line[0];
         display_start = line + 1;
 
-        t1 = NULL; t2 = NULL; t3 = NULL;
+        t1 = NULL; t2 = NULL; t3 = NULL; t4 = NULL;
         for (j = 1; j < line_len; j++) {
             if (line[j] == '\t') {
                 if      (!t1) t1 = line + j;
                 else if (!t2) t2 = line + j;
-                else if (!t3) { t3 = line + j; break; }
+                else if (!t3) t3 = line + j;
+                else if (!t4) { t4 = line + j; break; }
             }
         }
 
@@ -158,7 +159,7 @@ int gophermap_parse(const char *buf, size_t len, GopherItem **out_items)
 
         if (t3) {
             const char *port_start = t3 + 1;
-            const char *port_end   = line + line_len;
+            const char *port_end   = t4 ? t4 : (line + line_len);
             char        port_buf[16];
             size_t      pn = (size_t)(port_end - port_start);
             int         p;
@@ -168,6 +169,10 @@ int gophermap_parse(const char *buf, size_t len, GopherItem **out_items)
             p = atoi(port_buf);
             if (p > 0 && p <= 65535) it.port = p;
         }
+
+        /* Gopher+ (memo s2.2): the first character of the fifth field. */
+        if (t4 && t4 + 1 < line + line_len && (t4[1] == '+' || t4[1] == '?'))
+            it.gplus = t4[1];
 
         if (!it.display || !it.selector || !it.host) {
             free(it.display); free(it.selector); free(it.host);

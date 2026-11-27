@@ -83,6 +83,13 @@ void w31_draw_text_disabled(HDC hdc, const char *s, int n, RECT *rc, UINT fmt);
 void w31_draw_checkbox(HDC hdc, const RECT *rc, const char *label, BOOL checked,
                        BOOL focused, BOOL disabled, HFONT font);
 
+/* The Windows 3.1 option (radio) button (2026-11-22, the Gopher+ form):
+ * a 12 x 12 round button, white inside a black ring, a black dot when
+ * chosen, the label as w31_draw_checkbox draws it. Same contract: for a
+ * BS_OWNERDRAW button the owner keeps the state; font NULL = bold face. */
+void w31_draw_radio(HDC hdc, const RECT *rc, const char *label, BOOL checked,
+                    BOOL focused, BOOL disabled, HFONT font);
+
 /* WM_CTLCOLOR* answer for gray chrome: STATIC/BTN/DLG get black on face,
  * EDIT/LISTBOX get black on white. A read-only edit asks with
  * WM_CTLCOLORSTATIC; ctl lets it keep the white document interior, as
@@ -121,6 +128,20 @@ void w31_toggle_set(HWND btn, BOOL connected);
 /* Connecting, where the module cannot cancel safely: reads Disconnect,
  * grayed, until the attempt resolves. */
 void w31_toggle_busy(HWND btn);
+/* Navigator 2.0 (part 7): click and Enter to connect. w31_connect_click
+ * runs the tab's Connect command when its toggle reads "Connect" and is
+ * enabled (TRUE if it did); w31_connect_on_enter makes Enter in a Host or
+ * Port field do the same. */
+BOOL w31_connect_click(HWND toggle);
+void w31_connect_on_enter(HWND field, HWND toggle);
+/* 2026-11-24 (docs/2026-11-24_NAVIGATOR_CONNECT_FIXES_AND_URLBAR.md): a
+ * click on a DISABLED, empty pane (where the power watermark shows) runs
+ * w31_connect_click. Windows hands a disabled child's mouse input to its
+ * parent, so this watches the parent (a comctl32 subclass, keyed by the
+ * pane, safe on a shared parent) and acts only while the pane is visible,
+ * disabled and empty. Used by ARPANET FTP-Mail, whose body is disabled
+ * while not connected. */
+void w31_connect_click_disabled_pane(HWND pane, HWND toggle);
 
 /* The Windows 3.1 title bar on a top-level window (2026-11-11): navy bar,
  * centred bold title, system-menu box, minimize and maximize; every
@@ -142,6 +163,31 @@ HBITMAP w31_icon(int resource_id);
 /* Draw one of them at x,y with its #C0C0C0 pixels left out (the ribbon's
  * own blit), for icons outside a button: the Gopher item icons. */
 void w31_draw_icon(HDC hdc, HBITMAP bmp, int x, int y);
+/* Navigator 2.0 review round 1 (R1.2): the "not connected" watermark, a
+ * large translucent power symbol (the glyph of the old START icon) centred
+ * in pane; a visual cue only, drawn by a tab while its pane is empty and
+ * not connected, before any placeholder text. */
+void w31_draw_power_watermark(HDC hdc, const RECT *pane);
+/* 2.0 release (2026-11-27): for a stock control (EDIT, LISTBOX) that carries
+ * the watermark over its own empty paint: the control's WM_PAINT through
+ * orig, then the watermark over its client area CLIPPED to the region that
+ * paint just redrew. The watermark is translucent, so blending it again over
+ * pixels the control did not repaint darkened them (a resize gave a lighter
+ * or darker button than a full repaint). Returns the control's result. */
+LRESULT w31_paint_with_watermark(HWND h, WNDPROC orig, WPARAM w, LPARAM l);
+/* A1 (2026-11-23): the button is centred in the pane and a placeholder's
+ * text goes BELOW it, never over it: the y where that text starts (the
+ * button's bottom + W31_WM_TEXT_GAP), or -1 when the pane is too small for
+ * the button (the text then keeps its old place). */
+#define W31_WM_TEXT_GAP 14
+int  w31_power_watermark_text_top(const RECT *pane);
+/* Navigator 2.0 review round 2 (R2.2): the Windows 98 popup menu
+ * (suite_w98dlg.c w98_track_popup) tells the hook which menu it is
+ * tracking, so that menu's window gets the Windows 98 raised 3D frame
+ * instead of the Win 3.1 black line (NULL when done); and its owner asks
+ * for the frame again after each item, as the Win 3.1 painters do. */
+void w31_menu_set_w98(HMENU m);
+void w31_menu_frame_after_item(HDC dc);
 void w31_untheme(HWND h);
 
 /* Set (SetPropA, any non-NULL value) on a dialog field that must show a

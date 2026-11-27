@@ -39,6 +39,16 @@ int web_module_render_dump_to_file(const char *url, const char *out_path);
  * complement to --render-dump: that one protects parser/WebDoc
  * structure; this one protects the pixel-path computations. */
 int web_module_render_tokens_to_file(const char *url, const char *out_path);
+/* 2026-11-24: nonzero = the next render-tokens dump uses a desktop item's
+ * view (no_link_underline), as --render-tokens-desktop asks. */
+void web_module_render_tokens_desktop(int on);
+/* 2026-11-24: nonzero = the render-tokens dump also records table and cell
+ * background fills, as --render-tokens-fills asks (off: the dump unchanged). */
+void web_module_render_tokens_fills(int on);
+/* 2026-11-25: nonzero = the render-tokens dump first fetches the page's
+ * images against its final (post-redirect) address and notes that base,
+ * as --render-tokens-images asks (off: the dump unchanged). */
+void web_module_render_tokens_images(int on);
 
 /* Pass 9d copy-verification entry: fetch `url`, run the same headless
  * layout pass --render-tokens uses, set up a "select all" selection,
@@ -73,6 +83,12 @@ int web_module_render_copy_all_to_file(const char *url, const char *out_path);
  * with the standard free(). Returns 0 on failure or busy. */
 struct WebDoc;
 struct WebDoc *web_fetch_and_parse_html_sync(const char *url);
+
+/* 2026-11-26 (multilingual, Phase 2): the Channels pane names the open
+ * channel's CDF ENCODING (cdf_model.encoding) for the page href it opens
+ * next; it is that page's charset when neither the server nor the page
+ * declares one. NULL or an unknown name clears the hint. */
+void web_set_channel_charset_hint(const char *href, const char *encoding);
 int            web_fetch_raw_bytes_sync(const char *url,
                                         char **out_bytes,
                                         int *out_size);
@@ -96,5 +112,19 @@ int            web_fetch_raw_bytes_sync(const char *url,
  * actually succeeded, so an in-browser caller can show a differentiated
  * status line. Pass NULL if you do not care. */
 BOOL rwb_external_handler_try(const char *url, BOOL *out_launched);
+
+/* Navigator 1.8: non-zero while Retro Web has a page load in flight. Safe
+ * to call from any thread (the suite_netgate.c probe). */
+int web_fetch_in_flight(void);
+
+/* Navigator 1.8: lay the Retro Web tab out again at its current size, as a
+ * window resize does (the Channels pane opening or closing). */
+void web_module_relayout(void);
+
+/* Navigator 1.8 (Teletext Desktop Phase 2D): parse a desktop item's page off
+ * the UI thread through Retro Web's single-flight worker. 0 = busy, retry
+ * later. On completion msg is posted to hwnd: wParam = WebDoc * (receiver
+ * frees it with webdoc_free; NULL on failure), lParam = tag. */
+int web_side_fetch(const char *url, HWND hwnd, UINT msg, LPARAM tag);
 
 #endif /* WEB_MODULE_H */

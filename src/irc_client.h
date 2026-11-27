@@ -63,6 +63,12 @@ extern "C" {
                               * viewer updates its status from its own host/
                               * channel. Fired on the initial connect and on
                               * every silent reconnect. */
+#define IRC_EVT_ENDED    6   /* Navigator 2.0 (2026-11-25): a session that had
+                              * registered was ended by the server with an
+                              * ERROR line (RFC 2812 3.7.4: a "Closing Link",
+                              * a ban). `text` holds the server's words. The
+                              * worker stops: no reconnect into a ban. A drop
+                              * WITHOUT an ERROR still reconnects silently. */
 
 /* Kind of forwarded message. Only PRIVMSG/NOTICE are channel messages;
  * SYSTEM/FAILED events leave kind unset (the WPARAM event distinguishes). */

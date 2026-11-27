@@ -57,6 +57,17 @@ files are rendered here as "(C)".
 - Used for: the HTTP/HTML retrieval and parsing engine behind the F4
   Web module (and the Active Channel / Active Desktop scenes built on
   it).
+- Modified by Teletext Navigator. Each change is marked "Teletext
+  Navigator" in the file it touches (among them `HTMIME.c`,
+  `HTMLPDTD.c`/`.h`, `HTTeXGen.c`, `wwwsys.h`). 2026-11-25:
+  `HTNet.c`, `HTNet_addBefore` and `HTNet_addAfter` no longer delete
+  every earlier registration of the same filter function; they skip
+  only an identical registration (same function, template and status),
+  so HTTP 301, 302 and 303 redirects are followed again. 2026-11-25:
+  `HTTP.c`, on a preemptive load the body of a request (an HTML form's
+  POST) is written at once instead of being held for a "100 Continue"
+  on a timer that a preemptive load never services, so a POST to a
+  server that does not answer 100 completes.
 
 ## FFmpeg TrueSpeech decoder
 
@@ -584,13 +595,16 @@ implied.
 - How it ships: `tools/make_dialup_sound.py` fetches Freesound's public
   high-quality preview of the sound (pinned by SHA-256), averages it to
   mono, trims the leading and trailing silence and resamples it to 22,050
-  Hz 16-bit PCM (`assets/sound/dialup.wav`, 25.3 s), which is embedded in
-  the exe as a resource.
+  Hz 16-bit PCM (`assets/sound/dialup.wav`, 25.3 s). `tools/make_ringback_sounds.sh`
+  then splices two synthesized ringback rings in after the dialing, in
+  place of 1.2 s of silent line before the answer; the rest of the
+  recording is kept sample for sample (`assets/sound/dialup_ring.wav`, 32.1 s),
+  which is embedded in the exe as a resource.
 
 ## The BBS tab's intercept announcement
 
 - Announcement voice generated with Google Gemini text-to-speech (voice
-  Despina). It is heard in `assets/sound/intercept.wav`, which the BBS tab
+  Despina). It is heard in `assets/sound/intercept_ring.wav`, which the BBS tab
   plays when a call cannot be completed.
 
 ## Ruffle (the Flash player of the Retro Web Browser tab)

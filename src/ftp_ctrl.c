@@ -214,11 +214,47 @@ int ftpc_send_mail_text(ftp_ctrl_t *c, const char *data, int len)
     return lc_send_raw(c->lc, data, len);
 }
 
-int ftpc_login_anonymous(ftp_ctrl_t *c, char *last, int last_sz)
+/* One conventional anonymous user name, then PASS with the same address
+ * only if the server asks for it (331). */
+static int login_as(ftp_ctrl_t *c, const char *user, char *last, int last_sz)
 {
-    int code = ftpc_cmd(c, "USER", "anonymous", last, last_sz);
+    int code = ftpc_cmd(c, "USER", user, last, last_sz);
     if (code == 331 || code == 332)
         code = ftpc_cmd(c, "PASS", FTPC_ANON_PASSWORD, last, last_sz);
+    return code;
+}
+
+int ftpc_login_anonymous(ftp_ctrl_t *c, char *last, int last_sz)
+{
+    return login_as(c, "anonymous", last, last_sz);
+}
+
+/* Navigator 2.0 (2026-11-25, operator D1): some servers refuse the user
+ * name "anonymous" but take the other conventional anonymous name, "ftp"
+ * (the same public access). Only those two names, in that order, with the
+ * same address as the password; never a real account. A refusal of
+ * "anonymous" is a 4xx or 5xx reply. "ftp" is tried on the same control
+ * connection; if the server has dropped it (an I/O error, or 421), the
+ * connection is opened again (greeting included) and "ftp" is tried
+ * there. *used_ftp is set to 1 when "ftp" is what logged in. */
+int ftpc_login_anonymous_or_ftp(ftp_ctrl_t *c, const char *host, int port, int timeout_ms,
+                                char *last, int last_sz, int *used_ftp)
+{
+    int code = login_as(c, "anonymous", last, last_sz);
+    if (used_ftp) *used_ftp = 0;
+    if (code < 0 || code / 100 == 2) return code;
+    if (code / 100 != 4 && code / 100 != 5) return code;   /* not a refusal */
+    code = login_as(c, "ftp", last, last_sz);
+    if (code == FTPC_ERR_IO || code == 421) {
+        int rc;
+        ftpc_disconnect(c);
+        rc = ftpc_connect(c, host, port, timeout_ms);
+        if (rc != 0) return rc;
+        rc = ftpc_reply_final(c, last, last_sz);
+        if (rc < 0 || rc / 100 != 2) { ftpc_disconnect(c); return rc < 0 ? rc : FTPC_ERR_PROTO; }
+        code = login_as(c, "ftp", last, last_sz);
+    }
+    if (code >= 0 && code / 100 == 2 && used_ftp) *used_ftp = 1;
     return code;
 }
 

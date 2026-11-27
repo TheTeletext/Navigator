@@ -1,6 +1,6 @@
 ;; Screenshots (manual\shots\<name>.png, made by capture_shots.ps1) and where
 ;; they go: topic context | shot | caption. A figure follows its topic's text.
-nav_window | home | The Teletext Navigator window, at the Home service.
+nav_window | home | The Teletext Navigator window, at the Active Desktop (the START button).
 nav_menus | menu_file | The File menu.
 nav_menus | menu_settings | The Settings menu.
 nav_menus | menu_help | The Help menu.
@@ -10,7 +10,7 @@ rip_usage | ripscrip | The RIPscrip service, connected to The Teletext's board a
 bbs_usage | bbs | The BBS service at the main menu of The Teletext BBS, bbs.teletext.ca.
 bbs_download | bbs_download | The print replica edition arriving by Zmodem from The Teletext BBS.
 nabu_usage | nabu | The NABU service: the emulated NABU Personal Computer running the program of The Teletext's channel.
-vtx_usage | minitel | The Videotex service in Minitel format, connected to videotex.teletext.ca.
+vtx_usage | minitel | The Videotex service in Minitel format, connected to minitel.teletext.ca.
 web_usage | web | The Web service at http://www.teletext.ca/.
 web_usage | web_flash | The Teletext's Flash animation, a Flash version 4 movie, playing in a page of the Web service (http://www.teletext.ca/flash/demo.htm).
 web_usage | web_radio | The Radio page of The Teletext's web site, with its RealAudio link.

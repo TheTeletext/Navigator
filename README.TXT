@@ -1,4 +1,4 @@
-TELETEXT NAVIGATOR 1.7.2
+TELETEXT NAVIGATOR 2.0
 The Teletext, November 2026
 
 Teletext Navigator is the retro internet client of The Teletext
@@ -10,10 +10,12 @@ in the 1980s and 1990s.
                downloads (ripscrip.teletext.ca)
   BBS          an ANSI bulletin board terminal (PC characters,
                sixteen colours, 80 x 25) with Zmodem downloads
-               (bbs.teletext.ca, port 2026)
+               (bbs.teletext.ca, port 2026, and a Site list of 13
+               more boards)
   NABU         a built-in NABU Personal Computer that boots onto
                The Teletext NABU channel (nabu.teletext.ca)
-  Videotex     Minitel and NAPLPS terminals (videotex.teletext.ca)
+  Videotex     Minitel and NAPLPS terminals (minitel.teletext.ca,
+               naplps.teletext.ca)
   Web          a Web 1.0 browser built on W3C libwww
                (http://www.teletext.ca)
   Gopher       Gopher, RFC 1436 (gopher.teletext.ca)
@@ -71,7 +73,9 @@ ANSI: news, weather, traffic, markets and numbers, public alerts,
 text games and file areas. Files are received by Zmodem, as on a
 1990s terminal program, into the Downloads directory set under
 Settings, Configuration (the RIPscrip tab's downloads go there
-too, and the FTP tab starts there).
+too, and the FTP tab starts there). Its Site list also names 13
+other boards, run by their own sysops; choosing one fills in Host
+and Port, and Connect calls it.
 
 The GW-BASIC tab runs Microsoft's 1983 GW-BASIC source (MIT),
 built by T. K. Chia's project, unmodified on a small IBM PC inside
@@ -80,20 +84,23 @@ BASIC folder in your Documents, which comes with two type-in
 listings (LOAD "RETRO649" and LOAD "DIALUP"). Ctrl+V types in a
 listing copied from the web.
 
-NEW IN 1.7.2
+NEW IN 2.0
 
-New in 1.7.2: the BBS tab calls a board the way a modem did. When
-you choose Connect, a dialing window shows the call, the modems'
-handshake plays, and the modem reports CONNECT before the board's
-screen appears. If the board does not answer, you hear the
-telephone network's tones and a recorded announcement, then NO
-CARRIER. You can turn it off in Settings, under BBS. The RIPscrip
-tab now works with more boards: it answers a board's check for an
-ANSI terminal, shows the plain text a board sends between its
-pictures, such as a login prompt or a menu, and clears the screen
-when a button asks for it. From 1.7.1 the update installs and
-reopens by itself; from 1.7 the old setup wizard runs one last
-time.
+New in 2.0: START opens the Active Desktop: an icon for every
+service, the Channel Bar with four Active Channels, The Teletext's
+first, and the World News Ticker, a new world news story every 15
+seconds from independent publishers, each credited to its source;
+click it to read the whole article. The Canada News Ticker and maps
+of Montreal's weather and traffic are ready in Customize My
+Desktop. A channel's logo gleams when it has new content, and it
+opens in the Web service beside a Channels pane. The Web service
+fills in and sends forms, shows pages in other languages and
+scripts, such as Japanese, Chinese and Greek, and draws a page's
+text first, then its pictures one by one. The Gopher service
+browses one menu at a time, as the clients of the period did, and
+speaks Gopher+: attributes, alternative views and forms. Site lists
+in the BBS, Videotex, Web, Gopher, FTP, Newsgroups and IRC services
+fill in well-known servers for you.
 
 HELP AND THE MANUAL
 
@@ -119,7 +126,7 @@ pixels. Nothing else to install.
 
 INSTALL
 
-Run the installer, Teletext_Navigator_1.7.2.msi. It installs to
+Run the installer, Teletext_Navigator_2.0.0.msi. It installs to
 Program Files\Teletext Navigator for all users and adds a Start
 Menu entry; the desktop shortcut is optional and can be turned off
 during setup. Uninstall from Settings, Apps and features.

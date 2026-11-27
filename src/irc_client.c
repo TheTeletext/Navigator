@@ -46,6 +46,11 @@
  * cannot hang on the OS default (which can run to ~20s+). Checked in
  * ~200ms slices so a user Disconnect interrupts it promptly. */
 #define IRC_CONNECT_TIMEOUT_MS  18000
+/* Navigator 2.0 (2026-11-25): one address may use at most this much of the
+ * budget; a timed-out address hands over to the next one (a name with
+ * several A records, one of them dead, e.g. irc.undernet.org from the
+ * Z840, whose resolver listed its dead address first). */
+#define IRC_CONNECT_PER_ADDR_MS  5000
 
 /* Connect failure reasons (open_socket -> *reason). */
 #define IRC_FAIL_NONE     0
@@ -99,6 +104,8 @@ typedef struct Session {
     int    cap_end_sent;
     int    reached_reg;   /* set once 001 is seen; resets backoff */
     int    banner;        /* forward server banner lines this session */
+    char   error_text[480]; /* Navigator 2.0: the text of a server ERROR
+                               line, "" if none came (RFC 2812 3.7.4) */
 } Session;
 
 /* ------------------------------------------------------------------ */
@@ -130,6 +137,7 @@ static SOCKET open_socket(IrcClient *c, int *reason)
     struct addrinfo hints, *res = NULL, *ai;
     char            portbuf[8];
     int             rc;
+    int             total = 0;   /* ms spent waiting, over all addresses */
 
     *reason = IRC_FAIL_GENERIC;
 
@@ -177,14 +185,16 @@ static SOCKET open_socket(IrcClient *c, int *reason)
             int     sel;
 
             if (stop_requested(c)) { *reason = IRC_FAIL_ABORTED; break; }
-            if (waited >= IRC_CONNECT_TIMEOUT_MS) { *reason = IRC_FAIL_TIMEOUT; break; }
+            if (waited >= IRC_CONNECT_PER_ADDR_MS || total >= IRC_CONNECT_TIMEOUT_MS) {
+                *reason = IRC_FAIL_TIMEOUT; break;
+            }
 
             FD_ZERO(&wfds); FD_SET(s, &wfds);
             FD_ZERO(&efds); FD_SET(s, &efds);
             tv.tv_sec = 0; tv.tv_usec = 200 * 1000;
             sel = select(0, NULL, &wfds, &efds, &tv);
             if (sel == SOCKET_ERROR) { *reason = IRC_FAIL_REFUSED; break; }
-            if (sel == 0) { waited += 200; continue; }   /* slice timeout */
+            if (sel == 0) { waited += 200; total += 200; continue; }   /* slice timeout */
 
             if (FD_ISSET(s, &efds)) { *reason = IRC_FAIL_REFUSED; break; }
             if (FD_ISSET(s, &wfds)) {
@@ -203,8 +213,13 @@ static SOCKET open_socket(IrcClient *c, int *reason)
 
         set_sock(c, INVALID_SOCKET);
         closesocket(s);
-        if (*reason == IRC_FAIL_ABORTED || *reason == IRC_FAIL_TIMEOUT)
-            break;                    /* don't churn other addrs on abort/timeout */
+        /* A user abort stops at once, and so does a spent overall budget.
+         * Navigator 2.0 (2026-11-25): a timeout of THIS address (its 5 s
+         * share) moves on to the next one; until then a timeout stopped
+         * the whole connect, so one dead A record listed first made the
+         * name unreachable. */
+        if (*reason == IRC_FAIL_ABORTED || total >= IRC_CONNECT_TIMEOUT_MS)
+            break;
     }
 
     freeaddrinfo(res);
@@ -437,6 +452,22 @@ static void handle_line(IrcClient *c, Session *ss, char *line)
         return;
     }
 
+    /* Navigator 2.0 (2026-11-25, D1): ERROR (RFC 2812 3.7.4) is how a
+     * server says why it is closing the link (a ban, an address that must
+     * log in, a QUIT acknowledged). Show its words ALWAYS, also on a quiet
+     * reconnect, and keep them: the worker decides what follows (D2). */
+    if (strcmp(cmd, "ERROR") == 0) {
+        const char *t = rest;
+        char        sline[600];
+        if (*t == ':') t++;
+        strncpy(ss->error_text, t, sizeof(ss->error_text) - 1);
+        ss->error_text[sizeof(ss->error_text) - 1] = '\0';
+        _snprintf(sline, sizeof(sline), "ERROR: %s", ss->error_text);
+        sline[sizeof(sline) - 1] = '\0';
+        emit_line(c, IRC_EVT_SYSTEM, sline);
+        return;
+    }
+
     /* CAP negotiation. LS may be multi-line under 302: a continuation
      * carries " LS * :"; only the final " LS :" line triggers REQ. */
     if (strcmp(cmd, "CAP") == 0) {
@@ -536,6 +567,15 @@ static void handle_line(IrcClient *c, Session *ss, char *line)
         text = tsp + 1;
         while (*text == ' ') text++;
         if (*text == ':') text++;          /* strip trailing-param marker */
+        /* Navigator 2.0 (2026-11-25, D1): a NOTICE before 001 is the
+         * server talking to the connection ("*** Checking Ident", "***
+         * Found your hostname", an address that must log in). It is not
+         * channel traffic; show it as a banner line on the manual session
+         * (automatic reconnects stay quiet, as every banner line does). */
+        if (kind == IRC_MSG_NOTICE && !ss->reached_reg) {
+            if (ss->banner) emit_line(c, IRC_EVT_SYSTEM, text);
+            return;
+        }
         forward_message(c, kind, nick, target, msgidv, text, timev);
         return;
     }
@@ -545,8 +585,9 @@ static void handle_line(IrcClient *c, Session *ss, char *line)
 }
 
 /* Run one connected session to completion. Returns 1 if registration
- * (001) was reached, so the caller can reset its reconnect backoff. */
-static int run_session(IrcClient *c, SOCKET s)
+ * (001) was reached, so the caller can reset its reconnect backoff.
+ * err (Navigator 2.0) receives the text of a server ERROR line, or "". */
+static int run_session(IrcClient *c, SOCKET s, char *err, size_t errcap)
 {
     Session       ss;
     char          acc[IRC_LINE_MAX];
@@ -560,6 +601,8 @@ static int run_session(IrcClient *c, SOCKET s)
     ss.cap_end_sent = 0;
     ss.reached_reg  = 0;
     ss.banner       = c->banner_pending;   /* show banner on the manual session */
+    ss.error_text[0] = '\0';
+    if (err && errcap) err[0] = '\0';
     gen_nick(c->nick_pattern, ss.nick, sizeof(ss.nick));
 
     /* Kick off negotiation + registration. Registration is deferred by
@@ -591,6 +634,10 @@ static int run_session(IrcClient *c, SOCKET s)
             }
         }
     }
+    if (err && errcap) {
+        strncpy(err, ss.error_text, errcap - 1);
+        err[errcap - 1] = '\0';
+    }
     return ss.reached_reg;
 }
 
@@ -620,6 +667,7 @@ static DWORD WINAPI rx_thread_proc(LPVOID lp)
         SOCKET s;
         int    reached;
         int    reason = IRC_FAIL_NONE;
+        char   err[480];
 
         /* Banner session (the initial manual connect) announces the attempt
          * HexChat-style before dialing. */
@@ -648,7 +696,7 @@ static DWORD WINAPI rx_thread_proc(LPVOID lp)
         if (c->banner_pending && !c->ever_registered)
             emit_line(c, IRC_EVT_SYSTEM, "Connected");
 
-        reached = run_session(c, s);
+        reached = run_session(c, s, err, sizeof(err));
 
         EnterCriticalSection(&c->cs);
         if (c->sock != INVALID_SOCKET) {
@@ -661,8 +709,27 @@ static DWORD WINAPI rx_thread_proc(LPVOID lp)
 
         if (!reached && !c->ever_registered) {
             /* Connected but the peer closed before registration on the
-             * initial manual attempt (e.g. not an IRC server). TERMINAL. */
-            emit_line(c, IRC_EVT_FAILED, "Connection closed before registration");
+             * initial manual attempt (e.g. not an IRC server). TERMINAL.
+             * Navigator 2.0: with the server's ERROR text when it gave one
+             * (an address that must log in, a ban). */
+            if (err[0]) {
+                char why[600];
+                _snprintf(why, sizeof(why), "Closed by the server before registration: %s", err);
+                why[sizeof(why) - 1] = '\0';
+                emit_line(c, IRC_EVT_FAILED, why);
+            } else {
+                emit_line(c, IRC_EVT_FAILED, "Connection closed before registration");
+            }
+            break;
+        }
+
+        /* Navigator 2.0 (2026-11-25, D2): the server ENDED a registered
+         * session with an ERROR (a "Closing Link", a K-line): stop, show
+         * its words, never reconnect into a ban. A drop with no ERROR
+         * still reconnects below, as before (our own server relies on it;
+         * that reconnect has no limit, a known item). */
+        if (err[0]) {
+            emit_line(c, IRC_EVT_ENDED, err);
             break;
         }
 

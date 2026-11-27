@@ -91,5 +91,14 @@
 #define IDB_W31_GT_SOUND             537
 #define IDB_W31_GT_UNKNOWN           538
 #define IDB_W31_GT_LINK              539
+/* Navigator 2.0 Part B (2026-11-23): the Gopher+ column (refshots/ref52) */
+#define IDB_W31_GP_PLUS              540
+#define IDB_W31_GP_FORM              541
+#define IDB_W31_GP_VIEWS             542
+#define IDB_W31_GP_LANGS             543
+#define IDB_W31_GP_ERROR             544
+/* 2026-11-25 (design A): Gopher type h, a wire globe. GT_LINK (the chain)
+ * stays, as the FTP tab's symbolic-link icon. */
+#define IDB_W31_GT_WEB               545
 
 #endif /* SUITE_RES_H */

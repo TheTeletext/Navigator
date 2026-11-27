@@ -346,11 +346,56 @@ PUBLIC HTList * HTNet_before (void)
     return HTBefore;
 }
 
+/*
+**	TELETEXT NAVIGATOR MODIFICATION (2026-11-25) to W3C libwww 5.4.1.
+**	HTNet_addBefore and HTNet_addAfter used to delete EVERY earlier
+**	registration of the same filter function before adding ("Ensure not
+**	listed twice"). A function registered for several statuses therefore
+**	kept only the last one: HTAfterInit's HTRedirectFilter for 301, 302,
+**	303 and 307 ended up with 307 alone, so no 301, 302 or 303 redirect
+**	was ever followed. Now the add is skipped only when the SAME function
+**	is already listed with the SAME template (and, for an after filter,
+**	the SAME status); every other registration of it is kept, so a second
+**	registration adds instead of replacing. Identical repeat registrations
+**	(Navigator re-registers its terminate filter on every fetch) are still
+**	listed once. See docs/2026-11-25_NAVIGATOR_RETROWEB_REDIRECT_FIX.md.
+*/
+PRIVATE BOOL same_tmplate (const char * a, const char * b)
+{
+    if (!a || !b) return (a == b);
+    return (strcmp(a, b) == 0);
+}
+
+PRIVATE BOOL before_listed (HTList * list, HTNetBefore * before,
+			    const char * tmplate)
+{
+    HTList * cur = list;
+    BeforeFilter * pres;
+    while ((pres = (BeforeFilter *) HTList_nextObject(cur)))
+	if (pres->before == before && same_tmplate(pres->tmplate, tmplate))
+	    return YES;
+    return NO;
+}
+
+PRIVATE BOOL after_listed (HTList * list, HTNetAfter * after,
+			   const char * tmplate, int status)
+{
+    HTList * cur = list;
+    AfterFilter * pres;
+    while ((pres = (AfterFilter *) HTList_nextObject(cur)))
+	if (pres->after == after && pres->status == status &&
+	    same_tmplate(pres->tmplate, tmplate))
+	    return YES;
+    return NO;
+}
+
 PUBLIC BOOL HTNet_addBefore (HTNetBefore * before, const char * tmplate,
 			     void * param, HTFilterOrder order)
 {
     if (!HTBefore) HTBefore = HTList_new();
-    else HTNet_deleteBefore(before); /* Ensure not listed twice */
+    /* Navigator modification (see above): skip an identical registration
+     * instead of deleting every registration of this function. */
+    else if (before_listed(HTBefore, before, tmplate)) return YES;
     return HTNetCall_addBefore(HTBefore, before, tmplate, param, order);
 }
 
@@ -393,7 +438,10 @@ PUBLIC BOOL HTNet_addAfter (HTNetAfter * after, const char * tmplate,
 			    void * param, int status, HTFilterOrder order)
 {
     if (!HTAfter) HTAfter = HTList_new();
-    else HTNet_deleteAfter(after); /* Ensure not listed twice */
+    /* Navigator modification (see above HTNet_addBefore): skip an
+     * identical registration instead of deleting every registration of
+     * this function, so one function can serve several statuses. */
+    else if (after_listed(HTAfter, after, tmplate, status)) return YES;
     return HTNetCall_addAfter(HTAfter, after, tmplate, param, status, order);
 }
 

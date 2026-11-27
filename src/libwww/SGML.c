@@ -74,6 +74,14 @@ struct _HTStream
 /*	Find Attribute Number
 **	---------------------
 */
+/* TELETEXT NAVIGATOR MODIFICATION 2026-11-26 (multilingual, Phase 2):
+** what the bytes handed to the text sink are, read by the renderer's
+** addText: 0 = the page's own bytes (in its charset), 1 = UTF-8 made
+** here from a numeric character reference, 2 = a named entity's
+** ISO-8859-1 value (HTML.c HTML_put_entity). Set only around the one
+** call that hands those bytes over, so every other byte stays 0. */
+PUBLIC int SGML_emit_kind = 0;
+
 PRIVATE int SGMLFindAttribute  (HTTag* tag, const char * s)
     {
 	HTAttr* attributes = tag->attributes;
@@ -535,7 +543,9 @@ PRIVATE int SGML_write (HTStream * context, const char * b, int l)
 					utf8[3] = (char)(0x80U | (value & 0x3FU));
 					utf8_n = 4;
 				    }
+				    SGML_emit_kind = 1;   /* 2026-11-26: UTF-8, not page bytes */
 				    PUTB(utf8, utf8_n);
+				    SGML_emit_kind = 0;
 				} else {
 				    PUTB("&#", 2);
 				    PUTB(HTChunk_data(string), HTChunk_size(string)-1);

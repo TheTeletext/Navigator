@@ -59,6 +59,7 @@
 #include "suite_clipboard.h"
 #include "nntp_client.h"
 #include "news_mime.h"
+#include "suite_sites.h"   /* Navigator 2.0: the Site list and its group filters */
 
 #define NG_PANEL_CLASS   "TeletextNavigatorNewsPanel"
 #define NG_VIEW_CLASS    "TeletextNavigatorNewsView"
@@ -70,6 +71,12 @@
 #define NG_OPEN_TIMER_ID 0x4E48
 #define NG_OVER_CHUNK    500     /* article numbers per OVER: a cancel waits at most this */
 #define NG_STAT_BATCH    32      /* pipelined STATs */
+/* Navigator 2.0 (2026-11-25, operator D3): opening a group lists only its
+ * NEWEST 250 articles (count-based, no date cutoff), on every server; a
+ * group with more says so on the status line. A server holding decades
+ * of a group no longer means hundreds of thousands of OVER rows and STATs
+ * before an article can be opened. */
+#define NG_OVERVIEW_CAP  250
 #define NG_ARTICLE_MAX   (8 * 1024 * 1024)
 
 #define IDC_NG_HOST_LBL   7501
@@ -77,6 +84,8 @@
 #define IDC_NG_PORT_LBL   7503
 #define IDC_NG_PORT       7504
 #define IDC_NG_TOGGLE     7506
+#define IDC_NG_SITE_LBL   7513   /* Navigator 2.0 (2026-11-25): the Site list */
+#define IDC_NG_SITE       7514
 #define IDC_NG_GROUPS_LBL 7507
 #define IDC_NG_GROUPS     7508
 #define IDC_NG_ARTS_LBL   7509
@@ -108,6 +117,7 @@ typedef struct ng_group {
     char     name[512];          /* as the server sent it (UTF-8 allowed) */
     wchar_t *wname, *wdesc;
     int      count;              /* verified articles, -1 not read yet */
+    int      capped;             /* Navigator 2.0: count stopped at the cap */
 } ng_group_t;
 
 typedef struct ng_row {
@@ -138,6 +148,7 @@ typedef struct ng_result {
     ng_group_t  *groups;
     int          ngroups;
     int          count, ghosts;  /* JOB_GROUP */
+    int          capped;         /* JOB_GROUP: older articles not listed (the cap) */
     long         num;            /* JOB_ARTICLE */
     int          gone;           /* JOB_ARTICLE: 423/430 */
     int          have_art;
@@ -160,12 +171,17 @@ typedef struct ng_sess {
     int              port;
     int              use_over;   /* 1 OVER, 0 XOVER */
     char             cur_group[512];
+    char             groups[512]; /* Navigator 2.0: the site's wildmat for both
+                                    LISTs (RFC 3977 7.6.3); "" = every group */
 } ng_sess_t;
 
 /* ---------------------------------------------------------------- */
 /* UI state (UI thread only).                                        */
 
 static HWND g_panel, g_host_lbl, g_host, g_port_lbl, g_port, g_toggle;
+static HWND g_site_lbl, g_site;            /* Navigator 2.0: the Site list */
+static BOOL g_site_filling = FALSE;        /* a pick is writing the fields */
+static WNDPROC g_host_old_proc = NULL;     /* Server, before the paste hook */
 static HWND g_groups_lbl, g_groups_v, g_arts_lbl, g_arts_v, g_body_lbl, g_body_v;
 static BOOL g_created = FALSE, g_class_reg = FALSE;
 static HFONT g_body_font = NULL;
@@ -189,6 +205,7 @@ static ng_group_t *g_groups = NULL; static int g_ngroups = 0;
 static ng_row_t   *g_rows = NULL;   static int g_nrows = 0, g_rows_cap = 0;
 static wchar_t   **g_lines = NULL;  static int g_nlines = 0, g_maxcols = 0;
 static int         g_cur_group = -1;   /* index of the group whose list is shown */
+static char        g_filter[512] = ""; /* Navigator 2.0: the session's wildmat, "" = none */
 static long        g_cur_num = -1;     /* the article shown */
 
 typedef struct { int top, hpos, sel; } vstate_t;
@@ -356,6 +373,26 @@ static void conn_error(ng_sess_t *s, int code, const char *what, char *msg, int 
     nntp_disconnect(s->n);
 }
 
+/* Navigator 2.0 (2026-11-25, D4): the list is sorted once with qsort and
+ * each description finds its group by binary search; the insertion sort
+ * and the per-line scan of every group were quadratic (about 14 s of CPU
+ * for 38,000 groups, measured in the discovery). */
+static int group_name_cmp(const void *a, const void *b)
+{
+    return strcmp(((const ng_group_t *)a)->name, ((const ng_group_t *)b)->name);
+}
+
+static ng_group_t *group_find(ng_group_t *g, int ng, const char *name)
+{
+    int lo = 0, hi = ng - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2, c = strcmp(g[mid].name, name);
+        if (c == 0) return &g[mid];
+        if (c < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return NULL;
+}
+
 static void w_connect(ng_sess_t *s, ng_result_t *r)
 {
     char st[NNTP_STATUS_MAX + 1];
@@ -401,7 +438,15 @@ static void w_connect(ng_sess_t *s, ng_result_t *r)
     s->use_over = caps_over != 0;             /* unknown: try OVER, fall back on 500 */
 
     post_status(s, "Reading group list...");
-    code = nntp_cmd(s->n, "LIST", "ACTIVE", st, sizeof st);
+    /* Navigator 2.0 (D2): a site's wildmat on both LISTs (RFC 3977 7.6.3) */
+    if (s->groups[0]) {
+        char arg[600];
+        _snprintf(arg, sizeof arg, "ACTIVE %s", s->groups);
+        arg[sizeof arg - 1] = '\0';
+        code = nntp_cmd(s->n, "LIST", arg, st, sizeof st);
+    } else {
+        code = nntp_cmd(s->n, "LIST", "ACTIVE", st, sizeof st);
+    }
     if (code < 0) { conn_error(s, code, "reading the group list", r->msg, sizeof r->msg); return; }
     if (code != 215) {
         _snprintf(r->msg, sizeof r->msg, "The server would not list its groups: %s", st);
@@ -426,9 +471,18 @@ static void w_connect(ng_sess_t *s, ng_result_t *r)
         g[ng].count = -1;
         ng++;
     }
+    /* sorted by name, once (D4); the descriptions below look groups up */
+    if (ng > 1) qsort(g, (size_t)ng, sizeof *g, group_name_cmp);
     /* descriptions: optional; one or more spaces or tabs after the name
      * (RFC 3977 7.6.6; news.teletext.ca's news line carries two tabs) */
-    code = nntp_cmd(s->n, "LIST", "NEWSGROUPS", st, sizeof st);
+    if (s->groups[0]) {
+        char arg[600];
+        _snprintf(arg, sizeof arg, "NEWSGROUPS %s", s->groups);
+        arg[sizeof arg - 1] = '\0';
+        code = nntp_cmd(s->n, "LIST", arg, st, sizeof st);
+    } else {
+        code = nntp_cmd(s->n, "LIST", "NEWSGROUPS", st, sizeof st);
+    }
     if (code < 0) { free_groups(g, ng); conn_error(s, code, "reading the group descriptions", r->msg, sizeof r->msg); return; }
     if (code == 215) {
         for (;;) {
@@ -441,20 +495,14 @@ static void w_connect(ng_sess_t *s, ng_result_t *r)
             if (!*sp) continue;
             *sp++ = '\0';
             while (*sp == ' ' || *sp == '\t') sp++;
-            for (i = 0; i < ng; i++)
-                if (strcmp(g[i].name, l) == 0 && !g[i].wdesc) {
-                    g[i].wdesc = nm_decode_bytes(sp, (int)strlen(sp), 0, NULL);
-                    break;
-                }
+            {
+                ng_group_t *gp = group_find(g, ng, l);
+                if (gp && !gp->wdesc)
+                    gp->wdesc = nm_decode_bytes(sp, (int)strlen(sp), 0, NULL);
+            }
         }
     }
-    /* sorted by name */
-    for (i = 1; i < ng; i++) {
-        ng_group_t t = g[i];
-        int j = i - 1;
-        while (j >= 0 && strcmp(g[j].name, t.name) > 0) { g[j + 1] = g[j]; j--; }
-        g[j + 1] = t;
-    }
+    (void)i;
     r->groups = g; r->ngroups = ng;
     r->ok = 1;
 }
@@ -483,12 +531,13 @@ static int parse_over_row(char *l, ng_row_t *row)
 }
 
 /* The overview, in chunks of article numbers from the high end down
- * (newest first, the display order), each chunk's rows STAT-verified. */
+ * (newest first, the display order), each chunk's rows STAT-verified;
+ * Navigator 2.0: at most NG_OVERVIEW_CAP rows (the newest). */
 static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
 {
     char st[NNTP_STATUS_MAX + 1], arg[64];
     long cnt = 0, low = 0, high = 0, hi;
-    int code, verified = 0, ghosts = 0, last_pct = -1;
+    int code, verified = 0, ghosts = 0, last_pct = -1, target;
     r->seq = j->seq;
     code = nntp_cmd(s->n, "GROUP", j->group, st, sizeof st);
     if (code < 0) { conn_error(s, code, "opening the group", r->msg, sizeof r->msg); return; }
@@ -506,12 +555,21 @@ static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
         r->ok = 1; r->count = 0;
         return;
     }
-    for (hi = high; hi >= low; hi -= NG_OVER_CHUNK) {
-        long lo = hi - NG_OVER_CHUNK + 1;
+    /* Navigator 2.0 (D3): newest first, at most NG_OVERVIEW_CAP verified
+     * rows. Each OVER covers up to NG_OVER_CHUNK numbers; only the rows
+     * still needed are STAT-checked, and the next range starts just below
+     * the oldest row examined, so no row is skipped when a STAT finds an
+     * article gone. */
+    target = cnt < NG_OVERVIEW_CAP ? (int)cnt : NG_OVERVIEW_CAP;
+    if (target < 1) target = 1;
+    hi = high;
+    while (hi >= low && verified < NG_OVERVIEW_CAP) {
+        long lo = hi - NG_OVER_CHUNK + 1, next_hi;
         ng_row_t *rows = NULL;
-        int n = 0, cap = 0, i, k;
+        int n = 0, cap = 0, i, k, need;
         char *l;
         if (lo < low) lo = low;
+        next_hi = lo - 1;
         if (overview_superseded(s)) { r->ok = 0; r->msg[0] = '\0'; r->count = -2; return; }   /* superseded */
         _snprintf(arg, sizeof arg, "%ld-%ld", lo, hi);
         code = nntp_cmd(s->n, s->use_over ? "OVER" : "XOVER", arg, st, sizeof st);
@@ -520,7 +578,7 @@ static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
             code = nntp_cmd(s->n, "XOVER", arg, st, sizeof st);
         }
         if (code < 0) { conn_error(s, code, "reading the overview", r->msg, sizeof r->msg); return; }
-        if (code == 423 || code == 420) continue;               /* nothing in this range */
+        if (code == 423 || code == 420) { hi = next_hi; continue; }   /* nothing in this range */
         if (code != 224) {
             _snprintf(r->msg, sizeof r->msg, "The server would not give the overview: %s", st);
             r->ok = 1; r->count = verified;
@@ -536,12 +594,7 @@ static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
                 if (!nr) continue;
                 rows = nr; cap = nc;
             }
-            if (parse_over_row(l, &rows[n])) {
-                int pct = (int)((high - rows[n].num + 1) * 100 / (high - low + 1));
-                n++;
-                if (pct > 99) pct = 99;
-                if (pct != last_pct) { last_pct = pct; PostMessageA(s->hwnd, WM_NG_PROGRESS, (WPARAM)s->gen, (LPARAM)pct); }
-            }
+            if (parse_over_row(l, &rows[n])) n++;
         }
         /* newest first within the chunk */
         for (i = 1; i < n; i++) {
@@ -549,6 +602,14 @@ static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
             int q = i - 1;
             while (q >= 0 && rows[q].num < t.num) { rows[q + 1] = rows[q]; q--; }
             rows[q + 1] = t;
+        }
+        /* only as many as the cap still needs: the rest are older and are
+         * looked at by the next range, which starts below the last kept */
+        need = NG_OVERVIEW_CAP - verified;
+        if (n > need) {
+            next_hi = rows[need - 1].num - 1;
+            for (i = need; i < n; i++) { free(rows[i].subject); free(rows[i].from); free(rows[i].date); }
+            n = need;
         }
         /* keep only the rows whose article is there (STAT 223), pipelined */
         {
@@ -577,6 +638,11 @@ static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
             n = keep;
         }
         verified += n;
+        {   /* the bar: rows kept toward the newest-250 target (or the group) */
+            int pct = verified * 100 / target;
+            if (pct > 99) pct = 99;
+            if (pct != last_pct) { last_pct = pct; PostMessageA(s->hwnd, WM_NG_PROGRESS, (WPARAM)s->gen, (LPARAM)pct); }
+        }
         if (n > 0) {
             ng_chunk_t *c = (ng_chunk_t *)calloc(1, sizeof *c);
             if (c) {
@@ -584,8 +650,10 @@ static void w_group(ng_sess_t *s, ng_job_t *j, ng_result_t *r)
                 if (!PostMessageA(s->hwnd, WM_NG_ROWS, (WPARAM)s->gen, (LPARAM)c)) { free_rows(rows, n); free(c); }
             } else free_rows(rows, n);
         } else free(rows);
-        if (lo == low) break;
+        hi = next_hi;
     }
+    /* stopped at the cap with article numbers left below: older not listed */
+    r->capped = verified >= NG_OVERVIEW_CAP && hi >= low;
     r->ok = 1; r->count = verified; r->ghosts = ghosts;
 }
 
@@ -889,7 +957,7 @@ static void paint_groups(HWND h, HDC dc, const RECT *rc)
         const ng_group_t *g = &g_groups[i];
         wchar_t cnt[24] = L"";
         if (sel) { HBRUSH b = CreateSolidBrush(W31_NAVY); FillRect(dc, &r, b); DeleteObject(b); }
-        if (g->count >= 0) _snwprintf(cnt, 24, L"%d", g->count);
+        if (g->count >= 0) _snwprintf(cnt, 24, g->capped ? L"%d+" : L"%d", g->count);
         cnt[23] = 0;
         SelectObject(dc, g_list_font_bold);
         SetTextColor(dc, sel ? W31_WINDOW : W31_TEXT);
@@ -1072,7 +1140,7 @@ static char *view_text_utf8(int k)
         char num[40];
         if (k == V_GROUPS) {
             APPENDW(g_groups[i].wname); APPENDA("\t");
-            if (g_groups[i].count >= 0) { _snprintf(num, sizeof num, "%d", g_groups[i].count); APPENDA(num); }
+            if (g_groups[i].count >= 0) { _snprintf(num, sizeof num, g_groups[i].capped ? "%d+" : "%d", g_groups[i].count); APPENDA(num); }
             APPENDA("\t"); APPENDW(g_groups[i].wdesc);
         } else if (k == V_ARTS) {
             _snprintf(num, sizeof num, "%ld\t", g_rows[i].num); APPENDA(num);
@@ -1123,7 +1191,16 @@ static LRESULT CALLBACK NewsViewProc(HWND h, UINT m, WPARAM w, LPARAM l)
         bm = CreateCompatibleBitmap(dc, rc.right > 0 ? rc.right : 1, rc.bottom > 0 ? rc.bottom : 1);
         ob = (HBITMAP)SelectObject(mdc, bm);
         of = SelectObject(mdc, g_w31_font);
-        if (k == V_GROUPS) paint_groups(h, mdc, &rc);
+        /* 2026-11-24: R1.2 put the watermark test between "if groups" and
+         * "else if arts", so once connected the groups pane fell through
+         * to paint_body and its list was painted over (the empty list).
+         * The watermark now sits inside the groups branch. */
+        if (k == V_GROUPS) {
+            paint_groups(h, mdc, &rc);
+            /* R1.2: the Newsgroups pane, empty and not connected */
+            if (g_state == ST_DISC && g_ngroups == 0)
+                w31_draw_power_watermark(mdc, &rc);
+        }
         else if (k == V_ARTS) paint_arts(h, mdc, &rc);
         else paint_body(h, mdc, &rc);
         BitBlt(dc, 0, 0, rc.right, rc.bottom, mdc, 0, 0, SRCCOPY);
@@ -1140,6 +1217,9 @@ static LRESULT CALLBACK NewsViewProc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_LBUTTONDOWN: {
         int x = (short)LOWORD(l), y = (short)HIWORD(l);
         SetFocus(h);
+        /* Navigator 2.0 part 7: a click in an empty pane while not
+         * connected connects */
+        if (g_state == ST_DISC) { w31_connect_click(g_toggle); return 0; }
         if (k == V_BODY) {
             int line, col;
             if (g_nlines <= 0) return 0;
@@ -1291,7 +1371,98 @@ static void update_controls(void)
     BOOL disc = (g_state == ST_DISC);
     EnableWindow(g_host, disc);
     EnableWindow(g_port, disc);
+    if (g_site) EnableWindow(g_site, disc);   /* Navigator 2.0: locked while a session runs */
     w31_toggle_set(g_toggle, !disc);
+}
+
+/* ---------------------------------------------------------------- */
+/* Navigator 2.0 Site list (2026-11-25, docs/2026-11-25_NAVIGATOR_   */
+/* SITELISTS_2C_NEWS_BUILD.md): a pick fills Server and Port only;   */
+/* Connect stays the user's act. The group filter (wildmat) is the   */
+/* one of the entry the fields name when Connect is pressed (see     */
+/* ng_connect), so the list and the filter always agree.             */
+
+static void ng_site_sync(void)
+{
+    char host[256], port[16];
+    int sel;
+    if (!g_site || g_site_filling) return;
+    GetWindowTextA(g_host, host, sizeof host);
+    GetWindowTextA(g_port, port, sizeof port);
+    sel = suite_sites_find(SITES_TAB_NEWS, host, atoi(port));
+    if ((int)SendMessageA(g_site, CB_GETCURSEL, 0, 0) != sel)
+        SendMessageA(g_site, CB_SETCURSEL, (WPARAM)sel, 0);
+}
+
+static void ng_pick_site(int idx)
+{
+    int n;
+    const suite_site_t *t = suite_sites_table(SITES_TAB_NEWS, &n);
+    suite_site_addr_t a;
+    char port[16], m[700];
+    if (!t || idx < 0 || idx >= n || g_state != ST_DISC) return;
+    if (suite_sites_parse(t[idx].address, &a) != SITES_OK) return;
+    g_site_filling = TRUE;
+    SetWindowTextA(g_host, a.host);
+    _snprintf(port, sizeof port, "%d", a.port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_port, port);
+    g_site_filling = FALSE;
+    SendMessageA(g_site, CB_SETCURSEL, (WPARAM)idx, 0);
+    if (t[idx].groups)
+        _snprintf(m, sizeof m, "%s: %s port %d, groups %s. Press Connect to read it.",
+                  t[idx].label, a.host, a.port, t[idx].groups);
+    else
+        _snprintf(m, sizeof m, "%s: %s port %d. Press Connect to read it.", t[idx].label, a.host, a.port);
+    m[sizeof m - 1] = '\0';
+    ng_status(m);
+}
+
+/* A full address in Server (pasted, typed, or there at Connect): news://,
+ * nntp:// or host:port fills Server and Port through the strict host-field
+ * parser. A plain host name is left alone. Returns FALSE when the text is
+ * an address that cannot be used, after saying why. */
+static BOOL ng_apply_address(void)
+{
+    char text[SITES_HOST_MAX + SITES_PATH_MAX + 32], port[16], m[600];
+    const char *colon;
+    suite_site_addr_t a;
+    int rc;
+    GetWindowTextA(g_host, text, sizeof text);
+    colon = strchr(text, ':');
+    if (!strstr(text, "://") && !(colon && !strchr(colon + 1, ':')) && text[0] != '[')
+        return TRUE;
+    rc = suite_sites_parse_hostport(text, SITES_SCHEME_NEWS, &a);
+    if (rc == SITES_UNSUPPORTED) {
+        ng_status("Secure news (snews://) is not supported in this version.");
+        return FALSE;
+    }
+    if (rc != SITES_OK) {
+        ng_status("The Server box takes a host name, host:port, or a news:// address.");
+        return FALSE;
+    }
+    SetWindowTextA(g_host, a.host);
+    _snprintf(port, sizeof port, "%d", a.port);
+    port[sizeof port - 1] = '\0';
+    SetWindowTextA(g_port, port);
+    _snprintf(m, sizeof m, "Address filled in: %s port %d.", a.host, a.port);
+    m[sizeof m - 1] = '\0';
+    ng_status(m);
+    return TRUE;
+}
+
+/* The Server field: after a paste (the context menu's WM_PASTE, Ctrl+V,
+ * Shift+Insert) the field already holds the text when the original
+ * procedure returns; a full address then fills the fields. */
+static LRESULT CALLBACK NgHostProc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    LRESULT r = CallWindowProcA(g_host_old_proc, h, m, w, l);
+    if (g_state == ST_DISC
+        && (m == WM_PASTE
+            || (m == WM_CHAR && w == 0x16)
+            || (m == WM_KEYDOWN && w == VK_INSERT && (GetKeyState(VK_SHIFT) & 0x8000))))
+        ng_apply_address();
+    return r;
 }
 
 static void clear_rows(void)
@@ -1386,6 +1557,7 @@ static void ng_connect(void)
     ng_job_t j;
     HANDLE th;
     int p;
+    if (!ng_apply_address()) return;     /* Navigator 2.0: a full address in Server */
     GetWindowTextA(g_host, host, sizeof host);
     GetWindowTextA(g_port, port, sizeof port);
     p = atoi(port);
@@ -1401,6 +1573,18 @@ static void ng_connect(void)
     s->port = p;
     s->use_over = 1;
     strncpy(s->host, host, sizeof s->host - 1);
+    /* Navigator 2.0 (D2): the wildmat of the Site list entry these fields
+     * name (a typed server that is not in the list: none, every group) */
+    {
+        int n_ = 0, idx = suite_sites_find(SITES_TAB_NEWS, host, p);
+        const suite_site_t *t = suite_sites_table(SITES_TAB_NEWS, &n_);
+        g_filter[0] = '\0';
+        if (t && idx >= 0 && idx < n_ && t[idx].groups) {
+            strncpy(g_filter, t[idx].groups, sizeof g_filter - 1);
+            g_filter[sizeof g_filter - 1] = '\0';
+        }
+        strncpy(s->groups, g_filter, sizeof s->groups - 1);
+    }
     InitializeCriticalSection(&s->cs);
     s->ev = CreateEventA(NULL, FALSE, FALSE, NULL);
     s->n = nntp_new(sess_log, s);
@@ -1550,7 +1734,10 @@ static void on_done(ng_result_t *r)
         view_sync(g_groups_v);
         if (r->msg[0]) ng_status(r->msg);
         else {
-            _snprintf(m, sizeof m, "Groups: Done (%d)", g_ngroups);
+            if (g_filter[0])
+                _snprintf(m, sizeof m, "Groups: Done (%d; this site's group list: %s)", g_ngroups, g_filter);
+            else
+                _snprintf(m, sizeof m, "Groups: Done (%d)", g_ngroups);
             ng_status(m);
         }
         SetFocus(g_groups_v);
@@ -1560,6 +1747,7 @@ static void on_done(ng_result_t *r)
         if (g_progress_on) ng_progress(-1);
         if (g_cur_group >= 0 && r->count >= 0) {
             g_groups[g_cur_group].count = r->count;
+            g_groups[g_cur_group].capped = r->capped;
             InvalidateRect(g_groups_v, NULL, FALSE);
         }
         if (r->msg[0]) ng_status(r->msg);
@@ -1571,6 +1759,12 @@ static void on_done(ng_result_t *r)
                           nb, r->count == 1 ? "" : "s", r->ghosts, r->ghosts == 1 ? "" : "s");
             else
                 _snprintf(m, sizeof m, "Overview: Done (%s article%s)", nb, r->count == 1 ? "" : "s");
+            /* Navigator 2.0 (D3): the cap is said, never silent */
+            if (r->capped) {
+                size_t ml = strlen(m);
+                if (ml > 0 && m[ml - 1] == ')') m[ml - 1] = '\0';
+                _snprintf(m + strlen(m), sizeof m - strlen(m), "; newest %d shown, older not listed)", NG_OVERVIEW_CAP);
+            }
             m[sizeof m - 1] = '\0';
             ng_status(m);
         }
@@ -1687,6 +1881,20 @@ BOOL newsgroups_module_on_command(HWND content, WPARAM wParam, LPARAM lParam)
     case IDC_NG_TOGGLE:
         if (code == BN_CLICKED) { if (g_state == ST_DISC) ng_connect(); else ng_disconnect(); return TRUE; }
         break;
+    case IDC_NG_SITE:
+        /* act once the list is closed, as the BBS Site list does */
+        if ((code == CBN_SELCHANGE && !SendMessageA((HWND)lParam, CB_GETDROPPEDSTATE, 0, 0))
+            || code == CBN_CLOSEUP) {
+            int sel = (int)SendMessageA((HWND)lParam, CB_GETCURSEL, 0, 0);
+            if (sel >= 0 && g_state == ST_DISC) ng_pick_site(sel);
+            else ng_site_sync();
+        }
+        return TRUE;
+    case IDC_NG_HOST:
+    case IDC_NG_PORT:
+        if (code == EN_CHANGE) { ng_site_sync(); return TRUE; }
+        if (id == IDC_NG_HOST && code == EN_KILLFOCUS && g_state == ST_DISC) { ng_apply_address(); return TRUE; }
+        break;
     case IDC_NG_GROUPS:
         if (code == NVN_OPEN) { open_group(g_vs[V_GROUPS].sel); return TRUE; }
         if (code == NVN_SELCHANGE) { SetTimer(g_panel, NG_OPEN_TIMER_ID, 350, NULL); return TRUE; }
@@ -1742,6 +1950,13 @@ void newsgroups_module_resize(HWND content, int w, int h)
     MoveWindow(g_host, margin + 52, 14, 260, row_h, TRUE);
     MoveWindow(g_port_lbl, margin + 52 + 260 + 14, 18, 36, 20, TRUE);
     MoveWindow(g_port, margin + 52 + 260 + 14 + 38, 14, 56, row_h, TRUE);
+    {   /* Navigator 2.0: Site label + list after Port, kept clear of the toggle */
+        int sx = margin + 52 + 260 + 14 + 38 + 56 + 28, cw = 150;
+        int room = (w - margin - W31_TOGGLE_W - 14) - (sx + 32);
+        if (cw > room) cw = room < 80 ? 80 : room;
+        if (g_site_lbl) MoveWindow(g_site_lbl, sx, 18, 30, 20, TRUE);
+        if (g_site)     MoveWindow(g_site, sx + 32, 14, cw, 200, TRUE);   /* height includes the list */
+    }
     MoveWindow(g_toggle, w - margin - W31_TOGGLE_W, 14 + (row_h - W31_TOGGLE_H) / 2, W31_TOGGLE_W, W31_TOGGLE_H, TRUE);
     /* three panes: groups left; articles over the article, right */
     y2 = 14 + row_h + 12;
@@ -1809,6 +2024,15 @@ void newsgroups_module_activate(HWND content)
     g_port     = mk_ex(WS_EX_CLIENTEDGE, "EDIT", NG_DEFAULT_PORT, WS_TABSTOP | ES_NUMBER, IDC_NG_PORT, hi);
     SendMessageA(g_port, EM_SETLIMITTEXT, 5, 0);
     g_toggle   = mk("BUTTON", "Connect", WS_TABSTOP | BS_PUSHBUTTON, IDC_NG_TOGGLE, hi);
+    w31_connect_on_enter(g_host, g_toggle);   /* Navigator 2.0 part 7 */
+    w31_connect_on_enter(g_port, g_toggle);
+    /* Navigator 2.0 (2026-11-25): the Site list, a drop-down LIST after
+     * Port (the BBS pattern; the Windows 3.1 look comes from suite_w31),
+     * and the paste hook on Server (chained after Enter's) */
+    g_site_lbl = mk("STATIC", "Site:", SS_LEFTNOWORDWRAP, IDC_NG_SITE_LBL, hi);
+    g_site     = mk("COMBOBOX", "", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_NG_SITE, hi);
+    suite_sites_fill_combo(g_site, SITES_TAB_NEWS);
+    g_host_old_proc = (WNDPROC)SetWindowLongPtrA(g_host, GWLP_WNDPROC, (LONG_PTR)NgHostProc);
     g_groups_lbl = mk("STATIC", "Newsgroups:", SS_LEFTNOWORDWRAP, IDC_NG_GROUPS_LBL, hi);
     g_arts_lbl   = mk("STATIC", "Articles:", SS_LEFTNOWORDWRAP, IDC_NG_ARTS_LBL, hi);
     g_body_lbl   = mk("STATIC", "Article:", SS_LEFTNOWORDWRAP, IDC_NG_BODY_LBL, hi);
@@ -1818,6 +2042,7 @@ void newsgroups_module_activate(HWND content)
     g_vs[0].sel = g_vs[1].sel = g_vs[2].sel = -1;
     g_created = TRUE;
     update_controls();
+    ng_site_sync();                  /* the default server is The Teletext's entry */
     GetClientRect(content, &rc);
     newsgroups_module_resize(content, rc.right, rc.bottom);
     view_sync(g_groups_v); view_sync(g_arts_v); view_sync(g_body_v);
